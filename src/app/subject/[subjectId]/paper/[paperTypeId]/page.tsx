@@ -136,7 +136,7 @@ export default function PaperTypePage() {
         {paperType.topics.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {paperType.topics.map((topic: Topic) => (
-               <Link key={topic.id} href={`/subject/${subjectId}/paper/${paperTypeId}/topic/${topic.id}`} onClick={() => handleNavigate(topic.id)} className="block hover:no-underline">
+               <Link key={topic.id} href={`/subject/${subjectId}/paper/${encodeURIComponent(paperTypeId)}/topic/${encodeURIComponent(topic.id)}`} onClick={() => handleNavigate(topic.id)} className="block hover:no-underline">
                 <Card className="hover:bg-secondary transition-colors h-full">
                     <CardHeader>
                       <CardTitle className="text-lg">{topic.name}</CardTitle>
