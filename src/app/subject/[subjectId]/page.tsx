@@ -25,6 +25,7 @@ export default function SubjectPage() {
     // Reset loading state on mount in case user navigated back
     if (subject) {
       setLoading(`navigate-${subject.id}`, false);
+      subject.paperTypes.forEach(pt => setLoading(`navigate-paper-${pt.id}`, false));
     }
   }, [subject, setLoading]);
 

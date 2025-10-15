@@ -17,13 +17,20 @@ export default function TopicPage() {
   const { getSubjectById, setSubsectionsForTopic, isLoading, setLoading } = useAppContext();
   
   const subjectId = params.subjectId as string;
-  const paperTypeId = params.paperTypeId as string;
-  const topicId = params.topicId as string;
+  const paperTypeId = decodeURIComponent(params.paperTypeId as string);
+  const topicId = decodeURIComponent(params.topicId as string);
   const [navigatingTo, setNavigatingTo] = useState<string | null>(null);
 
   const subject = getSubjectById(subjectId);
   const paperType = subject?.paperTypes.find(pt => pt.id === paperTypeId);
   const topic = paperType?.topics.find(t => t.id === topicId);
+
+  useEffect(() => {
+    // Reset loading state on mount in case user navigated back
+    if (topic) {
+       Object.keys(topic.subsections).forEach(subId => setLoading(`navigate-subsection-${subId}`, false));
+    }
+  }, [topic, setLoading]);
 
   useEffect(() => {
     if (subject && paperType && topic && topic.subsections.length === 0) {

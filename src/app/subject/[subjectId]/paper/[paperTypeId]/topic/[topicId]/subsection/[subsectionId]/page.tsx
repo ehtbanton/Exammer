@@ -24,9 +24,9 @@ export default function InterviewPage() {
   const { toast } = useToast();
 
   const subjectId = params.subjectId as string;
-  const paperTypeId = params.paperTypeId as string;
-  const topicId = params.topicId as string;
-  const subsectionId = params.subsectionId as string;
+  const paperTypeId = decodeURIComponent(params.paperTypeId as string);
+  const topicId = decodeURIComponent(params.topicId as string);
+  const subsectionId = decodeURIComponent(params.subsectionId as string);
 
   const subject = getSubjectById(subjectId);
   const paperType = subject?.paperTypes.find(p => p.id === paperTypeId);

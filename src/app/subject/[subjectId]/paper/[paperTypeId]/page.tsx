@@ -1,6 +1,6 @@
 "use client";
 
-import { ChangeEvent, useRef, useState } from 'react';
+import { ChangeEvent, useRef, useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAppContext } from '@/app/context/AppContext';
@@ -27,6 +27,13 @@ export default function PaperTypePage() {
   const paperInputRef = useRef<HTMLInputElement>(null);
   const [isPaperDialogOpen, setPaperDialogOpen] = useState(false);
   const [navigatingTo, setNavigatingTo] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Reset loading state on mount in case user navigated back
+    if (paperType) {
+       paperType.topics.forEach(topic => setLoading(`navigate-topic-${topic.id}`, false));
+    }
+  }, [paperType, setLoading]);
   
   const handlePaperUpload = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
