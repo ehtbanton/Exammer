@@ -30,7 +30,22 @@ export function AppProvider({ children }: { children: ReactNode }) {
     try {
       const storedSubjects = localStorage.getItem('examplify-ai-subjects');
       if (storedSubjects) {
-        setSubjects(JSON.parse(storedSubjects));
+        const parsed = JSON.parse(storedSubjects);
+        // Migration: Add attempts field to existing subsections if missing
+        const migrated = parsed.map((subject: Subject) => ({
+          ...subject,
+          paperTypes: subject.paperTypes.map(pt => ({
+            ...pt,
+            topics: pt.topics.map(topic => ({
+              ...topic,
+              subsections: topic.subsections.map(sub => ({
+                ...sub,
+                attempts: sub.attempts ?? 0, // Add attempts if missing
+              }))
+            }))
+          }))
+        }));
+        setSubjects(migrated);
       }
     } catch (error) {
       console.error("Failed to load subjects from localStorage", error);
@@ -166,6 +181,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         id: subName.toLowerCase().replace(/\s+/g, '-'),
         name: subName,
         score: 0,
+        attempts: 0,
       }));
 
       setSubjects(prevSubjects => prevSubjects.map(s => 
@@ -204,10 +220,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
                 ...topic,
                 subsections: topic.subsections.map(sub => {
                   if (sub.name !== subsectionName) return sub;
-                  // The score from the AI is out of 10, so we scale it.
-                  // We add it to the existing score, maxing out at 100.
-                  const newScore = Math.min(100, sub.score + (score * 10));
-                  return { ...sub, score: newScore };
+
+                  // The score from the AI is out of 10
+                  // We treat scoring as an average, starting with an imaginary initial 0/10 score
+                  // Formula: new_percentage = (old_percentage * (n + 1) + score * 10) / (n + 2)
+                  const n = sub.attempts || 0;
+                  const oldPercentage = sub.score || 0;
+                  const newPercentage = (oldPercentage * (n + 1) + score * 10) / (n + 2);
+
+                  return {
+                    ...sub,
+                    score: Math.round(newPercentage * 10) / 10, // Round to 1 decimal place
+                    attempts: n + 1
+                  };
                 })
               };
             })

@@ -11,7 +11,8 @@ export interface PastPaper {
 export interface Subsection {
   id: string;
   name: string;
-  score: number;
+  score: number; // Percentage score (0-100)
+  attempts: number; // Number of times a question has been answered for this subsection
 }
 
 export interface Topic {

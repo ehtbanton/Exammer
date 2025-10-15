@@ -93,7 +93,12 @@ export default function TopicPage() {
               <Card key={subsection.id} className="hover:bg-secondary transition-colors cursor-pointer" onClick={() => handleNavigate(subsection.id)}>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-md font-medium">{subsection.name}</CardTitle>
-                  <span className="text-sm font-bold text-primary">{subsection.score}/100</span>
+                  <div className="text-right">
+                    <div className="text-sm font-bold text-primary">{subsection.score.toFixed(1)}%</div>
+                    {subsection.attempts > 0 && (
+                      <div className="text-xs text-muted-foreground">{subsection.attempts} attempt{subsection.attempts !== 1 ? 's' : ''}</div>
+                    )}
+                  </div>
                 </CardHeader>
                 <CardContent>
                   <Progress value={subsection.score} className="h-2" />
