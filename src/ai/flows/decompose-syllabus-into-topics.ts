@@ -55,6 +55,9 @@ const decomposeSyllabusFlow = ai.defineFlow(
   },
   async input => {
     const {output} = await prompt(input);
-    return output!;
+    
+    // Ensure that the output always has a paperTypes array.
+    const paperTypes = output?.paperTypes ?? [];
+    return { paperTypes };
   }
 );
