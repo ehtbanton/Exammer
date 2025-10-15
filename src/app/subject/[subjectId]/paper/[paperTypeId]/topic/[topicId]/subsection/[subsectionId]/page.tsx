@@ -40,6 +40,7 @@ export default function InterviewPage() {
   const [currentQuestion, setCurrentQuestion] = useState('');
 
   const scrollAreaViewport = useRef<HTMLDivElement>(null);
+  const hasInitialized = useRef(false);
 
   useEffect(() => {
     if (scrollAreaViewport.current) {
@@ -48,29 +49,50 @@ export default function InterviewPage() {
   }, [chatHistory]);
 
   useEffect(() => {
+    console.log('=== useEffect triggered ===', { subjectId: subject?.id, subsectionId: subsection?.id });
+
+    if (!subject || !subsection) {
+      console.log('Early return - no subject or subsection');
+      return;
+    }
+
+    // Create a unique key for this subsection to track if we've already initialized
+    const subsectionKey = `${subject.id}-${subsection.id}`;
+
+    if (hasInitialized.current === subsectionKey) {
+      console.log('Already initialized for this subsection, skipping');
+      return;
+    }
+
     const startInterview = async () => {
-      if (!subject || !subsection) return;
+      console.log('Starting interview...');
+      hasInitialized.current = subsectionKey;
       setIsLoading(true);
       try {
         const pastPapersContent = subject.pastPapers.map(p => p.content).join('\n\n---\n\n');
 
         // Generate the question separately
+        console.log('Calling generateQuestion...');
         const questionRes = await generateQuestion({
           subsection: subsection.name,
           pastPapers: pastPapersContent,
         });
+        console.log('Question generated:', questionRes.question);
         setCurrentQuestion(questionRes.question);
 
         // Start the interview with an initial greeting (without user answer)
+        console.log('Calling aiPoweredInterview...');
         const res = await aiPoweredInterview({
           subsection: subsection.name,
           pastPapers: pastPapersContent,
           question: questionRes.question,
         });
+        console.log('Interview started, chat history:', res.chatHistory);
         setChatHistory(res.chatHistory);
       } catch (e) {
         toast({ variant: 'destructive', title: 'AI Error', description: 'Could not start the interview.' });
         console.error(e);
+        hasInitialized.current = false; // Reset on error so user can retry
       } finally {
         setIsLoading(false);
       }

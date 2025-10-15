@@ -24,7 +24,6 @@ const AIPoweredInterviewInputSchema = z.object({
 export type AIPoweredInterviewInput = z.infer<typeof AIPoweredInterviewInputSchema>;
 
 const AIPoweredInterviewOutputSchema = z.object({
-  question: z.string().describe('The generated question for the subsection.'),
   nextAssistantMessage: z.string().describe('The next message from the AI assistant in the interview.'),
   isCorrect: z.boolean().optional().describe('Whether the user has answered the question correctly.'),
   score: z.number().optional().describe('The score awarded for answering the question, out of 10.'),
@@ -130,7 +129,6 @@ Here's the previous chat history:
 {{/if}}
 
 Output the nextAssistantMessage which contains your next message to the user.
-Keep the 'question' field as the same question throughout the interview (do not change it).
 If the question is fully and correctly answered, set the isCorrect boolean to true and award the final score in the score field (out of 10).
 Also output the updated chatHistory array, including the user answer (if any) and your assistant message.
 `,
@@ -173,7 +171,7 @@ const aiPoweredInterviewFlow = ai.defineFlow(
     updatedChatHistory.push({role: 'assistant', content: output.nextAssistantMessage});
 
     return {
-      question: output.question || question || '',
+      question: question || '',
       nextAssistantMessage: output.nextAssistantMessage,
       isCorrect: output.isCorrect,
       score: output.score,

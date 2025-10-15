@@ -51,7 +51,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       console.error("Failed to load subjects from localStorage", error);
       toast({ variant: "destructive", title: "Error", description: "Could not load your saved data." });
     }
-  }, [toast]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     try {
