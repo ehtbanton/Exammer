@@ -46,12 +46,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, [subjects]);
 
-  const setLoading = (key: string, value: boolean) => {
+  const setLoading = useCallback((key: string, value: boolean) => {
     setLoadingStates(prev => ({ ...prev, [key]: value }));
-  };
-  const isLoading = (key: string) => !!loadingStates[key];
+  }, []);
 
-  const addSubject = (name: string) => {
+  const isLoading = useCallback((key: string) => !!loadingStates[key], [loadingStates]);
+
+  const addSubject = useCallback((name: string) => {
     const newSubject: Subject = {
       id: Date.now().toString(),
       name,
@@ -61,16 +62,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
     };
     setSubjects(prev => [...prev, newSubject]);
     toast({ title: "Success", description: `Subject "${name}" created.` });
-  };
+  }, [toast]);
 
-  const deleteSubject = (subjectId: string) => {
+  const deleteSubject = useCallback((subjectId: string) => {
     setSubjects(prev => prev.filter(subject => subject.id !== subjectId));
     toast({ title: "Success", description: "Subject deleted." });
-  };
+  }, [toast]);
 
-  const getSubjectById = (subjectId: string) => {
+  const getSubjectById = useCallback((subjectId: string) => {
     return subjects.find(subject => subject.id === subjectId);
-  };
+  }, [subjects]);
   
   const fileToDataURI = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
@@ -124,7 +125,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     } finally {
       setLoading(loadingKey, false);
     }
-  }, [toast]);
+  }, [toast, setLoading]);
 
   const addPastPaperToSubject = useCallback(async (subjectId: string, paperFile: File) => {
     const loadingKey = `paper-${subjectId}`;
@@ -146,7 +147,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     } finally {
       setLoading(loadingKey, false);
     }
-  }, [toast]);
+  }, [toast, setLoading]);
 
   const setSubsectionsForTopic = useCallback(async (subjectId: string, paperTypeName: string, topicName: string) => {
     const subject = subjects.find(e => e.id === subjectId);
@@ -186,7 +187,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     } finally {
       setLoading(loadingKey, false);
     }
-  }, [subjects, toast]);
+  }, [subjects, toast, setLoading]);
 
   const updateSubsectionScore = useCallback((subjectId: string, paperTypeName: string, topicName: string, subsectionName: string, score: number) => {
     setSubjects(prevSubjects => prevSubjects.map(subject => {
