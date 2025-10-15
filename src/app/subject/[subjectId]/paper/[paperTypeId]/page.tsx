@@ -48,7 +48,7 @@ export default function PaperTypePage() {
     const loadingKey = `navigate-topic-${topicId}`;
     setLoading(loadingKey, true);
     setNavigatingTo(topicId);
-    router.push(`/subject/${subjectId}/paper/${paperTypeId}/topic/${topicId}`);
+    // Let the Link component handle navigation
   };
 
   if (navigatingTo && isLoading(`navigate-topic-${navigatingTo}`)) {
@@ -136,14 +136,16 @@ export default function PaperTypePage() {
         {paperType.topics.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {paperType.topics.map((topic: Topic) => (
-               <Card key={topic.id} className="hover:bg-secondary transition-colors cursor-pointer h-full" onClick={() => handleNavigate(topic.id)}>
-                  <CardHeader>
-                    <CardTitle className="text-lg">{topic.name}</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                     <p className="text-sm text-muted-foreground">{topic.subsections.length > 0 ? `${topic.subsections.length} subsections` : 'Click to generate subsections'}</p>
-                  </CardContent>
-                </Card>
+               <Link key={topic.id} href={`/subject/${subjectId}/paper/${paperTypeId}/topic/${topic.id}`} onClick={() => handleNavigate(topic.id)} className="block hover:no-underline">
+                <Card className="hover:bg-secondary transition-colors h-full">
+                    <CardHeader>
+                      <CardTitle className="text-lg">{topic.name}</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <p className="text-sm text-muted-foreground">{topic.subsections.length > 0 ? `${topic.subsections.length} subsections` : 'Click to generate subsections'}</p>
+                    </CardContent>
+                  </Card>
+               </Link>
             ))}
           </div>
         ) : (

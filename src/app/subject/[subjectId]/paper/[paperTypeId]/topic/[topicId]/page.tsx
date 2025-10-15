@@ -28,7 +28,7 @@ export default function TopicPage() {
   useEffect(() => {
     // Reset loading state on mount in case user navigated back
     if (topic) {
-       Object.keys(topic.subsections).forEach(subId => setLoading(`navigate-subsection-${subId}`, false));
+       Object.values(topic.subsections).forEach(sub => setLoading(`navigate-subsection-${sub.id}`, false));
     }
   }, [topic, setLoading]);
 
