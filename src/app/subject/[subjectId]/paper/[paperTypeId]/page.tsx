@@ -19,7 +19,7 @@ export default function PaperTypePage() {
   const { getSubjectById, addPastPaperToSubject, isLoading, setLoading } = useAppContext();
   
   const subjectId = params.subjectId as string;
-  const paperTypeId = params.paperTypeId as string;
+  const paperTypeId = decodeURIComponent(params.paperTypeId as string);
   
   const subject = getSubjectById(subjectId);
   const paperType = subject?.paperTypes.find(p => p.id === paperTypeId);
@@ -116,7 +116,7 @@ export default function PaperTypePage() {
                     {isPaperLoading ? <LoadingSpinner /> : <Upload />}
                     Upload New Paper
                   </Button>
-                  <Input type="file" ref={paperInputRef} className="hidden" onChange={handlePaperUpload} />
+                  <Input type="file" ref={paperInputref} className="hidden" onChange={handlePaperUpload} />
                 </div>
               </DialogContent>
             </Dialog>
