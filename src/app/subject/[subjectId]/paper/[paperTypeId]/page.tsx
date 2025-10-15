@@ -116,7 +116,7 @@ export default function PaperTypePage() {
                     {isPaperLoading ? <LoadingSpinner /> : <Upload />}
                     Upload New Paper
                   </Button>
-                  <Input type="file" ref={paperInputref} className="hidden" onChange={handlePaperUpload} />
+                  <Input type="file" ref={paperInputRef} className="hidden" onChange={handlePaperUpload} />
                 </div>
               </DialogContent>
             </Dialog>
