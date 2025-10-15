@@ -99,10 +99,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
       const result = await decomposeSyllabus({ syllabusDataUri });
       
-      const newPaperTypes: PaperType[] = result.paperTypes.map(pt => ({
+      const newPaperTypes: PaperType[] = (result.paperTypes || []).map(pt => ({
         id: pt.name.toLowerCase().replace(/\s+/g, '-'),
         name: pt.name,
-        topics: pt.topics.map(topicName => ({
+        topics: (pt.topics || []).map(topicName => ({
           id: topicName.toLowerCase().replace(/\s+/g, '-'),
           name: topicName,
           subsections: [],
@@ -112,10 +112,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setSubjects(prevSubjects => prevSubjects.map(subject => 
         subject.id === subjectId ? { ...subject, paperTypes: newPaperTypes, syllabusContent: syllabusText } : subject
       ));
-      toast({ title: "Syllabus Processed", description: `${result.paperTypes.length} paper types identified.` });
+      toast({ title: "Syllabus Processed", description: `${newPaperTypes.length} paper types identified.` });
     } catch (error) {
       console.error(error);
       toast({ variant: "destructive", title: "AI Error", description: "Failed to process syllabus." });
+      // Still update the syllabus content on failure
+      const syllabusText = await fileToString(syllabusFile).catch(() => '');
+      setSubjects(prevSubjects => prevSubjects.map(subject =>
+        subject.id === subjectId ? { ...subject, syllabusContent: syllabusText, paperTypes: [] } : subject
+      ));
     } finally {
       setLoading(loadingKey, false);
     }
