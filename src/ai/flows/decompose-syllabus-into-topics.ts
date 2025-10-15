@@ -1,3 +1,4 @@
+
 'use server';
 
 /**
@@ -54,8 +55,9 @@ const decomposeSyllabusFlow = ai.defineFlow(
     outputSchema: DecomposeSyllabusOutputSchema,
   },
   async input => {
-    const {output} = await prompt(input);
-    
+    const response = await prompt(input);
+    const output = response.output;
+
     // Ensure that the output always has a paperTypes array.
     const paperTypes = output?.paperTypes ?? [];
     return { paperTypes };
