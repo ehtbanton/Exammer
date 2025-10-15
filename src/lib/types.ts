@@ -1,4 +1,6 @@
-import type { ChatHistory } from "@/ai/flows/ai-powered-interview";
+import type { AIPoweredInterviewOutput } from "@/ai/flows/ai-powered-interview";
+
+export type ChatHistory = AIPoweredInterviewOutput['chatHistory'];
 
 export interface PastPaper {
   id: string;
@@ -18,12 +20,16 @@ export interface Topic {
   subsections: Subsection[];
 }
 
-export interface Exam {
+export interface PaperType {
+  id: string;
+  name: string;
+  topics: Topic[];
+}
+
+export interface Subject {
   id: string;
   name: string;
   syllabusContent: string | null;
   pastPapers: PastPaper[];
-  topics: Topic[];
+  paperTypes: PaperType[];
 }
-
-export type { ChatHistory };

@@ -30,6 +30,25 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  async redirects() {
+    return [
+      {
+        source: '/exam/:examId',
+        destination: '/subject/:examId',
+        permanent: true,
+      },
+      {
+        source: '/exam/:examId/topic/:topicId',
+        destination: '/subject/:examId/paper/default/topic/:topicId',
+        permanent: false, // These might not be permanent depending on the app's evolution
+      },
+       {
+        source: '/exam/:examId/topic/:topicId/subsection/:subsectionId',
+        destination: '/subject/:examId/paper/default/topic/:topicId/subsection/:subsectionId',
+        permanent: false,
+      }
+    ]
+  }
 };
 
 export default nextConfig;

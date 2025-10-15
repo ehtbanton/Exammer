@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { useAppContext } from '@/app/context/AppContext';
 import { aiPoweredInterview } from '@/ai/flows/ai-powered-interview';
 import type { ChatHistory } from '@/lib/types';
@@ -14,45 +15,50 @@ import { Send, User, Bot, ArrowLeft } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
+import PageSpinner from '@/components/PageSpinner';
 
 export default function InterviewPage() {
   const params = useParams();
   const router = useRouter();
-  const { getExamById, updateSubsectionScore } = useAppContext();
+  const { getSubjectById, updateSubsectionScore } = useAppContext();
   const { toast } = useToast();
 
-  const examId = params.examId as string;
+  const subjectId = params.subjectId as string;
+  const paperTypeId = params.paperTypeId as string;
   const topicId = params.topicId as string;
   const subsectionId = params.subsectionId as string;
 
-  const exam = getExamById(examId);
-  const topic = exam?.topics.find(t => t.id === topicId);
+  const subject = getSubjectById(subjectId);
+  const paperType = subject?.paperTypes.find(p => p.id === paperTypeId);
+  const topic = paperType?.topics.find(t => t.id === topicId);
   const subsection = topic?.subsections.find(s => s.id === subsectionId);
 
   const [chatHistory, setChatHistory] = useState<ChatHistory>([]);
   const [userInput, setUserInput] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [isCompleted, setIsCompleted] = useState(false);
+  const [currentQuestion, setCurrentQuestion] = useState('');
 
-  const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const scrollAreaViewport = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (scrollAreaRef.current) {
-      scrollAreaRef.current.scrollTo({ top: scrollAreaRef.current.scrollHeight, behavior: 'smooth' });
+    if (scrollAreaViewport.current) {
+      scrollAreaViewport.current.scrollTo({ top: scrollAreaViewport.current.scrollHeight, behavior: 'smooth' });
     }
   }, [chatHistory]);
 
   useEffect(() => {
     const startInterview = async () => {
-      if (!exam || !subsection) return;
-
+      if (!subject || !subsection) return;
+      setIsLoading(true);
       try {
-        const pastPapersContent = exam.pastPapers.map(p => p.content).join('\n\n---\n\n');
+        const pastPapersContent = subject.pastPapers.map(p => p.content).join('\n\n---\n\n');
         const res = await aiPoweredInterview({
           subsection: subsection.name,
           pastPapers: pastPapersContent,
         });
         setChatHistory(res.chatHistory);
+        setCurrentQuestion(res.question);
       } catch (e) {
         toast({ variant: 'destructive', title: 'AI Error', description: 'Could not start the interview.' });
         console.error(e);
@@ -62,10 +68,10 @@ export default function InterviewPage() {
     };
     startInterview();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [exam?.id, subsection?.id]);
+  }, [subject?.id, subsection?.id]);
 
   const handleSendMessage = async () => {
-    if (!userInput.trim() || !exam || !subsection || isLoading) return;
+    if (!userInput.trim() || !subject || !subsection || isLoading) return;
 
     setIsLoading(true);
     const currentInput = userInput;
@@ -75,25 +81,28 @@ export default function InterviewPage() {
     setChatHistory(newHistory);
 
     try {
-      const pastPapersContent = exam.pastPapers.map(p => p.content).join('\n\n---\n\n');
+      const pastPapersContent = subject.pastPapers.map(p => p.content).join('\n\n---\n\n');
       const res = await aiPoweredInterview({
         subsection: subsection.name,
         pastPapers: pastPapersContent,
         userAnswer: currentInput,
         previousChatHistory: chatHistory,
+        question: currentQuestion,
       });
 
       setChatHistory(res.chatHistory);
 
       if (res.isCorrect && res.score) {
         setIsCompleted(true);
-        updateSubsectionScore(exam.id, topic.name, subsection.name, res.score);
+        if (paperType && topic) {
+            updateSubsectionScore(subject.id, paperType.name, topic.name, subsection.name, res.score);
+        }
         toast({
           title: "Question Complete!",
           description: `You scored ${res.score}/10. Redirecting back to topic...`,
         });
         setTimeout(() => {
-          router.push(`/exam/${examId}/topic/${topicId}`);
+          router.push(`/subject/${subjectId}/paper/${paperTypeId}/topic/${topicId}`);
         }, 3000);
       }
     } catch (e) {
@@ -105,12 +114,13 @@ export default function InterviewPage() {
     }
   };
 
-  if (!exam || !topic || !subsection) {
+  if (!subject || !topic || !subsection) {
+    if (isLoading) return <PageSpinner />;
     return (
       <div className="text-center">
         <h1 className="text-2xl font-bold">Content not found</h1>
         <Button asChild variant="link" className="mt-4">
-          <Link href={`/exam/${examId}/topic/${topicId}`}>Go back to topic</Link>
+          <Link href={`/subject/${subjectId}/paper/${paperTypeId}/topic/${topicId}`}>Go back to topic</Link>
         </Button>
       </div>
     );
@@ -118,14 +128,14 @@ export default function InterviewPage() {
 
   return (
     <div className="flex flex-col h-[calc(100vh-12rem)] md:h-[calc(100vh-11rem)] max-w-3xl mx-auto">
-        <Button variant="ghost" onClick={() => router.push(`/exam/${examId}/topic/${topicId}`)} className="mb-4 self-start">
+        <Button variant="ghost" onClick={() => router.push(`/subject/${subjectId}/paper/${paperTypeId}/topic/${topicId}`)} className="mb-4 self-start">
             <ArrowLeft />
             Back to Subsections
         </Button>
       <h1 className="text-2xl font-bold font-headline mb-4">{subsection.name}</h1>
       <Card className="flex-1 flex flex-col">
         <CardContent className="flex-1 flex flex-col p-0">
-          <ScrollArea className="flex-1 p-4" ref={scrollAreaRef}>
+          <ScrollArea className="flex-1 p-4" viewportRef={scrollAreaViewport}>
             <div className="space-y-6">
               {chatHistory.map((message, index) => (
                 <div key={index} className={cn("flex items-start gap-3", message.role === 'user' ? "justify-end" : "")}>
@@ -156,6 +166,11 @@ export default function InterviewPage() {
                     </div>
                  </div>
               )}
+               {isLoading && chatHistory.length === 0 && (
+                  <div className="flex items-center justify-center h-full">
+                    <LoadingSpinner className="w-8 h-8" />
+                  </div>
+              )}
             </div>
           </ScrollArea>
           <div className="p-4 border-t">
@@ -168,7 +183,7 @@ export default function InterviewPage() {
                 disabled={isLoading || isCompleted}
               />
               <Button onClick={handleSendMessage} disabled={isLoading || isCompleted || !userInput.trim()}>
-                <Send />
+                {isLoading ? <LoadingSpinner /> : <Send />}
               </Button>
             </div>
           </div>

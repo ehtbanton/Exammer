@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAppContext } from '@/app/context/AppContext';
@@ -9,40 +9,58 @@ import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ArrowLeft } from 'lucide-react';
+import PageSpinner from '@/components/PageSpinner';
 
 export default function TopicPage() {
   const params = useParams();
   const router = useRouter();
-  const { getExamById, setSubsectionsForTopic, isLoading } = useAppContext();
+  const { getSubjectById, setSubsectionsForTopic, isLoading, setLoading } = useAppContext();
   
-  const examId = params.examId as string;
+  const subjectId = params.subjectId as string;
+  const paperTypeId = params.paperTypeId as string;
   const topicId = params.topicId as string;
+  const [navigatingTo, setNavigatingTo] = useState<string | null>(null);
 
-  const exam = getExamById(examId);
-  const topic = exam?.topics.find(t => t.id === topicId);
+  const subject = getSubjectById(subjectId);
+  const paperType = subject?.paperTypes.find(pt => pt.id === paperTypeId);
+  const topic = paperType?.topics.find(t => t.id === topicId);
 
   useEffect(() => {
-    if (exam && topic && topic.subsections.length === 0) {
-      setSubsectionsForTopic(exam.id, topic.name);
+    if (subject && paperType && topic && topic.subsections.length === 0) {
+      // Ensure we don't call this multiple times
+      if (!isLoading(`subsections-${subject.id}-${paperType.name}-${topic.name}`)) {
+        setSubsectionsForTopic(subject.id, paperType.name, topic.name);
+      }
     }
-  }, [exam, topic, setSubsectionsForTopic]);
+  }, [subject, paperType, topic, setSubsectionsForTopic, isLoading]);
 
-  if (!exam || !topic) {
+  const handleNavigate = (subsectionId: string) => {
+    const loadingKey = `navigate-subsection-${subsectionId}`;
+    setLoading(loadingKey, true);
+    setNavigatingTo(subsectionId);
+    router.push(`/subject/${subjectId}/paper/${paperTypeId}/topic/${topicId}/subsection/${subsectionId}`);
+  };
+
+  if (navigatingTo && isLoading(`navigate-subsection-${navigatingTo}`)) {
+    return <PageSpinner />;
+  }
+
+  if (!subject || !topic) {
     return (
       <div className="text-center">
         <h1 className="text-2xl font-bold">Topic not found</h1>
         <Button asChild variant="link" className="mt-4">
-          <Link href={`/exam/${examId}`}>Go back to exam</Link>
+          <Link href={`/subject/${subjectId}/paper/${paperTypeId}`}>Go back to paper</Link>
         </Button>
       </div>
     );
   }
   
-  const isSubsectionsLoading = isLoading(`subsections-${exam.id}-${topic.name}`);
+  const isSubsectionsLoading = isLoading(`subsections-${subject.id}-${paperType?.name}-${topic.name}`);
 
   return (
     <div className="container mx-auto">
-      <Button variant="ghost" onClick={() => router.push(`/exam/${examId}`)} className="mb-4">
+      <Button variant="ghost" onClick={() => router.push(`/subject/${subjectId}/paper/${paperTypeId}`)} className="mb-4">
         <ArrowLeft />
         Back to Topics
       </Button>
@@ -65,8 +83,7 @@ export default function TopicPage() {
       ) : topic.subsections.length > 0 ? (
         <div className="space-y-3">
           {topic.subsections.map(subsection => (
-            <Link key={subsection.id} href={`/exam/${exam.id}/topic/${topic.id}/subsection/${subsection.id}`} passHref>
-              <Card className="hover:bg-secondary transition-colors cursor-pointer">
+              <Card key={subsection.id} className="hover:bg-secondary transition-colors cursor-pointer" onClick={() => handleNavigate(subsection.id)}>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-md font-medium">{subsection.name}</CardTitle>
                   <span className="text-sm font-bold text-primary">{subsection.score}/100</span>
@@ -75,7 +92,6 @@ export default function TopicPage() {
                   <Progress value={subsection.score} className="h-2" />
                 </CardContent>
               </Card>
-            </Link>
           ))}
         </div>
       ) : (

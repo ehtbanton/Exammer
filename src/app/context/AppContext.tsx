@@ -1,74 +1,75 @@
 "use client";
 
 import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
-import type { Exam, Topic, Subsection, PastPaper } from '@/lib/types';
+import type { Subject, Topic, Subsection, PastPaper, PaperType } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
-import { decomposeSyllabusIntoTopics } from '@/ai/flows/decompose-syllabus-into-topics';
+import { decomposeSyllabus } from '@/ai/flows/decompose-syllabus-into-topics';
 import { generateGranularSubsections } from '@/ai/flows/generate-granular-subsections';
 
 interface AppContextType {
-  exams: Exam[];
-  addExam: (name: string) => void;
-  deleteExam: (examId: string) => void;
-  getExamById: (examId: string) => Exam | undefined;
-  addSyllabusToExam: (examId: string, syllabusFile: File) => Promise<void>;
-  addPastPaperToExam: (examId: string, paperFile: File) => Promise<void>;
-  setSubsectionsForTopic: (examId: string, topicName: string) => Promise<void>;
-  updateSubsectionScore: (examId: string, topicName: string, subsectionName: string, score: number) => void;
+  subjects: Subject[];
+  addSubject: (name: string) => void;
+  deleteSubject: (subjectId: string) => void;
+  getSubjectById: (subjectId: string) => Subject | undefined;
+  addSyllabusToSubject: (subjectId: string, syllabusFile: File) => Promise<void>;
+  addPastPaperToSubject: (subjectId: string, paperFile: File) => Promise<void>;
+  setSubsectionsForTopic: (subjectId: string, paperTypeName: string, topicName: string) => Promise<void>;
+  updateSubsectionScore: (subjectId: string, paperTypeName: string, topicName: string, subsectionName: string, score: number) => void;
   isLoading: (key: string) => boolean;
+  setLoading: (key: string, value: boolean) => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export function AppProvider({ children }: { children: ReactNode }) {
-  const [exams, setExams] = useState<Exam[]>([]);
+  const [subjects, setSubjects] = useState<Subject[]>([]);
   const [loadingStates, setLoadingStates] = useState<Record<string, boolean>>({});
   const { toast } = useToast();
 
   useEffect(() => {
     try {
-      const storedExams = localStorage.getItem('examplify-ai-exams');
-      if (storedExams) {
-        setExams(JSON.parse(storedExams));
+      const storedSubjects = localStorage.getItem('examplify-ai-subjects');
+      if (storedSubjects) {
+        setSubjects(JSON.parse(storedSubjects));
       }
     } catch (error) {
-      console.error("Failed to load exams from localStorage", error);
+      console.error("Failed to load subjects from localStorage", error);
       toast({ variant: "destructive", title: "Error", description: "Could not load your saved data." });
     }
   }, [toast]);
 
   useEffect(() => {
     try {
-      localStorage.setItem('examplify-ai-exams', JSON.stringify(exams));
+      localStorage.setItem('examplify-ai-subjects', JSON.stringify(subjects));
     } catch (error) {
-      console.error("Failed to save exams to localStorage", error);
+      console.error("Failed to save subjects to localStorage", error);
     }
-  }, [exams]);
+  }, [subjects]);
 
   const setLoading = (key: string, value: boolean) => {
     setLoadingStates(prev => ({ ...prev, [key]: value }));
   };
   const isLoading = (key: string) => !!loadingStates[key];
 
-  const addExam = (name: string) => {
-    const newExam: Exam = {
+  const addSubject = (name: string) => {
+    const newSubject: Subject = {
       id: Date.now().toString(),
       name,
       syllabusContent: null,
       pastPapers: [],
-      topics: [],
+      paperTypes: [],
     };
-    setExams(prev => [...prev, newExam]);
-    toast({ title: "Success", description: `Exam "${name}" created.` });
+    setSubjects(prev => [...prev, newSubject]);
+    toast({ title: "Success", description: `Subject "${name}" created.` });
   };
 
-  const deleteExam = (examId: string) => {
-    setExams(prev => prev.filter(exam => exam.id !== examId));
-    toast({ title: "Success", description: "Exam deleted." });
+  const deleteSubject = (subjectId: string) => {
+    setSubjects(prev => prev.filter(subject => subject.id !== subjectId));
+    toast({ title: "Success", description: "Subject deleted." });
   };
 
-  const getExamById = (examId: string) => {
-    return exams.find(exam => exam.id === examId);
+  const getSubjectById = (subjectId: string) => {
+    return subjects.find(subject => subject.id === subjectId);
   };
   
   const fileToDataURI = (file: File): Promise<string> => {
@@ -89,25 +90,29 @@ export function AppProvider({ children }: { children: ReactNode }) {
     });
   };
 
-  const addSyllabusToExam = useCallback(async (examId: string, syllabusFile: File) => {
-    const loadingKey = `syllabus-${examId}`;
+  const addSyllabusToSubject = useCallback(async (subjectId: string, syllabusFile: File) => {
+    const loadingKey = `syllabus-${subjectId}`;
     setLoading(loadingKey, true);
     try {
       const syllabusDataUri = await fileToDataURI(syllabusFile);
       const syllabusText = await fileToString(syllabusFile);
 
-      const result = await decomposeSyllabusIntoTopics({ syllabusDataUri });
+      const result = await decomposeSyllabus({ syllabusDataUri });
       
-      const newTopics: Topic[] = result.topics.map(topicName => ({
-        id: topicName.toLowerCase().replace(/\s+/g, '-'),
-        name: topicName,
-        subsections: [],
+      const newPaperTypes: PaperType[] = result.paperTypes.map(pt => ({
+        id: pt.name.toLowerCase().replace(/\s+/g, '-'),
+        name: pt.name,
+        topics: pt.topics.map(topicName => ({
+          id: topicName.toLowerCase().replace(/\s+/g, '-'),
+          name: topicName,
+          subsections: [],
+        })),
       }));
 
-      setExams(prevExams => prevExams.map(exam => 
-        exam.id === examId ? { ...exam, topics: newTopics, syllabusContent: syllabusText } : exam
+      setSubjects(prevSubjects => prevSubjects.map(subject => 
+        subject.id === subjectId ? { ...subject, paperTypes: newPaperTypes, syllabusContent: syllabusText } : subject
       ));
-      toast({ title: "Syllabus Processed", description: `${result.topics.length} topics identified.` });
+      toast({ title: "Syllabus Processed", description: `${result.paperTypes.length} paper types identified.` });
     } catch (error) {
       console.error(error);
       toast({ variant: "destructive", title: "AI Error", description: "Failed to process syllabus." });
@@ -116,8 +121,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, [toast]);
 
-  const addPastPaperToExam = useCallback(async (examId: string, paperFile: File) => {
-    const loadingKey = `paper-${examId}`;
+  const addPastPaperToSubject = useCallback(async (subjectId: string, paperFile: File) => {
+    const loadingKey = `paper-${subjectId}`;
     setLoading(loadingKey, true);
     try {
       const paperContent = await fileToString(paperFile);
@@ -126,8 +131,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
         name: paperFile.name,
         content: paperContent,
       };
-      setExams(prevExams => prevExams.map(exam =>
-        exam.id === examId ? { ...exam, pastPapers: [...exam.pastPapers, newPaper] } : exam
+      setSubjects(prevSubjects => prevSubjects.map(subject =>
+        subject.id === subjectId ? { ...subject, pastPapers: [...subject.pastPapers, newPaper] } : subject
       ));
       toast({ title: "Past Paper Added", description: `"${paperFile.name}" has been uploaded.` });
     } catch (error) {
@@ -138,17 +143,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, [toast]);
 
-  const setSubsectionsForTopic = useCallback(async (examId: string, topicName: string) => {
-    const exam = exams.find(e => e.id === examId);
-    if (!exam || !exam.syllabusContent) return;
+  const setSubsectionsForTopic = useCallback(async (subjectId: string, paperTypeName: string, topicName: string) => {
+    const subject = subjects.find(e => e.id === subjectId);
+    if (!subject || !subject.syllabusContent) return;
 
-    const loadingKey = `subsections-${examId}-${topicName}`;
+    const loadingKey = `subsections-${subjectId}-${paperTypeName}-${topicName}`;
     setLoading(loadingKey, true);
     try {
       const result = await generateGranularSubsections({
         topic: topicName,
-        examSyllabus: exam.syllabusContent,
-        pastPapers: exam.pastPapers.map(p => p.content),
+        examSyllabus: subject.syllabusContent,
+        pastPapers: subject.pastPapers.map(p => p.content),
       });
 
       const newSubsections: Subsection[] = result.subsections.map(subName => ({
@@ -157,13 +162,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
         score: 0,
       }));
 
-      setExams(prevExams => prevExams.map(e => 
-        e.id === examId ? {
-          ...e,
-          topics: e.topics.map(t => 
-            t.name === topicName ? { ...t, subsections: newSubsections } : t
+      setSubjects(prevSubjects => prevSubjects.map(s => 
+        s.id === subjectId ? {
+          ...s,
+          paperTypes: s.paperTypes.map(pt => 
+            pt.name === paperTypeName ? {
+              ...pt,
+              topics: pt.topics.map(t =>
+                t.name === topicName ? { ...t, subsections: newSubsections } : t
+              )
+            } : pt
           )
-        } : e
+        } : s
       ));
     } catch (error) {
       console.error(error);
@@ -171,30 +181,38 @@ export function AppProvider({ children }: { children: ReactNode }) {
     } finally {
       setLoading(loadingKey, false);
     }
-  }, [exams, toast]);
+  }, [subjects, toast]);
 
-  const updateSubsectionScore = useCallback((examId: string, topicName: string, subsectionName: string, score: number) => {
-    setExams(prevExams => prevExams.map(exam => {
-      if (exam.id !== examId) return exam;
+  const updateSubsectionScore = useCallback((subjectId: string, paperTypeName: string, topicName: string, subsectionName: string, score: number) => {
+    setSubjects(prevSubjects => prevSubjects.map(subject => {
+      if (subject.id !== subjectId) return subject;
       return {
-        ...exam,
-        topics: exam.topics.map(topic => {
-          if (topic.name !== topicName) return topic;
+        ...subject,
+        paperTypes: subject.paperTypes.map(pt => {
+          if (pt.name !== paperTypeName) return pt;
           return {
-            ...topic,
-            subsections: topic.subsections.map(sub => {
-              if (sub.name !== subsectionName) return sub;
-              const newScore = Math.min(100, sub.score + score);
-              return { ...sub, score: newScore };
+            ...pt,
+            topics: pt.topics.map(topic => {
+              if (topic.name !== topicName) return topic;
+              return {
+                ...topic,
+                subsections: topic.subsections.map(sub => {
+                  if (sub.name !== subsectionName) return sub;
+                  // The score from the AI is out of 10, so we scale it.
+                  // We add it to the existing score, maxing out at 100.
+                  const newScore = Math.min(100, sub.score + (score * 10));
+                  return { ...sub, score: newScore };
+                })
+              };
             })
-          };
+          }
         })
       };
     }));
   }, []);
 
   return (
-    <AppContext.Provider value={{ exams, addExam, deleteExam, getExamById, addSyllabusToExam, addPastPaperToExam, setSubsectionsForTopic, updateSubsectionScore, isLoading }}>
+    <AppContext.Provider value={{ subjects, addSubject, deleteSubject, getSubjectById, addSyllabusToSubject, addPastPaperToSubject, setSubsectionsForTopic, updateSubsectionScore, isLoading, setLoading }}>
       {children}
     </AppContext.Provider>
   );

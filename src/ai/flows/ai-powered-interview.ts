@@ -19,6 +19,7 @@ const AIPoweredInterviewInputSchema = z.object({
     role: z.enum(['user', 'assistant']),
     content: z.string(),
   })).optional().describe('The previous chat history between the user and the assistant.'),
+  question: z.string().optional().describe('The current question being asked.'),
 });
 export type AIPoweredInterviewInput = z.infer<typeof AIPoweredInterviewInputSchema>;
 
@@ -46,12 +47,17 @@ const prompt = ai.definePrompt({
 
 The current subsection is: {{{subsection}}}
 
+{{#if question}}
+The current question is:
+{{{question}}}
+{{/if}}
+
 Use the following past papers to generate questions and answers:
 {{{pastPapers}}}
 
 Here's the previous chat history:
 {{#each previousChatHistory}}
-  {{#if (eq role \"user\")}}
+  {{#if (eq role "user")}}
     User: {{{content}}}
   {{else}}
     Assistant: {{{content}}}
@@ -67,7 +73,9 @@ Here's the previous chat history:
   Generate an exam-style question for the user based on the subsection and past papers. Start by asking only the question.
 {{/if}}
 
-Output the nextAssistantMessage which contains your next message to the user. If the question is fully answered, set the isCorrect boolean and award the final score, setting it in the score field.
+Output the nextAssistantMessage which contains your next message to the user.
+If a new question is being generated, output it in the 'question' field.
+If the question is fully answered, set the isCorrect boolean and award the final score, setting it in the score field.
 Also output the updated chatHistory array, including the user answer and your assistant message.
 `,
 });
@@ -84,6 +92,7 @@ const aiPoweredInterviewFlow = ai.defineFlow(
       pastPapers,
       userAnswer,
       previousChatHistory = [],
+      question,
     } = input;
 
     const {
@@ -93,20 +102,25 @@ const aiPoweredInterviewFlow = ai.defineFlow(
       pastPapers,
       userAnswer,
       previousChatHistory,
+      question,
     });
+    
+    if (!output) {
+      throw new Error('AI response was empty.');
+    }
 
     // Update the chat history with the user's answer and the assistant's message.
     const updatedChatHistory = [...previousChatHistory];
     if (userAnswer) {
       updatedChatHistory.push({role: 'user', content: userAnswer});
     }
-    updatedChatHistory.push({role: 'assistant', content: output!.nextAssistantMessage});
+    updatedChatHistory.push({role: 'assistant', content: output.nextAssistantMessage});
 
     return {
-      question: output!.question,
-      nextAssistantMessage: output!.nextAssistantMessage,
-      isCorrect: output!.isCorrect,
-      score: output!.score,
+      question: output.question || question || '',
+      nextAssistantMessage: output.nextAssistantMessage,
+      isCorrect: output.isCorrect,
+      score: output.score,
       chatHistory: updatedChatHistory,
     };
   }
