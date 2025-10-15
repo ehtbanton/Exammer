@@ -35,24 +35,81 @@ const AIPoweredInterviewOutputSchema = z.object({
 });
 export type AIPoweredInterviewOutput = z.infer<typeof AIPoweredInterviewOutputSchema>;
 
+const GenerateQuestionInputSchema = z.object({
+  subsection: z.string().describe('The specific subsection to generate a question for.'),
+  pastPapers: z.string().describe('A string containing all the past papers to use for RAG.'),
+});
+export type GenerateQuestionInput = z.infer<typeof GenerateQuestionInputSchema>;
+
+const GenerateQuestionOutputSchema = z.object({
+  question: z.string().describe('The generated exam-style question for the subsection.'),
+});
+export type GenerateQuestionOutput = z.infer<typeof GenerateQuestionOutputSchema>;
+
 export async function aiPoweredInterview(input: AIPoweredInterviewInput): Promise<AIPoweredInterviewOutput> {
   return aiPoweredInterviewFlow(input);
 }
+
+export async function generateQuestion(input: GenerateQuestionInput): Promise<GenerateQuestionOutput> {
+  return generateQuestionFlow(input);
+}
+
+const questionGenerationPrompt = ai.definePrompt({
+  name: 'questionGenerationPrompt',
+  input: {schema: GenerateQuestionInputSchema},
+  output: {schema: GenerateQuestionOutputSchema},
+  prompt: `You are an AI assistant designed to generate exam-style questions for students.
+
+The current subsection is: {{{subsection}}}
+
+Use the following past papers to generate a relevant question:
+{{{pastPapers}}}
+
+Generate a challenging, exam-style question that is appropriate for the subsection. The question should:
+- Be clear and specific
+- Test understanding of key concepts
+- Be similar in style to questions from the past papers
+- Be answerable based on the material covered
+
+Output only the question in the 'question' field.`,
+});
+
+const generateQuestionFlow = ai.defineFlow(
+  {
+    name: 'generateQuestionFlow',
+    inputSchema: GenerateQuestionInputSchema,
+    outputSchema: GenerateQuestionOutputSchema,
+  },
+  async input => {
+    const { subsection, pastPapers } = input;
+
+    const { output } = await questionGenerationPrompt({
+      subsection,
+      pastPapers,
+    });
+
+    if (!output) {
+      throw new Error('AI response was empty.');
+    }
+
+    return {
+      question: output.question,
+    };
+  }
+);
 
 const prompt = ai.definePrompt({
   name: 'aiPoweredInterviewPrompt',
   input: {schema: AIPoweredInterviewInputSchema},
   output: {schema: AIPoweredInterviewOutputSchema},
-  prompt: `You are an AI assistant designed to help students learn material by conducting interview-style questions. Always ask one question at a time.
+  prompt: `You are an AI assistant designed to help students learn material by conducting interview-style conversations. You are helping the student answer a specific question.
 
 The current subsection is: {{{subsection}}}
 
-{{#if question}}
-The current question is:
+The question the student is working on:
 {{{question}}}
-{{/if}}
 
-Use the following past papers to generate questions and answers:
+Use the following past papers as reference material:
 {{{pastPapers}}}
 
 Here's the previous chat history:
@@ -63,16 +120,19 @@ Here's the previous chat history:
 {{#if userAnswer}}
   The user has provided the following answer:
   {{{userAnswer}}}
-  Based on this answer, provide the next step in the interview process. If the answer is correct, congratulate the user and award a score out of 10 based on the quality of the answer.
-  If the answer is incorrect, provide a helpful hint or a follow-up question to guide the user towards the correct answer.
+
+  Based on this answer, provide the next step in the interview process:
+  - If the answer is correct and complete, congratulate the user and award a score out of 10 based on the quality and completeness of the answer. Set isCorrect to true.
+  - If the answer is partially correct or incomplete, provide encouraging feedback and a helpful hint or follow-up question to guide them towards a more complete answer.
+  - If the answer is incorrect, provide constructive feedback and a guiding question to help them think about the problem differently.
 {{else}}
-  Generate an exam-style question for the user based on the subsection and past papers. Start by asking only the question.
+  This is the start of the interview. Provide a brief encouraging message to help the student begin answering the question. Do NOT repeat the question - it will be shown separately.
 {{/if}}
 
 Output the nextAssistantMessage which contains your next message to the user.
-If a new question is being generated, output it in the 'question' field.
-If the question is fully answered, set the isCorrect boolean and award the final score, setting it in the score field.
-Also output the updated chatHistory array, including the user answer and your assistant message.
+Keep the 'question' field as the same question throughout the interview (do not change it).
+If the question is fully and correctly answered, set the isCorrect boolean to true and award the final score in the score field (out of 10).
+Also output the updated chatHistory array, including the user answer (if any) and your assistant message.
 `,
 });
 

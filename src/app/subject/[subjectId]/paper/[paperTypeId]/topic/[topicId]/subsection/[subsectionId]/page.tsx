@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAppContext } from '@/app/context/AppContext';
-import { aiPoweredInterview } from '@/ai/flows/ai-powered-interview';
+import { aiPoweredInterview, generateQuestion } from '@/ai/flows/ai-powered-interview';
 import type { ChatHistory } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -53,12 +53,21 @@ export default function InterviewPage() {
       setIsLoading(true);
       try {
         const pastPapersContent = subject.pastPapers.map(p => p.content).join('\n\n---\n\n');
-        const res = await aiPoweredInterview({
+
+        // Generate the question separately
+        const questionRes = await generateQuestion({
           subsection: subsection.name,
           pastPapers: pastPapersContent,
         });
+        setCurrentQuestion(questionRes.question);
+
+        // Start the interview with an initial greeting (without user answer)
+        const res = await aiPoweredInterview({
+          subsection: subsection.name,
+          pastPapers: pastPapersContent,
+          question: questionRes.question,
+        });
         setChatHistory(res.chatHistory);
-        setCurrentQuestion(res.question);
       } catch (e) {
         toast({ variant: 'destructive', title: 'AI Error', description: 'Could not start the interview.' });
         console.error(e);
@@ -133,6 +142,17 @@ export default function InterviewPage() {
             Back to Subsections
         </Button>
       <h1 className="text-2xl font-bold font-headline mb-4">{subsection.name}</h1>
+
+      {/* Question Display */}
+      {currentQuestion && (
+        <Card className="mb-4 bg-primary/5 border-primary/20">
+          <CardContent className="p-4">
+            <h2 className="text-sm font-semibold text-muted-foreground mb-2">Question:</h2>
+            <p className="text-base whitespace-pre-wrap">{currentQuestion}</p>
+          </CardContent>
+        </Card>
+      )}
+
       <Card className="flex-1 flex flex-col">
         <CardContent className="flex-1 flex flex-col p-0">
           <ScrollArea className="flex-1 p-4" viewportRef={scrollAreaViewport}>
