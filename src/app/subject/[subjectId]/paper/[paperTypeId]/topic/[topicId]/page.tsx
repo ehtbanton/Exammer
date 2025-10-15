@@ -45,7 +45,7 @@ export default function TopicPage() {
     const loadingKey = `navigate-subsection-${subsectionId}`;
     setLoading(loadingKey, true);
     setNavigatingTo(subsectionId);
-    router.push(`/subject/${subjectId}/paper/${paperTypeId}/topic/${topicId}/subsection/${subsectionId}`);
+    router.push(`/subject/${subjectId}/paper/${encodeURIComponent(paperTypeId)}/topic/${encodeURIComponent(topicId)}/subsection/${encodeURIComponent(subsectionId)}`);
   };
 
   if (navigatingTo && isLoading(`navigate-subsection-${navigatingTo}`)) {
@@ -57,7 +57,7 @@ export default function TopicPage() {
       <div className="text-center">
         <h1 className="text-2xl font-bold">Topic not found</h1>
         <Button asChild variant="link" className="mt-4">
-          <Link href={`/subject/${subjectId}/paper/${paperTypeId}`}>Go back to paper</Link>
+          <Link href={`/subject/${subjectId}/paper/${encodeURIComponent(paperTypeId)}`}>Go back to paper</Link>
         </Button>
       </div>
     );
@@ -67,7 +67,7 @@ export default function TopicPage() {
 
   return (
     <div className="container mx-auto">
-      <Button variant="ghost" onClick={() => router.push(`/subject/${subjectId}/paper/${paperTypeId}`)} className="mb-4">
+      <Button variant="ghost" onClick={() => router.push(`/subject/${subjectId}/paper/${encodeURIComponent(paperTypeId)}`)} className="mb-4">
         <ArrowLeft />
         Back to Topics
       </Button>
