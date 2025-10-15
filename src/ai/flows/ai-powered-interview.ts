@@ -57,11 +57,7 @@ Use the following past papers to generate questions and answers:
 
 Here's the previous chat history:
 {{#each previousChatHistory}}
-  {{#if (eq role "user")}}
-    User: {{{content}}}
-  {{else}}
-    Assistant: {{{content}}}
-  {{/if}}
+  {{role}}: {{{content}}}
 {{/each}}
 
 {{#if userAnswer}}
