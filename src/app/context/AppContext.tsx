@@ -115,14 +115,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const syllabusText = await fileToString(syllabusFile);
 
       const result = await decomposeSyllabus({ syllabusDataUri });
-      
+
       const newPaperTypes: PaperType[] = (result.paperTypes || []).map(pt => ({
         id: pt.name.toLowerCase().replace(/\s+/g, '-'),
         name: pt.name,
-        topics: (pt.topics || []).map(topicName => ({
-          id: topicName.toLowerCase().replace(/\s+/g, '-'),
-          name: topicName,
-          subsections: [],
+        topics: (pt.topics || []).map(topic => ({
+          id: topic.name.toLowerCase().replace(/\s+/g, '-'),
+          name: topic.name,
+          subsections: (topic.subsections || []).map(subsectionName => ({
+            id: subsectionName.toLowerCase().replace(/\s+/g, '-'),
+            name: subsectionName,
+            score: 0,
+            attempts: 0,
+          })),
         })),
       }));
 

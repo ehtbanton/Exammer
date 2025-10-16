@@ -21,9 +21,14 @@ const DecomposeSyllabusInputSchema = z.object({
 });
 export type DecomposeSyllabusInput = z.infer<typeof DecomposeSyllabusInputSchema>;
 
+const TopicSchema = z.object({
+  name: z.string().describe('The name of the topic.'),
+  subsections: z.array(z.string()).describe('A granular list of subsections for this topic.'),
+});
+
 const PaperTypeSchema = z.object({
   name: z.string().describe('The name of the paper type, e.g., "Paper 1: Core Principles".'),
-  topics: z.array(z.string()).describe('A list of topics covered in this paper type.'),
+  topics: z.array(TopicSchema).describe('A list of topics with their subsections covered in this paper type.'),
 });
 
 const DecomposeSyllabusOutputSchema = z.object({
@@ -41,11 +46,18 @@ const prompt = ai.definePrompt({
   name: 'decomposeSyllabusPrompt',
   input: {schema: DecomposeSyllabusInputSchema},
   output: {schema: DecomposeSyllabusOutputSchema},
-  prompt: `You are an expert educator. Please read this syllabus and identify the different paper types (e.g., "Paper 1", "Written Exam", "Practical Assessment"). For each paper type, extract the list of topics or main sections covered under it.
+  prompt: `You are an expert educator helping students to learn effectively for their exams.
+
+Please read this syllabus and identify the different paper types (e.g., "Paper 1", "Written Exam", "Practical Assessment").
+
+For each paper type, extract the list of topics or main sections covered under it. Then, for each topic, generate a granular list of subsections that comprehensively cover the topic. Each subsection should be relatively granular and focused to help students understand the scope of learning required.
 
 Syllabus: {{media url=syllabusDataUri}}
 
-Structure your output clearly, with each paper type as an object containing its name and a list of its topics.`,
+Structure your output clearly:
+- Each paper type should contain its name and a list of topics
+- Each topic should contain its name and a list of subsections
+- Subsections should be specific, granular areas of study within each topic`,
 });
 
 const decomposeSyllabusFlow = ai.defineFlow(
