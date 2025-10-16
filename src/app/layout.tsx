@@ -6,7 +6,7 @@ import Header from '@/components/Header';
 import { cn } from '@/lib/utils';
 
 export const metadata: Metadata = {
-  title: 'Examplify AI',
+  title: 'Erudate',
   description: 'AI-Powered Exam Preparation Tool',
 };
 
