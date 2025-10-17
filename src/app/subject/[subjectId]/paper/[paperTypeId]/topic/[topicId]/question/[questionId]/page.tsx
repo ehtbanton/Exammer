@@ -155,7 +155,7 @@ export default function InterviewPage() {
     <div className="container mx-auto h-[calc(100vh-8rem)]">
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-full">
         {/* Left Side - Question Info */}
-        <div className="lg:col-span-1 space-y-4">
+        <div className="lg:col-span-1 space-y-4 max-h-full overflow-y-auto">
           <Button variant="ghost" onClick={() => router.push(`/subject/${subjectId}/paper/${encodeURIComponent(paperTypeId)}/topic/${encodeURIComponent(topicId)}`)} className="w-full">
             <ArrowLeft />
             Back to Questions
@@ -180,25 +180,25 @@ export default function InterviewPage() {
         </div>
 
         {/* Right Side - Chat Interface */}
-        <div className="lg:col-span-2">
+        <div className="lg:col-span-2 min-h-0">
           <Card className="h-full flex flex-col">
-            <CardContent className="flex-1 flex flex-col p-0 h-full">
-              <ScrollArea className="flex-1 p-4" viewportRef={scrollAreaViewport}>
+            <CardContent className="flex-1 flex flex-col p-0 min-h-0">
+              <ScrollArea className="flex-1 p-4 min-h-0" viewportRef={scrollAreaViewport}>
                 <div className="space-y-6">
                   {chatHistory.map((message, index) => (
                     <div key={index} className={cn("flex items-start gap-3", message.role === 'user' ? "justify-end" : "")}>
                       {message.role === 'assistant' && (
-                        <Avatar className="w-8 h-8">
+                        <Avatar className="w-8 h-8 shrink-0">
                           <AvatarFallback><Bot size={20} /></AvatarFallback>
                         </Avatar>
                       )}
-                      <div className={cn("rounded-lg px-4 py-3 max-w-lg whitespace-pre-wrap",
+                      <div className={cn("rounded-lg px-4 py-3 max-w-lg whitespace-pre-wrap break-words",
                         message.role === 'assistant' ? "bg-secondary text-secondary-foreground" : "bg-primary text-primary-foreground"
                       )}>
                         <p className="text-sm">{message.content}</p>
                       </div>
                       {message.role === 'user' && (
-                        <Avatar className="w-8 h-8">
+                        <Avatar className="w-8 h-8 shrink-0">
                           <AvatarFallback><User size={20} /></AvatarFallback>
                         </Avatar>
                       )}
@@ -206,7 +206,7 @@ export default function InterviewPage() {
                   ))}
                   {isLoading && chatHistory.length > 0 && (
                      <div className="flex items-start gap-3">
-                        <Avatar className="w-8 h-8">
+                        <Avatar className="w-8 h-8 shrink-0">
                           <AvatarFallback><Bot size={20} /></AvatarFallback>
                         </Avatar>
                         <div className="rounded-lg px-4 py-3 bg-secondary text-secondary-foreground">
@@ -221,7 +221,7 @@ export default function InterviewPage() {
                   )}
                 </div>
               </ScrollArea>
-              <div className="p-4 border-t">
+              <div className="p-4 border-t shrink-0">
                 <div className="flex items-center gap-2">
                   <Input
                     placeholder="Type your answer..."

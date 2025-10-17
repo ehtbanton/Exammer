@@ -54,9 +54,38 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     try {
-      localStorage.setItem('examplify-ai-subjects', JSON.stringify(subjects));
+      // Clean up subjects data before saving to avoid quota issues
+      const cleanedSubjects = subjects.map(subject => ({
+        ...subject,
+        // Remove large PDF content from past papers after they're processed
+        pastPapers: subject.pastPapers.map(paper => ({
+          ...paper,
+          content: paper.content.length > 1000 ? paper.content.substring(0, 1000) + '... [truncated]' : paper.content
+        })),
+        // Keep syllabus content truncated as well
+        syllabusContent: subject.syllabusContent.length > 5000
+          ? subject.syllabusContent.substring(0, 5000) + '... [truncated]'
+          : subject.syllabusContent
+      }));
+
+      localStorage.setItem('examplify-ai-subjects', JSON.stringify(cleanedSubjects));
     } catch (error) {
       console.error("Failed to save subjects to localStorage", error);
+      // Try to save with even more aggressive truncation
+      try {
+        const minimalSubjects = subjects.map(subject => ({
+          ...subject,
+          pastPapers: subject.pastPapers.map(paper => ({
+            id: paper.id,
+            name: paper.name,
+            content: '[Content removed to save space]'
+          })),
+          syllabusContent: '[Content removed to save space]'
+        }));
+        localStorage.setItem('examplify-ai-subjects', JSON.stringify(minimalSubjects));
+      } catch (fallbackError) {
+        console.error("Even fallback save failed", fallbackError);
+      }
     }
   }, [subjects]);
 

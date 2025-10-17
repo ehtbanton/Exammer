@@ -159,10 +159,10 @@ export default function HomePage() {
                   </Button>
 
                   {examPapers.length > 0 && (
-                    <div className="mt-3 space-y-2">
+                    <div className="mt-3 max-h-64 overflow-y-auto border rounded-md p-2 space-y-2">
                       {examPapers.map((paper, index) => (
                         <div key={index} className="flex items-center justify-between p-2 bg-muted rounded">
-                          <span className="text-sm">{paper.name}</span>
+                          <span className="text-sm truncate flex-1 mr-2">{paper.name}</span>
                           <Button
                             variant="ghost"
                             size="sm"
