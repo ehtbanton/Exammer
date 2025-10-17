@@ -14,7 +14,7 @@ import PageSpinner from '@/components/PageSpinner';
 export default function TopicPage() {
   const params = useParams();
   const router = useRouter();
-  const { getSubjectById, setSubsectionsForTopic, isLoading, setLoading } = useAppContext();
+  const { getSubjectById, isLoading, setLoading } = useAppContext();
   
   const subjectId = params.subjectId as string;
   const paperTypeId = decodeURIComponent(params.paperTypeId as string);
@@ -32,14 +32,6 @@ export default function TopicPage() {
     }
   }, [topic, setLoading]);
 
-  useEffect(() => {
-    if (subject && paperType && topic && topic.subsections.length === 0) {
-      // Ensure we don't call this multiple times
-      if (!isLoading(`subsections-${subject.id}-${paperType.name}-${topic.name}`)) {
-        setSubsectionsForTopic(subject.id, paperType.name, topic.name);
-      }
-    }
-  }, [subject, paperType, topic, setSubsectionsForTopic, isLoading]);
 
   const handleNavigate = (subsectionId: string) => {
     const loadingKey = `navigate-subsection-${subsectionId}`;
@@ -62,8 +54,6 @@ export default function TopicPage() {
       </div>
     );
   }
-  
-  const isSubsectionsLoading = isLoading(`subsections-${subject.id}-${paperType?.name}-${topic.name}`);
 
   return (
     <div className="container mx-auto">
@@ -73,21 +63,8 @@ export default function TopicPage() {
       </Button>
       <h1 className="text-3xl font-bold font-headline mb-2">{topic.name}</h1>
       <p className="text-muted-foreground mb-8">Select a subsection to start practicing.</p>
-      
-      {isSubsectionsLoading && topic.subsections.length === 0 ? (
-        <div className="space-y-4">
-          {[...Array(5)].map((_, i) => (
-             <Card key={i}>
-                <CardHeader>
-                    <Skeleton className="h-6 w-3/4" />
-                </CardHeader>
-                <CardContent>
-                    <Skeleton className="h-4 w-full" />
-                </CardContent>
-             </Card>
-          ))}
-        </div>
-      ) : topic.subsections.length > 0 ? (
+
+      {topic.subsections.length > 0 ? (
         <div className="space-y-3">
           {topic.subsections.map(subsection => (
               <Card key={subsection.id} className="hover:bg-secondary transition-colors cursor-pointer" onClick={() => handleNavigate(subsection.id)}>

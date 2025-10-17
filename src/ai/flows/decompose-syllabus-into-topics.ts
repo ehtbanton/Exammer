@@ -32,6 +32,7 @@ const PaperTypeSchema = z.object({
 });
 
 const DecomposeSyllabusOutputSchema = z.object({
+  subjectName: z.string().describe('The name of the subject/course as identified from the syllabus.'),
   paperTypes: z.array(PaperTypeSchema).describe('A list of paper types and their topics derived from the syllabus.'),
 });
 export type DecomposeSyllabusOutput = z.infer<typeof DecomposeSyllabusOutputSchema>;
@@ -48,16 +49,20 @@ const prompt = ai.definePrompt({
   output: {schema: DecomposeSyllabusOutputSchema},
   prompt: `You are an expert educator helping students to learn effectively for their exams.
 
-Please read this syllabus and identify the different paper types (e.g., "Paper 1", "Written Exam", "Practical Assessment").
+Please read this syllabus and extract the following information:
 
-For each paper type, extract the list of topics or main sections covered under it. Then, for each topic, generate a granular list of subsections that comprehensively cover the topic. Each subsection should be relatively granular and focused to help students understand the scope of learning required.
+1. The subject name (e.g., "Biology", "Computer Science A-Level", "GCSE Mathematics")
+2. The different paper types (e.g., "Paper 1", "Written Exam", "Practical Assessment")
+3. For each paper type, extract the list of topics or main sections covered under it
+4. For each topic, generate a granular list of subsections that comprehensively cover the topic
 
 Syllabus: {{media url=syllabusDataUri}}
 
 Structure your output clearly:
+- Identify the subject name from the syllabus
 - Each paper type should contain its name and a list of topics
 - Each topic should contain its name and a list of subsections
-- Subsections should be specific, granular areas of study within each topic`,
+- Subsections should be specific, granular areas of study within each topic to help students understand the scope of learning required`,
 });
 
 const decomposeSyllabusFlow = ai.defineFlow(
@@ -70,8 +75,9 @@ const decomposeSyllabusFlow = ai.defineFlow(
     const response = await prompt(input);
     const output = response.output;
 
-    // Ensure that the output always has a paperTypes array.
+    // Ensure that the output always has required fields.
+    const subjectName = output?.subjectName ?? 'Untitled Subject';
     const paperTypes = output?.paperTypes ?? [];
-    return { paperTypes };
+    return { subjectName, paperTypes };
   }
 );

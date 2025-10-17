@@ -1,27 +1,25 @@
 "use client";
 
-import { useState } from 'react';
+import { ChangeEvent, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useAppContext } from '@/app/context/AppContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogHeader, AlertDialogTitle, AlertDialogFooter, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { PlusCircle, Trash2, BookOpen } from 'lucide-react';
+import { Upload, Trash2, BookOpen } from 'lucide-react';
+import LoadingSpinner from '@/components/LoadingSpinner';
 import PageSpinner from '@/components/PageSpinner';
 
 export default function HomePage() {
-  const { subjects, addSubject, deleteSubject, isLoading, setLoading } = useAppContext();
-  const [newSubjectName, setNewSubjectName] = useState('');
-  const [isDialogOpen, setDialogOpen] = useState(false);
+  const { subjects, createSubjectFromSyllabus, deleteSubject, isLoading, setLoading } = useAppContext();
   const [navigatingTo, setNavigatingTo] = useState<string | null>(null);
+  const syllabusInputRef = useRef<HTMLInputElement>(null);
 
-  const handleAddSubject = () => {
-    if (newSubjectName.trim()) {
-      addSubject(newSubjectName.trim());
-      setNewSubjectName('');
-      setDialogOpen(false);
+  const handleSyllabusUpload = (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      createSubjectFromSyllabus(file);
     }
   };
 
@@ -36,44 +34,30 @@ export default function HomePage() {
     return <PageSpinner />;
   }
 
+  const isCreatingSubject = isLoading('create-subject');
+
   return (
     <div className="container mx-auto">
       <div className="flex justify-between items-center mb-8">
         <h1 className="text-3xl font-bold font-headline">Your Subjects</h1>
-        <Dialog open={isDialogOpen} onOpenChange={setDialogOpen}>
-          <DialogTrigger asChild>
-            <Button>
-              <PlusCircle />
-              Create New Subject
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Create a New Subject</DialogTitle>
-            </DialogHeader>
-            <div className="grid gap-4 py-4">
-              <Input
-                placeholder="E.g., A-Level Chemistry"
-                value={newSubjectName}
-                onChange={(e) => setNewSubjectName(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleAddSubject()}
-              />
-            </div>
-            <DialogFooter>
-              <DialogClose asChild>
-                <Button variant="outline">Cancel</Button>
-              </DialogClose>
-              <Button onClick={handleAddSubject}>Create Subject</Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+        <Button onClick={() => syllabusInputRef.current?.click()} disabled={isCreatingSubject}>
+          {isCreatingSubject ? <LoadingSpinner /> : <Upload />}
+          Upload Syllabus
+        </Button>
+        <Input
+          type="file"
+          accept=".pdf,.txt,.md"
+          ref={syllabusInputRef}
+          className="hidden"
+          onChange={handleSyllabusUpload}
+        />
       </div>
 
       {subjects.length === 0 ? (
         <Card className="text-center py-12">
           <CardContent>
             <h2 className="text-xl font-semibold">No subjects yet!</h2>
-            <p className="text-muted-foreground mt-2">Click "Create New Subject" to get started.</p>
+            <p className="text-muted-foreground mt-2">Upload a syllabus to get started.</p>
           </CardContent>
         </Card>
       ) : (
