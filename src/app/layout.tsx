@@ -3,6 +3,7 @@ import './globals.css';
 import { AppProvider } from '@/app/context/AppContext';
 import { Toaster } from '@/components/ui/toaster';
 import Header from '@/components/Header';
+import { BackgroundTaskIndicator } from '@/components/BackgroundTaskIndicator';
 import { cn } from '@/lib/utils';
 
 export const metadata: Metadata = {
@@ -30,6 +31,7 @@ export default function RootLayout({
               {children}
             </main>
           </div>
+          <BackgroundTaskIndicator />
           <Toaster />
         </AppProvider>
       </body>

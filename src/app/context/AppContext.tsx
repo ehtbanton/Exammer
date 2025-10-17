@@ -5,6 +5,7 @@ import type { Subject, Topic, ExamQuestion, PastPaper, PaperType } from '@/lib/t
 import { useToast } from '@/hooks/use-toast';
 import { decomposeSyllabus } from '@/ai/flows/decompose-syllabus-into-topics';
 import { extractExamQuestions } from '@/ai/flows/extract-exam-questions';
+import { backgroundQueue } from '@/lib/background-queue';
 
 interface AppContextType {
   subjects: Subject[];
@@ -68,41 +69,70 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const createSubjectFromSyllabus = useCallback(async (syllabusFile: File) => {
     const loadingKey = `create-subject`;
     setLoading(loadingKey, true);
+
     try {
       const syllabusDataUri = await fileToDataURI(syllabusFile);
       const syllabusText = await fileToString(syllabusFile);
 
-      // Decompose syllabus into paper types and topics (without questions)
-      const result = await decomposeSyllabus({ syllabusDataUri });
-
-      // Build paper types with topics but no questions yet
-      const newPaperTypes: PaperType[] = (result.paperTypes || []).map(pt => ({
-        id: pt.name.toLowerCase().replace(/\s+/g, '-'),
-        name: pt.name,
-        topics: (pt.topics || []).map(topic => ({
-          id: topic.name.toLowerCase().replace(/\s+/g, '-'),
-          name: topic.name,
-          description: topic.description,
-          examQuestions: [], // Empty initially
-        })),
-      }));
-
-      const newSubject: Subject = {
-        id: Date.now().toString(),
-        name: result.subjectName || 'Untitled Subject',
+      // Create a placeholder subject immediately
+      const subjectId = Date.now().toString();
+      const placeholderSubject: Subject = {
+        id: subjectId,
+        name: 'Processing...',
         syllabusContent: syllabusText,
         pastPapers: [],
-        paperTypes: newPaperTypes,
+        paperTypes: [],
       };
 
-      setSubjects(prev => [...prev, newSubject]);
-      toast({
-        title: "Subject Created",
-        description: `"${newSubject.name}" with ${newPaperTypes.length} paper types created. Now upload exam papers to extract questions.`
+      setSubjects(prev => [...prev, placeholderSubject]);
+
+      // Create Process A task and add it to the queue
+      const processAId = `process-a-${subjectId}`;
+      const taskA = backgroundQueue.addTask({
+        id: processAId,
+        type: 'process_a',
+        status: 'pending',
+        displayName: 'P_A: Determining paper types and topics...',
+        subjectId,
+        execute: async () => {
+          // Decompose syllabus into paper types and topics
+          const result = await decomposeSyllabus({ syllabusDataUri });
+
+          // Build paper types with topics but no questions yet
+          const newPaperTypes: PaperType[] = (result.paperTypes || []).map(pt => ({
+            id: pt.name.toLowerCase().replace(/\s+/g, '-'),
+            name: pt.name,
+            topics: (pt.topics || []).map(topic => ({
+              id: topic.name.toLowerCase().replace(/\s+/g, '-'),
+              name: topic.name,
+              description: topic.description,
+              examQuestions: [], // Empty initially
+            })),
+          }));
+
+          // Update the subject with the decomposed data
+          setSubjects(prev => prev.map(s =>
+            s.id === subjectId
+              ? { ...s, name: result.subjectName || 'Untitled Subject', paperTypes: newPaperTypes }
+              : s
+          ));
+
+          // Store result for Process B to use
+          const task = backgroundQueue.getTaskById(processAId);
+          if (task) {
+            task.result = { paperTypes: newPaperTypes };
+          }
+
+          toast({
+            title: "Syllabus Processed",
+            description: `"${result.subjectName}" with ${newPaperTypes.length} paper types identified.`
+          });
+        }
       });
+
     } catch (error) {
       console.error(error);
-      toast({ variant: "destructive", title: "AI Error", description: "Failed to process syllabus." });
+      toast({ variant: "destructive", title: "Error", description: "Failed to start syllabus processing." });
     } finally {
       setLoading(loadingKey, false);
     }
@@ -111,15 +141,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const processExamPapers = useCallback(async (subjectId: string, examPapers: File[]) => {
     const loadingKey = `process-papers-${subjectId}`;
     setLoading(loadingKey, true);
-    try {
-      const subject = subjects.find(s => s.id === subjectId);
-      if (!subject) {
-        throw new Error('Subject not found');
-      }
 
+    try {
+      // Pre-process exam papers for storage
       const examPapersDataUris = await Promise.all(examPapers.map(file => fileToDataURI(file)));
 
-      // Store past papers
       const pastPapers: PastPaper[] = [];
       for (const paperFile of examPapers) {
         const paperContent = await fileToString(paperFile);
@@ -130,54 +156,91 @@ export function AppProvider({ children }: { children: ReactNode }) {
         });
       }
 
-      // Extract questions from all papers
-      const topicsInfo = subject.paperTypes.flatMap(pt =>
-        pt.topics.map(t => ({ name: t.name, description: t.description }))
-      );
+      // Store past papers immediately
+      setSubjects(prev => prev.map(s =>
+        s.id === subjectId ? { ...s, pastPapers: [...s.pastPapers, ...pastPapers] } : s
+      ));
 
-      const questionsResult = await extractExamQuestions({
-        examPapersDataUris,
-        topics: topicsInfo,
+      // Find the Process A task for this subject
+      const processAId = `process-a-${subjectId}`;
+
+      // Create Process B task and add it to the queue (depends on Process A)
+      const processBId = `process-b-${subjectId}`;
+      backgroundQueue.addTask({
+        id: processBId,
+        type: 'process_b',
+        status: 'pending',
+        displayName: 'P_B: Extracting and categorizing PPQs...',
+        subjectId,
+        dependsOn: processAId, // Wait for Process A to complete
+        execute: async () => {
+          // Get the result from Process A
+          const processATask = backgroundQueue.getTaskById(processAId);
+          if (!processATask || !processATask.result || !processATask.result.paperTypes) {
+            throw new Error('Process A result not available');
+          }
+
+          const paperTypes: PaperType[] = processATask.result.paperTypes;
+
+          // Extract questions from all papers
+          const topicsInfo = paperTypes.flatMap(pt =>
+            pt.topics.map(t => ({ name: t.name, description: t.description }))
+          );
+
+          if (topicsInfo.length === 0) {
+            throw new Error('No topics found for question extraction');
+          }
+
+          const questionsResult = await extractExamQuestions({
+            examPapersDataUris,
+            topics: topicsInfo,
+          });
+
+          const extractedQuestions = questionsResult.questions;
+
+          // Update subject with questions
+          setSubjects(prev => prev.map(s => {
+            if (s.id !== subjectId) return s;
+
+            return {
+              ...s,
+              paperTypes: s.paperTypes.map(pt => ({
+                ...pt,
+                topics: pt.topics.map(topic => {
+                  const topicQuestions = extractedQuestions
+                    .filter(q => q.topicName === topic.name)
+                    .map((q, index) => ({
+                      id: `${topic.name.toLowerCase().replace(/\s+/g, '-')}-q${Date.now()}-${index}`,
+                      questionText: q.questionText,
+                      summary: q.summary,
+                      score: 0,
+                      attempts: 0,
+                    }));
+
+                  return {
+                    ...topic,
+                    examQuestions: [...topic.examQuestions, ...topicQuestions],
+                  };
+                }),
+              })),
+            };
+          }));
+
+          toast({
+            title: "Questions Extracted",
+            description: `Extracted ${extractedQuestions.length} questions from ${examPapers.length} paper(s).`
+          });
+        }
       });
-
-      const extractedQuestions = questionsResult.questions;
-
-      // Update subject with papers and questions
-      setSubjects(prev => prev.map(s => {
-        if (s.id !== subjectId) return s;
-
-        return {
-          ...s,
-          pastPapers: [...s.pastPapers, ...pastPapers],
-          paperTypes: s.paperTypes.map(pt => ({
-            ...pt,
-            topics: pt.topics.map(topic => {
-              const topicQuestions = extractedQuestions
-                .filter(q => q.topicName === topic.name)
-                .map((q, index) => ({
-                  id: `${topic.name.toLowerCase().replace(/\s+/g, '-')}-q${index}`,
-                  questionText: q.questionText,
-                  summary: q.summary,
-                  score: 0,
-                  attempts: 0,
-                }));
-
-              return {
-                ...topic,
-                examQuestions: [...topic.examQuestions, ...topicQuestions],
-              };
-            }),
-          })),
-        };
-      }));
 
       toast({
-        title: "Exam Papers Processed",
-        description: `Extracted ${extractedQuestions.length} questions from ${examPapers.length} paper(s).`
+        title: "Papers Uploaded",
+        description: `${examPapers.length} paper(s) uploaded. Question extraction will begin after syllabus processing completes.`
       });
+
     } catch (error) {
       console.error(error);
-      toast({ variant: "destructive", title: "AI Error", description: "Failed to process exam papers." });
+      toast({ variant: "destructive", title: "Error", description: "Failed to process exam papers." });
     } finally {
       setLoading(loadingKey, false);
     }

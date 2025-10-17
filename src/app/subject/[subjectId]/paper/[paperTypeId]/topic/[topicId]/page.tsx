@@ -15,14 +15,15 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 export default function TopicPage() {
   const params = useParams();
   const router = useRouter();
-  const { getSubjectById, isLoading, setLoading } = useAppContext();
+  const { subjects, isLoading, setLoading } = useAppContext();
 
   const subjectId = params.subjectId as string;
   const paperTypeId = decodeURIComponent(params.paperTypeId as string);
   const topicId = decodeURIComponent(params.topicId as string);
   const [navigatingTo, setNavigatingTo] = useState<string | null>(null);
 
-  const subject = getSubjectById(subjectId);
+  // Directly access subjects to ensure component re-renders when subjects change
+  const subject = subjects.find(s => s.id === subjectId);
   const paperType = subject?.paperTypes.find(pt => pt.id === paperTypeId);
   const topic = paperType?.topics.find(t => t.id === topicId);
 

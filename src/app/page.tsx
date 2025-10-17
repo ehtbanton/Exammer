@@ -24,10 +24,9 @@ export default function HomePage() {
     const file = e.target.files?.[0];
     if (file) {
       setSyllabusFile(file);
-      // Start processing syllabus immediately
-      setUploadStage('syllabus');
+      // Start processing syllabus in background
       await createSubjectFromSyllabus(file);
-      // After processing, move to papers stage
+      // Immediately transition to papers stage (processing happens in background)
       setUploadStage('papers');
     }
   };
@@ -73,51 +72,78 @@ export default function HomePage() {
 
   return (
     <div className="container mx-auto">
-      <div className="flex justify-between items-center mb-8">
-        <h1 className="text-3xl font-bold font-headline">Your Subjects</h1>
-        <Button onClick={() => syllabusInputRef.current?.click()} disabled={isCreatingSubject || uploadStage !== 'initial'}>
-          {isCreatingSubject ? <LoadingSpinner /> : <Upload />}
-          Create New Subject
-        </Button>
-        <Input
-          type="file"
-          accept=".pdf,.txt,.md"
-          ref={syllabusInputRef}
-          className="hidden"
-          onChange={handleSyllabusSelect}
-        />
-      </div>
+      {subjects.length > 0 && (
+        <div className="flex justify-between items-center mb-8">
+          <h1 className="text-3xl font-bold font-headline">Your Subjects</h1>
+          <Button onClick={() => setUploadStage('syllabus')} disabled={isCreatingSubject || uploadStage !== 'initial'}>
+            {isCreatingSubject ? <LoadingSpinner /> : <Upload />}
+            Create New Subject
+          </Button>
+        </div>
+      )}
+      <Input
+        type="file"
+        accept=".pdf,.txt,.md"
+        ref={syllabusInputRef}
+        className="hidden"
+        onChange={handleSyllabusSelect}
+      />
+      <Input
+        type="file"
+        accept=".pdf,.txt,.md"
+        ref={examPapersInputRef}
+        className="hidden"
+        onChange={handleExamPapersSelect}
+        multiple
+      />
 
-      {/* Two-Stage Upload Dialog */}
+      {/* Upload Dialog */}
       <AlertDialog open={uploadStage === 'syllabus' || uploadStage === 'papers'} onOpenChange={(open) => !open && handleSkipPapers()}>
         <AlertDialogContent className="max-w-2xl">
           {uploadStage === 'syllabus' && (
             <>
               <AlertDialogHeader>
-                <AlertDialogTitle>Processing Syllabus...</AlertDialogTitle>
+                <AlertDialogTitle>Upload Your Syllabus</AlertDialogTitle>
                 <AlertDialogDescription>
-                  Please wait while we analyze your syllabus and identify paper types and topics.
+                  Upload your exam syllabus to begin. We'll analyze it to identify paper types and topics.
                 </AlertDialogDescription>
               </AlertDialogHeader>
-              <div className="flex items-center justify-center py-8">
-                <LoadingSpinner className="w-12 h-12" />
+
+              <div className="space-y-4">
+                <div>
+                  <Button
+                    variant="outline"
+                    onClick={() => syllabusInputRef.current?.click()}
+                    type="button"
+                    className="w-full"
+                  >
+                    <Upload className="mr-2 h-4 w-4" />
+                    {syllabusFile ? syllabusFile.name : 'Choose Syllabus File'}
+                  </Button>
+                </div>
               </div>
+
+              <AlertDialogFooter>
+                <AlertDialogCancel onClick={handleSkipPapers}>
+                  Cancel
+                </AlertDialogCancel>
+              </AlertDialogFooter>
             </>
           )}
 
           {uploadStage === 'papers' && (
             <>
               <AlertDialogHeader>
-                <AlertDialogTitle>Upload Exam Papers</AlertDialogTitle>
+                <AlertDialogTitle>Upload Past Exam Papers</AlertDialogTitle>
                 <AlertDialogDescription>
-                  Now upload past exam papers to extract real exam questions. This step is highly recommended for the best learning experience.
+                  Your syllabus is being processed in the background. Upload past exam papers to extract real exam questions.
                 </AlertDialogDescription>
               </AlertDialogHeader>
 
               <div className="space-y-4">
                 <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
                   <p className="text-sm text-blue-800 dark:text-blue-200">
-                    <strong>Highly Recommended:</strong> Upload at least 1 exam paper for each topic you want to study. Questions are extracted from real exam papers to give you authentic practice.
+                    <strong>Recommended:</strong> Upload at least 1 paper for each paper type.
                   </p>
                 </div>
 
@@ -131,14 +157,6 @@ export default function HomePage() {
                     <FileText className="mr-2 h-4 w-4" />
                     Add Exam Papers
                   </Button>
-                  <Input
-                    type="file"
-                    accept=".pdf,.txt,.md"
-                    ref={examPapersInputRef}
-                    className="hidden"
-                    onChange={handleExamPapersSelect}
-                    multiple
-                  />
 
                   {examPapers.length > 0 && (
                     <div className="mt-3 space-y-2">
@@ -167,7 +185,7 @@ export default function HomePage() {
                   onClick={handleFinishUpload}
                   disabled={examPapers.length === 0 || isLoading(`process-papers-${subjects[subjects.length - 1]?.id}`)}
                 >
-                  {isLoading(`process-papers-${subjects[subjects.length - 1]?.id}`) ? <LoadingSpinner /> : 'Process Papers'}
+                  {isLoading(`process-papers-${subjects[subjects.length - 1]?.id}`) ? <LoadingSpinner /> : 'Finish'}
                 </AlertDialogAction>
               </AlertDialogFooter>
             </>
@@ -176,12 +194,27 @@ export default function HomePage() {
       </AlertDialog>
 
       {subjects.length === 0 ? (
-        <Card className="text-center py-12">
-          <CardContent>
-            <h2 className="text-xl font-semibold">No subjects yet!</h2>
-            <p className="text-muted-foreground mt-2">Upload a syllabus to get started.</p>
-          </CardContent>
-        </Card>
+        <div className="flex items-center justify-center min-h-[60vh]">
+          <Card className="text-center py-12 px-8 max-w-md">
+            <CardContent className="space-y-6">
+              <div>
+                <h2 className="text-2xl font-bold font-headline">Welcome to Erudate!</h2>
+                <p className="text-muted-foreground mt-2">Start your exam preparation journey</p>
+              </div>
+              <Button
+                size="lg"
+                className="w-full text-lg py-6"
+                onClick={() => setUploadStage('syllabus')}
+                disabled={isCreatingSubject}
+              >
+                {isCreatingSubject ? <LoadingSpinner /> : 'Get Started!'}
+              </Button>
+              <p className="text-sm text-muted-foreground">
+                Upload a syllabus to create your first subject
+              </p>
+            </CardContent>
+          </Card>
+        </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {subjects.map((subject) => (
