@@ -143,6 +143,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setLoading(loadingKey, true);
 
     try {
+      // Get current subject to check if we have paper types
+      const currentSubject = subjects.find(s => s.id === subjectId);
+      if (!currentSubject) {
+        throw new Error('Subject not found');
+      }
+
       // Pre-process exam papers for storage
       const examPapersDataUris = await Promise.all(examPapers.map(file => fileToDataURI(file)));
 
@@ -161,26 +167,40 @@ export function AppProvider({ children }: { children: ReactNode }) {
         s.id === subjectId ? { ...s, pastPapers: [...s.pastPapers, ...pastPapers] } : s
       ));
 
-      // Find the Process A task for this subject
+      // Check if Process A exists and is not yet complete
       const processAId = `process-a-${subjectId}`;
+      const processATask = backgroundQueue.getTaskById(processAId);
+      const needsToWaitForProcessA = processATask && processATask.status !== 'completed';
 
-      // Create Process B task and add it to the queue (depends on Process A)
-      const processBId = `process-b-${subjectId}`;
+      // Create Process B task and add it to the queue
+      const processBId = `process-b-${subjectId}-${Date.now()}`;
       backgroundQueue.addTask({
         id: processBId,
         type: 'process_b',
         status: 'pending',
         displayName: 'P_B: Extracting and categorizing PPQs...',
         subjectId,
-        dependsOn: processAId, // Wait for Process A to complete
+        dependsOn: needsToWaitForProcessA ? processAId : undefined, // Only wait if Process A is running
         execute: async () => {
-          // Get the result from Process A
-          const processATask = backgroundQueue.getTaskById(processAId);
-          if (!processATask || !processATask.result || !processATask.result.paperTypes) {
-            throw new Error('Process A result not available');
-          }
+          // Get paper types - either from Process A result or from current subject state
+          let paperTypes: PaperType[];
 
-          const paperTypes: PaperType[] = processATask.result.paperTypes;
+          if (needsToWaitForProcessA && processATask?.result) {
+            // Use Process A result if we waited for it
+            paperTypes = processATask.result.paperTypes;
+          } else {
+            // Otherwise use current subject state
+            const storedSubjects = localStorage.getItem('examplify-ai-subjects');
+            if (!storedSubjects) {
+              throw new Error('No subjects found');
+            }
+            const allSubjects: Subject[] = JSON.parse(storedSubjects);
+            const subject = allSubjects.find(s => s.id === subjectId);
+            if (!subject || subject.paperTypes.length === 0) {
+              throw new Error('No paper types found for question extraction');
+            }
+            paperTypes = subject.paperTypes;
+          }
 
           // Extract questions from all papers
           const topicsInfo = paperTypes.flatMap(pt =>
@@ -233,9 +253,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
         }
       });
 
+      const message = needsToWaitForProcessA
+        ? `${examPapers.length} paper(s) uploaded. Question extraction will begin after syllabus processing completes.`
+        : `${examPapers.length} paper(s) uploaded. Starting question extraction...`;
+
       toast({
         title: "Papers Uploaded",
-        description: `${examPapers.length} paper(s) uploaded. Question extraction will begin after syllabus processing completes.`
+        description: message
       });
 
     } catch (error) {

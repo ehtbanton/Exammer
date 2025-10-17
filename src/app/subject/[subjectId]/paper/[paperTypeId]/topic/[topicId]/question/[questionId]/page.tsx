@@ -152,77 +152,93 @@ export default function InterviewPage() {
   }
 
   return (
-    <div className="flex flex-col h-[calc(100vh-12rem)] md:h-[calc(100vh-11rem)] max-w-3xl mx-auto">
-        <Button variant="ghost" onClick={() => router.push(`/subject/${subjectId}/paper/${encodeURIComponent(paperTypeId)}/topic/${encodeURIComponent(topicId)}`)} className="mb-4 self-start">
+    <div className="container mx-auto h-[calc(100vh-8rem)]">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-full">
+        {/* Left Side - Question Info */}
+        <div className="lg:col-span-1 space-y-4">
+          <Button variant="ghost" onClick={() => router.push(`/subject/${subjectId}/paper/${encodeURIComponent(paperTypeId)}/topic/${encodeURIComponent(topicId)}`)} className="w-full">
             <ArrowLeft />
             Back to Questions
-        </Button>
-      <h1 className="text-2xl font-bold font-headline mb-4">{examQuestion.summary}</h1>
+          </Button>
 
-      {/* Question Display */}
-      <Card className="mb-4 bg-primary/5 border-primary/20">
-        <CardContent className="p-4">
-          <h2 className="text-sm font-semibold text-muted-foreground mb-2">Question:</h2>
-          <p className="text-base whitespace-pre-wrap">{examQuestion.questionText}</p>
-        </CardContent>
-      </Card>
+          <Card>
+            <CardContent className="p-4">
+              <h2 className="text-xs font-semibold text-muted-foreground uppercase mb-2">Topic</h2>
+              <p className="text-sm font-medium">{topic.name}</p>
+            </CardContent>
+          </Card>
 
-      <Card className="flex-1 flex flex-col">
-        <CardContent className="flex-1 flex flex-col p-0">
-          <ScrollArea className="flex-1 p-4" viewportRef={scrollAreaViewport}>
-            <div className="space-y-6">
-              {chatHistory.map((message, index) => (
-                <div key={index} className={cn("flex items-start gap-3", message.role === 'user' ? "justify-end" : "")}>
-                  {message.role === 'assistant' && (
-                    <Avatar className="w-8 h-8">
-                      <AvatarFallback><Bot size={20} /></AvatarFallback>
-                    </Avatar>
+          <Card className="bg-primary/5 border-primary/20">
+            <CardContent className="p-4">
+              <h2 className="text-xs font-semibold text-muted-foreground uppercase mb-2">Question</h2>
+              <p className="text-lg font-semibold mb-3">{examQuestion.summary}</p>
+              <div className="max-h-96 overflow-y-auto">
+                <p className="text-sm whitespace-pre-wrap">{examQuestion.questionText}</p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Right Side - Chat Interface */}
+        <div className="lg:col-span-2">
+          <Card className="h-full flex flex-col">
+            <CardContent className="flex-1 flex flex-col p-0 h-full">
+              <ScrollArea className="flex-1 p-4" viewportRef={scrollAreaViewport}>
+                <div className="space-y-6">
+                  {chatHistory.map((message, index) => (
+                    <div key={index} className={cn("flex items-start gap-3", message.role === 'user' ? "justify-end" : "")}>
+                      {message.role === 'assistant' && (
+                        <Avatar className="w-8 h-8">
+                          <AvatarFallback><Bot size={20} /></AvatarFallback>
+                        </Avatar>
+                      )}
+                      <div className={cn("rounded-lg px-4 py-3 max-w-lg whitespace-pre-wrap",
+                        message.role === 'assistant' ? "bg-secondary text-secondary-foreground" : "bg-primary text-primary-foreground"
+                      )}>
+                        <p className="text-sm">{message.content}</p>
+                      </div>
+                      {message.role === 'user' && (
+                        <Avatar className="w-8 h-8">
+                          <AvatarFallback><User size={20} /></AvatarFallback>
+                        </Avatar>
+                      )}
+                    </div>
+                  ))}
+                  {isLoading && chatHistory.length > 0 && (
+                     <div className="flex items-start gap-3">
+                        <Avatar className="w-8 h-8">
+                          <AvatarFallback><Bot size={20} /></AvatarFallback>
+                        </Avatar>
+                        <div className="rounded-lg px-4 py-3 bg-secondary text-secondary-foreground">
+                           <LoadingSpinner className="w-5 h-5" />
+                        </div>
+                     </div>
                   )}
-                  <div className={cn("rounded-lg px-4 py-3 max-w-lg whitespace-pre-wrap",
-                    message.role === 'assistant' ? "bg-secondary text-secondary-foreground" : "bg-primary text-primary-foreground"
-                  )}>
-                    <p className="text-sm">{message.content}</p>
-                  </div>
-                  {message.role === 'user' && (
-                    <Avatar className="w-8 h-8">
-                      <AvatarFallback><User size={20} /></AvatarFallback>
-                    </Avatar>
+                   {isLoading && chatHistory.length === 0 && (
+                      <div className="flex items-center justify-center h-full">
+                        <LoadingSpinner className="w-8 h-8" />
+                      </div>
                   )}
                 </div>
-              ))}
-              {isLoading && chatHistory.length > 0 && (
-                 <div className="flex items-start gap-3">
-                    <Avatar className="w-8 h-8">
-                      <AvatarFallback><Bot size={20} /></AvatarFallback>
-                    </Avatar>
-                    <div className="rounded-lg px-4 py-3 bg-secondary text-secondary-foreground">
-                       <LoadingSpinner className="w-5 h-5" />
-                    </div>
-                 </div>
-              )}
-               {isLoading && chatHistory.length === 0 && (
-                  <div className="flex items-center justify-center h-full">
-                    <LoadingSpinner className="w-8 h-8" />
-                  </div>
-              )}
-            </div>
-          </ScrollArea>
-          <div className="p-4 border-t">
-            <div className="flex items-center gap-2">
-              <Input
-                placeholder="Type your answer..."
-                value={userInput}
-                onChange={(e) => setUserInput(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
-                disabled={isLoading || isCompleted}
-              />
-              <Button onClick={handleSendMessage} disabled={isLoading || isCompleted || !userInput.trim()}>
-                {isLoading ? <LoadingSpinner /> : <Send />}
-              </Button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+              </ScrollArea>
+              <div className="p-4 border-t">
+                <div className="flex items-center gap-2">
+                  <Input
+                    placeholder="Type your answer..."
+                    value={userInput}
+                    onChange={(e) => setUserInput(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
+                    disabled={isLoading || isCompleted}
+                  />
+                  <Button onClick={handleSendMessage} disabled={isLoading || isCompleted || !userInput.trim()}>
+                    {isLoading ? <LoadingSpinner /> : <Send />}
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
     </div>
   );
 }
