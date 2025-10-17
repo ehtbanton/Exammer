@@ -23,7 +23,7 @@ export type DecomposeSyllabusInput = z.infer<typeof DecomposeSyllabusInputSchema
 
 const TopicSchema = z.object({
   name: z.string().describe('The name of the topic.'),
-  subsections: z.array(z.string()).describe('A granular list of subsections for this topic.'),
+  description: z.string().describe('A detailed description of what this topic covers, including key concepts and learning objectives.'),
 });
 
 const PaperTypeSchema = z.object({
@@ -54,15 +54,15 @@ Please read this syllabus and extract the following information:
 1. The subject name (e.g., "Biology", "Computer Science A-Level", "GCSE Mathematics")
 2. The different paper types (e.g., "Paper 1", "Written Exam", "Practical Assessment")
 3. For each paper type, extract the list of topics or main sections covered under it
-4. For each topic, generate a granular list of subsections that comprehensively cover the topic
+4. For each topic, provide a detailed description including key concepts, learning objectives, and what students need to know
 
 Syllabus: {{media url=syllabusDataUri}}
 
 Structure your output clearly:
 - Identify the subject name from the syllabus
 - Each paper type should contain its name and a list of topics
-- Each topic should contain its name and a list of subsections
-- Subsections should be specific, granular areas of study within each topic to help students understand the scope of learning required`,
+- Each topic should contain its name and a comprehensive description of what it covers
+- Descriptions should be detailed enough to give students a clear understanding of the topic scope`,
 });
 
 const decomposeSyllabusFlow = ai.defineFlow(

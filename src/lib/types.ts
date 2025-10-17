@@ -8,17 +8,19 @@ export interface PastPaper {
   content: string;
 }
 
-export interface Subsection {
+export interface ExamQuestion {
   id: string;
-  name: string;
+  questionText: string; // The full exam question from past papers
+  summary: string; // One-sentence preview of the question
   score: number; // Percentage score (0-100)
-  attempts: number; // Number of times a question has been answered for this subsection
+  attempts: number; // Number of times this question has been answered
 }
 
 export interface Topic {
   id: string;
   name: string;
-  subsections: Subsection[];
+  description: string; // Info block about this topic from the syllabus
+  examQuestions: ExamQuestion[];
 }
 
 export interface PaperType {

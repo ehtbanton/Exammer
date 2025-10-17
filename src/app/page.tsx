@@ -7,20 +7,55 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogHeader, AlertDialogTitle, AlertDialogFooter, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Upload, Trash2, BookOpen } from 'lucide-react';
+import { Upload, Trash2, BookOpen, FileText } from 'lucide-react';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import PageSpinner from '@/components/PageSpinner';
 
 export default function HomePage() {
-  const { subjects, createSubjectFromSyllabus, deleteSubject, isLoading, setLoading } = useAppContext();
+  const { subjects, createSubjectFromSyllabus, processExamPapers, deleteSubject, isLoading, setLoading } = useAppContext();
   const [navigatingTo, setNavigatingTo] = useState<string | null>(null);
+  const [syllabusFile, setSyllabusFile] = useState<File | null>(null);
+  const [uploadStage, setUploadStage] = useState<'initial' | 'syllabus' | 'papers'>('initial');
+  const [examPapers, setExamPapers] = useState<File[]>([]);
   const syllabusInputRef = useRef<HTMLInputElement>(null);
+  const examPapersInputRef = useRef<HTMLInputElement>(null);
 
-  const handleSyllabusUpload = (e: ChangeEvent<HTMLInputElement>) => {
+  const handleSyllabusSelect = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      createSubjectFromSyllabus(file);
+      setSyllabusFile(file);
+      // Start processing syllabus immediately
+      setUploadStage('syllabus');
+      await createSubjectFromSyllabus(file);
+      // After processing, move to papers stage
+      setUploadStage('papers');
     }
+  };
+
+  const handleExamPapersSelect = (e: ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    setExamPapers(prev => [...prev, ...files]);
+  };
+
+  const removeExamPaper = (index: number) => {
+    setExamPapers(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleFinishUpload = async () => {
+    if (subjects.length > 0 && examPapers.length > 0) {
+      const latestSubject = subjects[subjects.length - 1];
+      await processExamPapers(latestSubject.id, examPapers);
+    }
+    // Reset and close
+    setSyllabusFile(null);
+    setExamPapers([]);
+    setUploadStage('initial');
+  };
+
+  const handleSkipPapers = () => {
+    setSyllabusFile(null);
+    setExamPapers([]);
+    setUploadStage('initial');
   };
 
   const handleNavigate = (subjectId: string) => {
@@ -40,18 +75,105 @@ export default function HomePage() {
     <div className="container mx-auto">
       <div className="flex justify-between items-center mb-8">
         <h1 className="text-3xl font-bold font-headline">Your Subjects</h1>
-        <Button onClick={() => syllabusInputRef.current?.click()} disabled={isCreatingSubject}>
+        <Button onClick={() => syllabusInputRef.current?.click()} disabled={isCreatingSubject || uploadStage !== 'initial'}>
           {isCreatingSubject ? <LoadingSpinner /> : <Upload />}
-          Upload Syllabus
+          Create New Subject
         </Button>
         <Input
           type="file"
           accept=".pdf,.txt,.md"
           ref={syllabusInputRef}
           className="hidden"
-          onChange={handleSyllabusUpload}
+          onChange={handleSyllabusSelect}
         />
       </div>
+
+      {/* Two-Stage Upload Dialog */}
+      <AlertDialog open={uploadStage === 'syllabus' || uploadStage === 'papers'} onOpenChange={(open) => !open && handleSkipPapers()}>
+        <AlertDialogContent className="max-w-2xl">
+          {uploadStage === 'syllabus' && (
+            <>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Processing Syllabus...</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Please wait while we analyze your syllabus and identify paper types and topics.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <div className="flex items-center justify-center py-8">
+                <LoadingSpinner className="w-12 h-12" />
+              </div>
+            </>
+          )}
+
+          {uploadStage === 'papers' && (
+            <>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Upload Exam Papers</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Now upload past exam papers to extract real exam questions. This step is highly recommended for the best learning experience.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+
+              <div className="space-y-4">
+                <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                  <p className="text-sm text-blue-800 dark:text-blue-200">
+                    <strong>Highly Recommended:</strong> Upload at least 1 exam paper for each topic you want to study. Questions are extracted from real exam papers to give you authentic practice.
+                  </p>
+                </div>
+
+                <div>
+                  <Button
+                    variant="outline"
+                    onClick={() => examPapersInputRef.current?.click()}
+                    type="button"
+                    className="w-full"
+                  >
+                    <FileText className="mr-2 h-4 w-4" />
+                    Add Exam Papers
+                  </Button>
+                  <Input
+                    type="file"
+                    accept=".pdf,.txt,.md"
+                    ref={examPapersInputRef}
+                    className="hidden"
+                    onChange={handleExamPapersSelect}
+                    multiple
+                  />
+
+                  {examPapers.length > 0 && (
+                    <div className="mt-3 space-y-2">
+                      {examPapers.map((paper, index) => (
+                        <div key={index} className="flex items-center justify-between p-2 bg-muted rounded">
+                          <span className="text-sm">{paper.name}</span>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => removeExamPaper(index)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <AlertDialogFooter>
+                <AlertDialogCancel onClick={handleSkipPapers}>
+                  Skip for Now
+                </AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={handleFinishUpload}
+                  disabled={examPapers.length === 0 || isLoading(`process-papers-${subjects[subjects.length - 1]?.id}`)}
+                >
+                  {isLoading(`process-papers-${subjects[subjects.length - 1]?.id}`) ? <LoadingSpinner /> : 'Process Papers'}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </>
+          )}
+        </AlertDialogContent>
+      </AlertDialog>
 
       {subjects.length === 0 ? (
         <Card className="text-center py-12">

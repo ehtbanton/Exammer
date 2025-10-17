@@ -16,7 +16,7 @@ import { Topic } from '@/lib/types';
 export default function PaperTypePage() {
   const params = useParams();
   const router = useRouter();
-  const { getSubjectById, addPastPaperToSubject, isLoading, setLoading } = useAppContext();
+  const { getSubjectById, processExamPapers, isLoading, setLoading } = useAppContext();
   
   const subjectId = params.subjectId as string;
   const paperTypeId = decodeURIComponent(params.paperTypeId as string);
@@ -27,6 +27,7 @@ export default function PaperTypePage() {
   const paperInputRef = useRef<HTMLInputElement>(null);
   const [isPaperDialogOpen, setPaperDialogOpen] = useState(false);
   const [navigatingTo, setNavigatingTo] = useState<string | null>(null);
+  const [selectedPapers, setSelectedPapers] = useState<File[]>([]);
 
   useEffect(() => {
     // Reset loading state on mount in case user navigated back
@@ -34,13 +35,21 @@ export default function PaperTypePage() {
        paperType.topics.forEach(topic => setLoading(`navigate-topic-${topic.id}`, false));
     }
   }, [paperType, setLoading]);
-  
-  const handlePaperUpload = (e: ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file && subject) {
-      addPastPaperToSubject(subject.id, file).then(() => {
-        setPaperDialogOpen(true);
-      });
+
+  const handlePaperSelect = (e: ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    setSelectedPapers(prev => [...prev, ...files]);
+  };
+
+  const removePaper = (index: number) => {
+    setSelectedPapers(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleUploadPapers = async () => {
+    if (selectedPapers.length > 0 && subject) {
+      await processExamPapers(subject.id, selectedPapers);
+      setSelectedPapers([]);
+      setPaperDialogOpen(false);
     }
   };
   
@@ -102,28 +111,65 @@ export default function PaperTypePage() {
               </DialogTrigger>
               <DialogContent className="max-w-md">
                 <DialogHeader>
-                  <DialogTitle>Past Papers</DialogTitle>
+                  <DialogTitle>Upload Past Papers</DialogTitle>
                   <DialogDescription>
-                    View and upload past papers for "{subject.name}".
+                    Upload exam papers to automatically extract questions for all topics in "{subject.name}".
                   </DialogDescription>
                 </DialogHeader>
-                <div className="mt-4 max-h-60 overflow-y-auto pr-2">
-                  {subject.pastPapers.length > 0 ? (
-                    <ul className="space-y-2">
-                      {subject.pastPapers.map(paper => (
-                        <li key={paper.id} className="text-sm p-2 bg-secondary rounded-md">{paper.name}</li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <p className="text-sm text-center text-muted-foreground py-4">No papers uploaded.</p>
+
+                <div className="space-y-4">
+                  <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
+                    <p className="text-xs text-blue-800 dark:text-blue-200">
+                      Questions will be automatically extracted and sorted into topics.
+                    </p>
+                  </div>
+
+                  {subject.pastPapers.length > 0 && (
+                    <div>
+                      <h4 className="text-sm font-semibold mb-2">Previously Uploaded:</h4>
+                      <div className="max-h-32 overflow-y-auto space-y-1">
+                        {subject.pastPapers.map(paper => (
+                          <div key={paper.id} className="text-xs p-2 bg-secondary rounded-md">{paper.name}</div>
+                        ))}
+                      </div>
+                    </div>
                   )}
-                </div>
-                <div className="mt-4">
-                  <Button onClick={() => paperInputRef.current?.click()} className="w-full" disabled={isPaperLoading}>
-                    {isPaperLoading ? <LoadingSpinner /> : <Upload />}
-                    Upload New Paper
+
+                  <div>
+                    <Button onClick={() => paperInputRef.current?.click()} variant="outline" className="w-full">
+                      <Upload className="mr-2 h-4 w-4" />
+                      Select Papers to Upload
+                    </Button>
+                    <Input
+                      type="file"
+                      ref={paperInputRef}
+                      className="hidden"
+                      onChange={handlePaperSelect}
+                      accept=".pdf,.txt,.md"
+                      multiple
+                    />
+
+                    {selectedPapers.length > 0 && (
+                      <div className="mt-3 space-y-2">
+                        {selectedPapers.map((paper, index) => (
+                          <div key={index} className="flex items-center justify-between p-2 bg-muted rounded text-sm">
+                            <span>{paper.name}</span>
+                            <Button variant="ghost" size="sm" onClick={() => removePaper(index)}>
+                              <span className="text-xs">Remove</span>
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <Button
+                    onClick={handleUploadPapers}
+                    className="w-full"
+                    disabled={isPaperLoading || selectedPapers.length === 0}
+                  >
+                    {isPaperLoading ? <LoadingSpinner /> : 'Process Papers & Extract Questions'}
                   </Button>
-                  <Input type="file" ref={paperInputRef} className="hidden" onChange={handlePaperUpload} />
                 </div>
               </DialogContent>
             </Dialog>
@@ -142,7 +188,7 @@ export default function PaperTypePage() {
                       <CardTitle className="text-lg">{topic.name}</CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <p className="text-sm text-muted-foreground">{topic.subsections.length > 0 ? `${topic.subsections.length} subsections` : 'Click to generate subsections'}</p>
+                      <p className="text-sm text-muted-foreground">{topic.examQuestions?.length > 0 ? `${topic.examQuestions.length} questions` : 'No questions yet'}</p>
                     </CardContent>
                   </Card>
                </Link>
