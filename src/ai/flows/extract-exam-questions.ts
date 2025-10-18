@@ -43,9 +43,10 @@ export type ExtractExamQuestionsOutput = z.infer<typeof ExtractExamQuestionsOutp
 /**
  * Configuration for batch processing
  */
-const BATCH_SIZE = 10; // Process 10 papers per batch
-const MAX_PARALLEL_BATCHES_PER_KEY = 10; // Process up to 10 batches in parallel per API key
-const MAX_REQUESTS_PER_MINUTE_PER_KEY = 10; // Rate limit: 10 requests per minute per API key
+const BATCH_SIZE = 5; // Number of papers to send in a single API call
+const BATCHES_PER_KEY_PER_MINUTE = 10; // Number of batches (API requests) allowed per key per minute
+const MAX_CONCURRENT_REQUESTS_PER_KEY = 2; // Maximum concurrent requests per API key (Gemini API limit)
+const REQUEST_START_DELAY_MS = 50; // Small delay between starting requests to avoid thundering herd
 
 /**
  * API Key manager with rate limiting and round-robin distribution
@@ -54,6 +55,7 @@ class ApiKeyManager {
   private apiKeys: string[];
   private keyTimers: Map<string, number> = new Map(); // Tracks when each key can next be used
   private keyRequestCounts: Map<string, number> = new Map(); // Tracks requests made in current window
+  private keyConcurrentCounts: Map<string, number> = new Map(); // Tracks concurrent requests per key
   private currentKeyIndex: number = 0; // Round-robin index
   private keyLock: Promise<void> = Promise.resolve(); // Ensures atomic key selection
 
@@ -71,9 +73,17 @@ class ApiKeyManager {
 
     // Create a new lock for this selection
     let releaseLock: () => void;
+    let lockReleased = false;
     this.keyLock = new Promise(resolve => {
       releaseLock = resolve;
     });
+
+    const release = () => {
+      if (!lockReleased) {
+        releaseLock!();
+        lockReleased = true;
+      }
+    };
 
     try {
       const now = Date.now();
@@ -84,8 +94,11 @@ class ApiKeyManager {
         const key = this.apiKeys[this.currentKeyIndex];
         const nextAvailable = this.keyTimers.get(key) || 0;
         const requestCount = this.keyRequestCounts.get(key) || 0;
+        const concurrentCount = this.keyConcurrentCounts.get(key) || 0;
 
-        if (now >= nextAvailable && requestCount < MAX_REQUESTS_PER_MINUTE_PER_KEY) {
+        if (now >= nextAvailable &&
+            requestCount < BATCHES_PER_KEY_PER_MINUTE &&
+            concurrentCount < MAX_CONCURRENT_REQUESTS_PER_KEY) {
           const keyIndex = this.currentKeyIndex;
           // Move to next key for next request
           this.currentKeyIndex = (this.currentKeyIndex + 1) % this.apiKeys.length;
@@ -93,6 +106,8 @@ class ApiKeyManager {
           // Mark request immediately while we have the lock
           this.markRequestStart(key);
 
+          console.log(`[Key Manager] Assigned key #${keyIndex + 1} (count: ${requestCount + 1}/${BATCHES_PER_KEY_PER_MINUTE}, concurrent: ${concurrentCount + 1}/${MAX_CONCURRENT_REQUESTS_PER_KEY}, next index: ${this.currentKeyIndex})`);
+          release();
           return {key, index: keyIndex + 1};
         }
 
@@ -108,7 +123,7 @@ class ApiKeyManager {
       const waitTime = Math.max(0, soonestAvailable - now);
       if (waitTime > 0) {
         console.log(`Rate limit: All keys busy, waiting ${waitTime}ms...`);
-        releaseLock!(); // Release lock before waiting
+        release(); // Release lock before waiting
         await new Promise(resolve => setTimeout(resolve, waitTime));
         // Recursively try again
         return this.getAvailableKey();
@@ -116,11 +131,11 @@ class ApiKeyManager {
 
       // Reset index to start and try again
       this.currentKeyIndex = startIndex;
-      releaseLock!(); // Release lock before recursing
+      release(); // Release lock before recursing
       return this.getAvailableKey();
     } finally {
-      // Ensure lock is released
-      releaseLock!();
+      // Ensure lock is released even if an error occurs
+      release();
     }
   }
 
@@ -131,6 +146,10 @@ class ApiKeyManager {
     const requestCount = (this.keyRequestCounts.get(apiKey) || 0) + 1;
     this.keyRequestCounts.set(apiKey, requestCount);
 
+    // Increment concurrent request count
+    const concurrentCount = (this.keyConcurrentCounts.get(apiKey) || 0) + 1;
+    this.keyConcurrentCounts.set(apiKey, concurrentCount);
+
     // If this is the first request, set a timer to reset the count after 1 minute
     if (requestCount === 1) {
       setTimeout(() => {
@@ -140,10 +159,18 @@ class ApiKeyManager {
     }
 
     // If we've hit the limit, set the next available time to 1 minute from now
-    if (requestCount >= MAX_REQUESTS_PER_MINUTE_PER_KEY) {
+    if (requestCount >= BATCHES_PER_KEY_PER_MINUTE) {
       this.keyTimers.set(apiKey, Date.now() + 60000);
-      console.log(`API key ${this.getKeyIndex(apiKey)} hit rate limit (${requestCount}/${MAX_REQUESTS_PER_MINUTE_PER_KEY})`);
+      console.log(`API key ${this.getKeyIndex(apiKey)} hit rate limit (${requestCount}/${BATCHES_PER_KEY_PER_MINUTE})`);
     }
+  }
+
+  /**
+   * Mark that a request has completed for this key
+   */
+  markRequestComplete(apiKey: string) {
+    const concurrentCount = (this.keyConcurrentCounts.get(apiKey) || 1) - 1;
+    this.keyConcurrentCounts.set(apiKey, Math.max(0, concurrentCount));
   }
 
   private getKeyIndex(apiKey: string): number {
@@ -180,6 +207,7 @@ export async function extractExamQuestions(
   }
 
   console.log(`Processing ${examPapersDataUris.length} papers using ${parallelApiKeys.length} API keys...`);
+  console.log(`API Keys (first 10 chars): ${parallelApiKeys.map((k, i) => `Key ${i+1}: ${k.substring(0, 10)}...`).join(', ')}`);
 
   // Split papers into batches
   const batches: string[][] = [];
@@ -199,13 +227,18 @@ export async function extractExamQuestions(
   for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
     const batch = batches[batchIndex];
 
+    // Add pacing delay to avoid burst limits (except for first request)
+    if (batchIndex > 0) {
+      await new Promise(resolve => setTimeout(resolve, REQUEST_START_DELAY_MS));
+    }
+
     // Create a promise for this batch
     const batchPromise = (async () => {
       // Get an available API key (waits if necessary, marks request atomically)
       const {key: apiKey, index: keyIndex} = await keyManager.getAvailableKey();
 
       const batchStartTime = Date.now();
-      console.log(`[Question Extraction] Batch ${batchIndex + 1}/${batches.length}: Started using API key ${keyIndex}, processing ${batch.length} papers...`);
+      console.log(`[Question Extraction] Batch ${batchIndex + 1}/${batches.length}: Started using API key ${keyIndex} (${apiKey.substring(0, 10)}...), processing ${batch.length} papers...`);
 
       try {
         // Create a genkit instance with this specific API key
@@ -270,15 +303,20 @@ Important guidelines:
         console.log(`[Question Extraction] Batch ${batchIndex + 1}/${batches.length}: Completed in ${batchDuration}s - Extracted ${result.questions.length} questions`);
         return result.questions;
       } catch (error) {
-        console.error(`Batch ${batchIndex + 1}/${batches.length}: Error:`, error);
+        const batchEndTime = Date.now();
+        const batchDuration = ((batchEndTime - batchStartTime) / 1000).toFixed(2);
+        console.error(`[Question Extraction] Batch ${batchIndex + 1}/${batches.length}: Error after ${batchDuration}s using API key ${keyIndex}:`, error);
         return [];
+      } finally {
+        // Mark request as complete to free up concurrent slot
+        keyManager.markRequestComplete(apiKey);
       }
     })();
 
     batchPromises.push(batchPromise);
 
-    // Control parallelism: only allow MAX_PARALLEL_BATCHES_PER_KEY * number of keys to run at once
-    const maxConcurrent = MAX_PARALLEL_BATCHES_PER_KEY * parallelApiKeys.length;
+    // Control parallelism: only allow MAX_CONCURRENT_REQUESTS_PER_KEY * number of keys to run at once
+    const maxConcurrent = MAX_CONCURRENT_REQUESTS_PER_KEY * parallelApiKeys.length;
     if (batchPromises.length >= maxConcurrent) {
       // Wait for at least one to complete before continuing
       const results = await Promise.race(batchPromises.map((p, i) => p.then(r => ({ index: i, result: r }))));
