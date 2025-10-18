@@ -5,6 +5,7 @@ import type { Subject, Topic, ExamQuestion, PastPaper, PaperType } from '@/lib/t
 import { useToast } from '@/hooks/use-toast';
 import { decomposeSyllabus } from '@/ai/flows/decompose-syllabus-into-topics';
 import { extractExamQuestions } from '@/ai/flows/extract-exam-questions';
+import { generateSimilarQuestion } from '@/ai/flows/generate-similar-question';
 import { backgroundQueue } from '@/lib/background-queue';
 
 interface AppContextType {
@@ -15,6 +16,7 @@ interface AppContextType {
   getSubjectById: (subjectId: string) => Subject | undefined;
   addPastPaperToSubject: (subjectId: string, paperFile: File) => Promise<void>;
   updateExamQuestionScore: (subjectId: string, paperTypeName: string, topicName: string, questionId: string, score: number) => void;
+  generateQuestionVariant: (subjectId: string, paperTypeId: string, topicId: string, questionId: string) => Promise<string>;
   isLoading: (key: string) => boolean;
   setLoading: (key: string, value: boolean) => void;
 }
@@ -389,8 +391,36 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }));
   }, []);
 
+  const generateQuestionVariant = useCallback(async (subjectId: string, paperTypeId: string, topicId: string, questionId: string): Promise<string> => {
+    // Find the question to generate a variant for
+    const subject = subjects.find(s => s.id === subjectId);
+    if (!subject) throw new Error('Subject not found');
+
+    const paperType = subject.paperTypes.find(pt => pt.id === paperTypeId);
+    if (!paperType) throw new Error('Paper type not found');
+
+    const topic = paperType.topics.find(t => t.id === topicId);
+    if (!topic) throw new Error('Topic not found');
+
+    const question = topic.examQuestions.find(q => q.id === questionId);
+    if (!question) throw new Error('Question not found');
+
+    console.log('[Process C] Generating similar question variant...');
+
+    // Generate the variant directly (synchronously from the caller's perspective)
+    const result = await generateSimilarQuestion({
+      originalQuestionText: question.questionText,
+      topicName: topic.name,
+      topicDescription: topic.description,
+    });
+
+    console.log('[Process C] Question variant generated successfully');
+
+    return result.questionText;
+  }, [subjects]);
+
   return (
-    <AppContext.Provider value={{ subjects, createSubjectFromSyllabus, processExamPapers, deleteSubject, getSubjectById, addPastPaperToSubject, updateExamQuestionScore, isLoading, setLoading }}>
+    <AppContext.Provider value={{ subjects, createSubjectFromSyllabus, processExamPapers, deleteSubject, getSubjectById, addPastPaperToSubject, updateExamQuestionScore, generateQuestionVariant, isLoading, setLoading }}>
       {children}
     </AppContext.Provider>
   );

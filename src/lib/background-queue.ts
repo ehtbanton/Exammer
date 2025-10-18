@@ -7,7 +7,7 @@ export type TaskStatus = 'pending' | 'running' | 'completed' | 'failed';
 
 export interface BackgroundTask {
   id: string;
-  type: 'process_a' | 'process_b';
+  type: 'process_a' | 'process_b' | 'process_c';
   status: TaskStatus;
   displayName: string;
   subjectId?: string;

@@ -20,7 +20,7 @@ import PageSpinner from '@/components/PageSpinner';
 export default function InterviewPage() {
   const params = useParams();
   const router = useRouter();
-  const { getSubjectById, updateExamQuestionScore } = useAppContext();
+  const { getSubjectById, updateExamQuestionScore, generateQuestionVariant } = useAppContext();
   const { toast } = useToast();
 
   const subjectId = params.subjectId as string;
@@ -37,6 +37,7 @@ export default function InterviewPage() {
   const [userInput, setUserInput] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [isCompleted, setIsCompleted] = useState(false);
+  const [generatedVariant, setGeneratedVariant] = useState<string | null>(null);
 
   const scrollAreaViewport = useRef<HTMLDivElement>(null);
   const hasInitialized = useRef<string | false>(false);
@@ -51,7 +52,7 @@ export default function InterviewPage() {
   useEffect(() => {
     console.log('=== useEffect triggered ===', { subjectId: subject?.id, questionId: examQuestion?.id });
 
-    if (!subject || !examQuestion) {
+    if (!subject || !examQuestion || !paperType || !topic) {
       console.log('Early return - no subject or exam question');
       return;
     }
@@ -76,11 +77,17 @@ export default function InterviewPage() {
       hasInitialized.current = questionKey;
       setIsLoading(true);
       try {
-        // Start the interview with an initial greeting (without user answer)
-        console.log('Calling aiPoweredInterview...');
+        // Generate a fresh variant EVERY time
+        console.log('Generating question variant...');
+        const variant = await generateQuestionVariant(subject.id, paperType.id, topic.id, examQuestion.id);
+        setGeneratedVariant(variant);
+        console.log('Question variant generated successfully');
+
+        // Start the interview with the generated variant
+        console.log('Calling aiPoweredInterview with generated variant...');
         const res = await aiPoweredInterview({
           subsection: examQuestion.summary, // Using summary as context
-          question: examQuestion.questionText,
+          question: variant, // Use the generated variant
         });
         console.log('Interview started, chat history:', res.chatHistory);
         setChatHistory(res.chatHistory);
@@ -98,7 +105,7 @@ export default function InterviewPage() {
   }, [subject?.id, examQuestion?.id]);
 
   const handleSendMessage = async () => {
-    if (!userInput.trim() || !subject || !examQuestion || isLoading) return;
+    if (!userInput.trim() || !subject || !examQuestion || isLoading || !generatedVariant) return;
 
     setIsLoading(true);
     const currentInput = userInput;
@@ -112,7 +119,7 @@ export default function InterviewPage() {
         subsection: examQuestion.summary,
         userAnswer: currentInput,
         previousChatHistory: chatHistory,
-        question: examQuestion.questionText,
+        question: generatedVariant, // Always use the generated variant
       });
 
       setChatHistory(res.chatHistory);
@@ -173,7 +180,14 @@ export default function InterviewPage() {
               <h2 className="text-xs font-semibold text-muted-foreground uppercase mb-2">Question</h2>
               <p className="text-lg font-semibold mb-3">{examQuestion.summary}</p>
               <div className="max-h-96 overflow-y-auto">
-                <p className="text-sm whitespace-pre-wrap">{examQuestion.questionText}</p>
+                {generatedVariant ? (
+                  <>
+                    <p className="text-sm whitespace-pre-wrap">{generatedVariant}</p>
+                    <p className="text-xs text-muted-foreground mt-3 italic">Similar question generated for practice</p>
+                  </>
+                ) : (
+                  <p className="text-sm text-muted-foreground">Generating similar question...</p>
+                )}
               </div>
             </CardContent>
           </Card>

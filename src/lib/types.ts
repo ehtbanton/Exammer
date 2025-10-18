@@ -10,7 +10,7 @@ export interface PastPaper {
 
 export interface ExamQuestion {
   id: string;
-  questionText: string; // The full exam question from past papers
+  questionText: string; // The ORIGINAL exam question from past papers (kept for reference, not displayed)
   summary: string; // One-sentence preview of the question
   score: number; // Percentage score (0-100)
   attempts: number; // Number of times this question has been answered
