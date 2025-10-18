@@ -204,7 +204,8 @@ export async function extractExamQuestions(
       // Get an available API key (waits if necessary, marks request atomically)
       const {key: apiKey, index: keyIndex} = await keyManager.getAvailableKey();
 
-      console.log(`Batch ${batchIndex + 1}/${batches.length}: Using API key ${keyIndex}, processing ${batch.length} papers...`);
+      const batchStartTime = Date.now();
+      console.log(`[Question Extraction] Batch ${batchIndex + 1}/${batches.length}: Started using API key ${keyIndex}, processing ${batch.length} papers...`);
 
       try {
         // Create a genkit instance with this specific API key
@@ -264,7 +265,9 @@ Important guidelines:
           topics,
         });
 
-        console.log(`Batch ${batchIndex + 1}/${batches.length}: Extracted ${result.questions.length} questions`);
+        const batchEndTime = Date.now();
+        const batchDuration = ((batchEndTime - batchStartTime) / 1000).toFixed(2);
+        console.log(`[Question Extraction] Batch ${batchIndex + 1}/${batches.length}: Completed in ${batchDuration}s - Extracted ${result.questions.length} questions`);
         return result.questions;
       } catch (error) {
         console.error(`Batch ${batchIndex + 1}/${batches.length}: Error:`, error);

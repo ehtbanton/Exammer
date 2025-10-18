@@ -66,14 +66,23 @@ const decomposeSyllabusFlow = ai.defineFlow(
     outputSchema: DecomposeSyllabusOutputSchema,
   },
   async input => {
+    const startTime = Date.now();
+    console.log('[Syllabus Processing] Started decomposing syllabus...');
+
     const response = await prompt(input, {
-      model: 'googleai/gemini-2.0-flash-exp', // Use faster experimental model
+      model: 'googleai/gemini-2.5-flash',
     });
     const output = response.output;
 
     // Ensure that the output always has required fields.
     const subjectName = output?.subjectName ?? 'Untitled Subject';
     const paperTypes = output?.paperTypes ?? [];
+
+    const endTime = Date.now();
+    const duration = ((endTime - startTime) / 1000).toFixed(2);
+    console.log(`[Syllabus Processing] Completed in ${duration}s`);
+    console.log(`[Syllabus Processing] Found ${paperTypes.length} paper type(s) with ${paperTypes.reduce((acc, pt) => acc + pt.topics.length, 0)} total topics`);
+
     return { subjectName, paperTypes };
   }
 );
