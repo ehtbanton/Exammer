@@ -9,6 +9,9 @@ import { cn } from '@/lib/utils';
 export const metadata: Metadata = {
   title: 'Erudate',
   description: 'AI-Powered Exam Preparation Tool',
+  icons: {
+    icon: '/erudate.png',
+  },
 };
 
 export default function RootLayout({
