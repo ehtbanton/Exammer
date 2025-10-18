@@ -55,10 +55,11 @@ export default function PaperTypePage() {
 
   // Calculate average score for each topic
   const getTopicAverageScore = (topic: Topic): number | null => {
-    const questionsWithScores = topic.examQuestions?.filter(q => q.attempts > 0) || [];
-    if (questionsWithScores.length === 0) return null;
-    const sum = questionsWithScores.reduce((acc, q) => acc + q.score, 0);
-    return sum / questionsWithScores.length;
+    const allQuestions = topic.examQuestions || [];
+    if (allQuestions.length === 0) return null;
+    // Include all questions - unattempted questions have a score of 0
+    const sum = allQuestions.reduce((acc, q) => acc + q.score, 0);
+    return sum / allQuestions.length;
   };
 
   return (

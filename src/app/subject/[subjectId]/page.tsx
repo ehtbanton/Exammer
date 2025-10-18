@@ -80,18 +80,19 @@ export default function SubjectPage() {
     if (topicsWithQuestions.length === 0) return null;
 
     let totalScore = 0;
-    let totalQuestionsWithAttempts = 0;
+    let totalQuestions = 0;
 
     for (const topic of topicsWithQuestions) {
-      const questionsWithScores = topic.examQuestions.filter(q => q.attempts > 0);
-      for (const question of questionsWithScores) {
+      // Include all questions - unattempted questions have a score of 0
+      const allQuestions = topic.examQuestions || [];
+      for (const question of allQuestions) {
         totalScore += question.score;
-        totalQuestionsWithAttempts++;
+        totalQuestions++;
       }
     }
 
-    if (totalQuestionsWithAttempts === 0) return null;
-    return totalScore / totalQuestionsWithAttempts;
+    if (totalQuestions === 0) return null;
+    return totalScore / totalQuestions;
   };
 
   return (
