@@ -124,8 +124,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
         displayName: 'P_A: Determining paper types and topics...',
         subjectId,
         execute: async () => {
+          console.log('Starting syllabus processing...');
           // Decompose syllabus into paper types and topics
           const result = await decomposeSyllabus({ syllabusDataUri });
+          console.log('Syllabus processing complete.');
 
           // Build paper types with topics but no questions yet
           const newPaperTypes: PaperType[] = (result.paperTypes || []).map(pt => ({

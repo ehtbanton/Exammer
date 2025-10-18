@@ -7,52 +7,70 @@ export function cn(...inputs: ClassValue[]) {
 
 /**
  * Gets background color class for a score (0-100%)
- * Red-amber-green scale changing smoothly every 10%
+ * Bold traffic-light color scale (Red -> Amber -> Green) with black text
  */
 export function getScoreColorClass(score: number): string {
   const clampedScore = Math.max(0, Math.min(100, score));
 
-  // Using inline styles instead of classes for dynamic colors
-  if (clampedScore === 0) return 'bg-red-100 border-red-300';
-  if (clampedScore <= 10) return 'bg-red-50 border-red-200';
-  if (clampedScore <= 20) return 'bg-orange-50 border-orange-200';
-  if (clampedScore <= 30) return 'bg-orange-100 border-orange-300';
-  if (clampedScore <= 40) return 'bg-amber-50 border-amber-200';
-  if (clampedScore <= 50) return 'bg-amber-100 border-amber-300';
-  if (clampedScore <= 60) return 'bg-yellow-50 border-yellow-200';
-  if (clampedScore <= 70) return 'bg-lime-50 border-lime-200';
-  if (clampedScore <= 80) return 'bg-lime-100 border-lime-300';
-  if (clampedScore <= 90) return 'bg-green-50 border-green-200';
-  return 'bg-green-100 border-green-300';
+  // Bold red for low scores (0-33%)
+  if (clampedScore <= 10) return 'bg-red-500 border-red-700 text-black';
+  if (clampedScore <= 20) return 'bg-red-400 border-red-600 text-black';
+  if (clampedScore <= 33) return 'bg-red-300 border-red-500 text-black';
+
+  // Bold amber/yellow for medium scores (34-66%)
+  if (clampedScore <= 44) return 'bg-orange-400 border-orange-600 text-black';
+  if (clampedScore <= 55) return 'bg-amber-400 border-amber-600 text-black';
+  if (clampedScore <= 66) return 'bg-yellow-400 border-yellow-600 text-black';
+
+  // Bold green for high scores (67-100%)
+  if (clampedScore <= 77) return 'bg-lime-500 border-lime-700 text-black';
+  if (clampedScore <= 88) return 'bg-green-400 border-green-600 text-black';
+  return 'bg-green-500 border-green-700 text-black';
+}
+
+/**
+ * Gets default light grey class for boxes without scores
+ */
+export function getDefaultBoxClass(): string {
+  return 'bg-gray-200 border-gray-400 text-black';
 }
 
 /**
  * Gets inline style for a score (0-100%)
- * Red-amber-green scale changing smoothly
+ * Bold traffic-light color scale (Red -> Amber -> Green)
  */
 export function getScoreColorStyle(score: number): React.CSSProperties {
   const clampedScore = Math.max(0, Math.min(100, score));
 
-  if (clampedScore === 0) {
-    return { backgroundColor: 'rgb(254, 226, 226)', borderColor: 'rgb(252, 165, 165)' }; // red-100, red-300
-  } else if (clampedScore <= 10) {
-    return { backgroundColor: 'rgb(254, 242, 242)', borderColor: 'rgb(254, 202, 202)' }; // red-50, red-200
+  // Bold red for low scores (0-33%)
+  if (clampedScore <= 10) {
+    return { backgroundColor: 'rgb(239, 68, 68)', borderColor: 'rgb(185, 28, 28)', color: 'rgb(0, 0, 0)' }; // red-500, red-700
   } else if (clampedScore <= 20) {
-    return { backgroundColor: 'rgb(255, 247, 237)', borderColor: 'rgb(254, 215, 170)' }; // orange-50, orange-200
-  } else if (clampedScore <= 30) {
-    return { backgroundColor: 'rgb(255, 237, 213)', borderColor: 'rgb(253, 186, 116)' }; // orange-100, orange-300
-  } else if (clampedScore <= 40) {
-    return { backgroundColor: 'rgb(255, 251, 235)', borderColor: 'rgb(253, 230, 138)' }; // amber-50, amber-200
-  } else if (clampedScore <= 50) {
-    return { backgroundColor: 'rgb(254, 243, 199)', borderColor: 'rgb(252, 211, 77)' }; // amber-100, amber-300
-  } else if (clampedScore <= 60) {
-    return { backgroundColor: 'rgb(254, 252, 232)', borderColor: 'rgb(254, 240, 138)' }; // yellow-50, yellow-200
-  } else if (clampedScore <= 70) {
-    return { backgroundColor: 'rgb(247, 254, 231)', borderColor: 'rgb(217, 249, 157)' }; // lime-50, lime-200
-  } else if (clampedScore <= 80) {
-    return { backgroundColor: 'rgb(236, 252, 203)', borderColor: 'rgb(190, 242, 100)' }; // lime-100, lime-300
-  } else if (clampedScore <= 90) {
-    return { backgroundColor: 'rgb(240, 253, 244)', borderColor: 'rgb(187, 247, 208)' }; // green-50, green-200
+    return { backgroundColor: 'rgb(248, 113, 113)', borderColor: 'rgb(220, 38, 38)', color: 'rgb(0, 0, 0)' }; // red-400, red-600
+  } else if (clampedScore <= 33) {
+    return { backgroundColor: 'rgb(252, 165, 165)', borderColor: 'rgb(239, 68, 68)', color: 'rgb(0, 0, 0)' }; // red-300, red-500
   }
-  return { backgroundColor: 'rgb(220, 252, 231)', borderColor: 'rgb(134, 239, 172)' }; // green-100, green-300
+  // Bold amber/yellow for medium scores (34-66%)
+  else if (clampedScore <= 44) {
+    return { backgroundColor: 'rgb(251, 146, 60)', borderColor: 'rgb(234, 88, 12)', color: 'rgb(0, 0, 0)' }; // orange-400, orange-600
+  } else if (clampedScore <= 55) {
+    return { backgroundColor: 'rgb(251, 191, 36)', borderColor: 'rgb(217, 119, 6)', color: 'rgb(0, 0, 0)' }; // amber-400, amber-600
+  } else if (clampedScore <= 66) {
+    return { backgroundColor: 'rgb(250, 204, 21)', borderColor: 'rgb(202, 138, 4)', color: 'rgb(0, 0, 0)' }; // yellow-400, yellow-600
+  }
+  // Bold green for high scores (67-100%)
+  else if (clampedScore <= 77) {
+    return { backgroundColor: 'rgb(132, 204, 22)', borderColor: 'rgb(77, 124, 15)', color: 'rgb(0, 0, 0)' }; // lime-500, lime-700
+  } else if (clampedScore <= 88) {
+    return { backgroundColor: 'rgb(74, 222, 128)', borderColor: 'rgb(22, 163, 74)', color: 'rgb(0, 0, 0)' }; // green-400, green-600
+  } else {
+    return { backgroundColor: 'rgb(34, 197, 94)', borderColor: 'rgb(21, 128, 61)', color: 'rgb(0, 0, 0)' }; // green-500, green-700
+  }
+}
+
+/**
+ * Gets default light grey style for boxes without scores
+ */
+export function getDefaultBoxStyle(): React.CSSProperties {
+  return { backgroundColor: 'rgb(229, 231, 235)', borderColor: 'rgb(156, 163, 175)', color: 'rgb(0, 0, 0)' }; // gray-200, gray-400
 }

@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import LoadingSpinner from '@/components/LoadingSpinner';
 import PageSpinner from '@/components/PageSpinner';
 import { ArrowLeft, BookCopy, FileText, List, Upload } from 'lucide-react';
-import { getScoreColorStyle } from '@/lib/utils';
+import { getScoreColorStyle, getDefaultBoxStyle } from '@/lib/utils';
 import { PaperType } from '@/lib/types';
 
 export default function SubjectPage() {
@@ -211,18 +211,18 @@ export default function SubjectPage() {
               return (
                 <Card
                   key={paperType.id}
-                  className={`hover:shadow-md transition-all cursor-pointer h-full border-2 ${!hasScore && 'hover:bg-secondary'}`}
-                  style={hasScore ? getScoreColorStyle(avgScore) : undefined}
+                  className="hover:shadow-md transition-all cursor-pointer h-full border-2"
+                  style={hasScore ? getScoreColorStyle(avgScore) : getDefaultBoxStyle()}
                   onClick={() => handleNavigate(paperType.id)}
                 >
                   <CardHeader>
-                    <CardTitle className="text-lg">{paperType.name}</CardTitle>
+                    <CardTitle className="text-lg text-black">{paperType.name}</CardTitle>
                   </CardHeader>
                   <CardContent>
                     <div className="flex items-center justify-between">
-                      <p className="text-sm text-muted-foreground">{paperType.topics.length} topics</p>
+                      <p className="text-sm text-black">{paperType.topics.length} topics</p>
                       {hasScore && (
-                        <p className="text-sm font-bold">{avgScore.toFixed(1)}%</p>
+                        <p className="text-sm font-bold text-black">{avgScore.toFixed(1)}%</p>
                       )}
                     </div>
                   </CardContent>

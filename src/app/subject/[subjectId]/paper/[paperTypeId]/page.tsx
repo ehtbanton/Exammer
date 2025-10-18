@@ -9,7 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import PageSpinner from '@/components/PageSpinner';
 import { ArrowLeft, BookCopy } from 'lucide-react';
 import { Topic } from '@/lib/types';
-import { getScoreColorStyle } from '@/lib/utils';
+import { getScoreColorStyle, getDefaultBoxStyle } from '@/lib/utils';
 
 export default function PaperTypePage() {
   const params = useParams();
@@ -81,17 +81,17 @@ export default function PaperTypePage() {
               return (
                 <Link key={topic.id} href={`/subject/${subjectId}/paper/${encodeURIComponent(paperTypeId)}/topic/${encodeURIComponent(topic.id)}`} onClick={() => handleNavigate(topic.id)} className="block hover:no-underline">
                   <Card
-                    className={`hover:shadow-md transition-all h-full border-2 ${!hasScore && 'hover:bg-secondary'}`}
-                    style={hasScore ? getScoreColorStyle(avgScore) : undefined}
+                    className="hover:shadow-md transition-all h-full border-2"
+                    style={hasScore ? getScoreColorStyle(avgScore) : getDefaultBoxStyle()}
                   >
                     <CardHeader>
-                      <CardTitle className="text-lg">{topic.name}</CardTitle>
+                      <CardTitle className="text-lg text-black">{topic.name}</CardTitle>
                     </CardHeader>
                     <CardContent>
                       <div className="flex items-center justify-between">
-                        <p className="text-sm text-muted-foreground">{topic.examQuestions?.length > 0 ? `${topic.examQuestions.length} questions` : 'No questions yet'}</p>
+                        <p className="text-sm text-black">{topic.examQuestions?.length > 0 ? `${topic.examQuestions.length} questions` : 'No questions yet'}</p>
                         {hasScore && (
-                          <p className="text-sm font-bold">{avgScore.toFixed(1)}%</p>
+                          <p className="text-sm font-bold text-black">{avgScore.toFixed(1)}%</p>
                         )}
                       </div>
                     </CardContent>

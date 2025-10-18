@@ -88,12 +88,12 @@ export default function TopicPage() {
               >
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <div className="flex-1">
-                    <CardTitle className="text-md font-medium">{question.summary}</CardTitle>
+                    <CardTitle className="text-md font-medium text-black">{question.summary}</CardTitle>
                   </div>
                   <div className="text-right ml-4">
-                    <div className="text-sm font-bold">{question.score.toFixed(1)}%</div>
+                    <div className="text-sm font-bold text-black">{question.score.toFixed(1)}%</div>
                     {question.attempts > 0 && (
-                      <div className="text-xs text-muted-foreground">{question.attempts} attempt{question.attempts !== 1 ? 's' : ''}</div>
+                      <div className="text-xs text-black">{question.attempts} attempt{question.attempts !== 1 ? 's' : ''}</div>
                     )}
                   </div>
                 </CardHeader>
