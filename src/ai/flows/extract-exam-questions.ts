@@ -48,12 +48,14 @@ const MAX_PARALLEL_BATCHES_PER_KEY = 10; // Process up to 10 batches in parallel
 const MAX_REQUESTS_PER_MINUTE_PER_KEY = 10; // Rate limit: 10 requests per minute per API key
 
 /**
- * API Key manager with rate limiting
+ * API Key manager with rate limiting and round-robin distribution
  */
 class ApiKeyManager {
   private apiKeys: string[];
   private keyTimers: Map<string, number> = new Map(); // Tracks when each key can next be used
   private keyRequestCounts: Map<string, number> = new Map(); // Tracks requests made in current window
+  private currentKeyIndex: number = 0; // Round-robin index
+  private keyLock: Promise<void> = Promise.resolve(); // Ensures atomic key selection
 
   constructor(apiKeys: string[]) {
     this.apiKeys = apiKeys;
@@ -61,40 +63,71 @@ class ApiKeyManager {
   }
 
   /**
-   * Get an available API key, respecting rate limits
+   * Get an available API key, respecting rate limits and rotating through keys
    */
-  async getAvailableKey(): Promise<string> {
-    const now = Date.now();
+  async getAvailableKey(): Promise<{key: string, index: number}> {
+    // Wait for any previous key selection to complete (makes selection atomic)
+    await this.keyLock;
 
-    // Find a key that's ready to use
-    for (const key of this.apiKeys) {
-      const nextAvailable = this.keyTimers.get(key) || 0;
-      const requestCount = this.keyRequestCounts.get(key) || 0;
+    // Create a new lock for this selection
+    let releaseLock: () => void;
+    this.keyLock = new Promise(resolve => {
+      releaseLock = resolve;
+    });
 
-      if (now >= nextAvailable && requestCount < MAX_REQUESTS_PER_MINUTE_PER_KEY) {
-        return key;
+    try {
+      const now = Date.now();
+      const startIndex = this.currentKeyIndex;
+
+      // Try each key in round-robin order
+      for (let attempts = 0; attempts < this.apiKeys.length; attempts++) {
+        const key = this.apiKeys[this.currentKeyIndex];
+        const nextAvailable = this.keyTimers.get(key) || 0;
+        const requestCount = this.keyRequestCounts.get(key) || 0;
+
+        if (now >= nextAvailable && requestCount < MAX_REQUESTS_PER_MINUTE_PER_KEY) {
+          const keyIndex = this.currentKeyIndex;
+          // Move to next key for next request
+          this.currentKeyIndex = (this.currentKeyIndex + 1) % this.apiKeys.length;
+
+          // Mark request immediately while we have the lock
+          this.markRequestStart(key);
+
+          return {key, index: keyIndex + 1};
+        }
+
+        // Try next key
+        this.currentKeyIndex = (this.currentKeyIndex + 1) % this.apiKeys.length;
       }
+
+      // If no key is immediately available, wait for the soonest one
+      const soonestAvailable = Math.min(
+        ...this.apiKeys.map(key => this.keyTimers.get(key) || 0)
+      );
+
+      const waitTime = Math.max(0, soonestAvailable - now);
+      if (waitTime > 0) {
+        console.log(`Rate limit: All keys busy, waiting ${waitTime}ms...`);
+        releaseLock!(); // Release lock before waiting
+        await new Promise(resolve => setTimeout(resolve, waitTime));
+        // Recursively try again
+        return this.getAvailableKey();
+      }
+
+      // Reset index to start and try again
+      this.currentKeyIndex = startIndex;
+      releaseLock!(); // Release lock before recursing
+      return this.getAvailableKey();
+    } finally {
+      // Ensure lock is released
+      releaseLock!();
     }
-
-    // If no key is immediately available, wait for the soonest one
-    const soonestAvailable = Math.min(
-      ...this.apiKeys.map(key => this.keyTimers.get(key) || 0)
-    );
-
-    const waitTime = Math.max(0, soonestAvailable - now);
-    if (waitTime > 0) {
-      console.log(`Rate limit: waiting ${waitTime}ms for next available API key...`);
-      await new Promise(resolve => setTimeout(resolve, waitTime));
-    }
-
-    // Recursively try again
-    return this.getAvailableKey();
   }
 
   /**
    * Mark that a request is being made with this key
    */
-  markRequestStart(apiKey: string) {
+  private markRequestStart(apiKey: string) {
     const requestCount = (this.keyRequestCounts.get(apiKey) || 0) + 1;
     this.keyRequestCounts.set(apiKey, requestCount);
 
@@ -168,11 +201,10 @@ export async function extractExamQuestions(
 
     // Create a promise for this batch
     const batchPromise = (async () => {
-      // Get an available API key (waits if necessary)
-      const apiKey = await keyManager.getAvailableKey();
-      keyManager.markRequestStart(apiKey);
+      // Get an available API key (waits if necessary, marks request atomically)
+      const {key: apiKey, index: keyIndex} = await keyManager.getAvailableKey();
 
-      console.log(`Batch ${batchIndex + 1}/${batches.length}: Using API key ${keyManager.getAllKeys().indexOf(apiKey) + 1}, processing ${batch.length} papers...`);
+      console.log(`Batch ${batchIndex + 1}/${batches.length}: Using API key ${keyIndex}, processing ${batch.length} papers...`);
 
       try {
         // Create a genkit instance with this specific API key
