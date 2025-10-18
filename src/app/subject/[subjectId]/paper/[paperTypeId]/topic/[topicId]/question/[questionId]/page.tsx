@@ -158,44 +158,67 @@ export default function InterviewPage() {
     );
   }
 
+  // Format question text with better spacing for parts
+  const formatQuestionText = (text: string) => {
+    if (!text) return text;
+
+    // Add spacing before lettered parts like "a)" or "(a)" at the start of a line
+    let formatted = text.replace(/(\n|^)\s*\(?([a-z])\)\s*/gim, '\n\n$2) ');
+
+    // Add spacing before roman numeral parts like "i)" or "(i)" at the start of a line
+    formatted = formatted.replace(/(\n|^)\s*\(?(i{1,3}|iv|v|vi{0,3}|ix|x)\)\s*/gim, '\n$2) ');
+
+    return formatted.trim();
+  };
+
   return (
-    <div className="container mx-auto h-[calc(100vh-8rem)]">
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-full">
-        {/* Left Side - Question Info */}
-        <div className="lg:col-span-1 space-y-4 max-h-full overflow-y-auto">
-          <Button variant="ghost" onClick={() => router.push(`/subject/${subjectId}/paper/${encodeURIComponent(paperTypeId)}/topic/${encodeURIComponent(topicId)}`)} className="w-full">
-            <ArrowLeft />
-            Back to Questions
-          </Button>
+    <div className="container mx-auto h-[calc(100vh-8rem)] flex flex-col">
+      {/* Header with Back Button and Topic */}
+      <div className="flex items-center justify-between mb-4 pb-3 border-b">
+        <Button variant="ghost" onClick={() => router.push(`/subject/${subjectId}/paper/${encodeURIComponent(paperTypeId)}/topic/${encodeURIComponent(topicId)}`)}>
+          <ArrowLeft className="mr-2 h-4 w-4" />
+          Back to Questions
+        </Button>
+        <div className="text-sm text-muted-foreground">
+          <span className="font-medium">Topic:</span> {topic.name}
+        </div>
+      </div>
 
-          <Card>
-            <CardContent className="p-4">
-              <h2 className="text-xs font-semibold text-muted-foreground uppercase mb-2">Topic</h2>
-              <p className="text-sm font-medium">{topic.name}</p>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-primary/5 border-primary/20">
-            <CardContent className="p-4">
-              <h2 className="text-xs font-semibold text-muted-foreground uppercase mb-2">Question</h2>
-              <p className="text-lg font-semibold mb-3">{examQuestion.summary}</p>
-              <div className="max-h-96 overflow-y-auto">
-                {generatedVariant ? (
-                  <>
-                    <p className="text-sm whitespace-pre-wrap">{generatedVariant}</p>
-                    <p className="text-xs text-muted-foreground mt-3 italic">Similar question generated for practice</p>
-                  </>
-                ) : (
-                  <p className="text-sm text-muted-foreground">Generating similar question...</p>
-                )}
+      {/* Main Content - Question Left, Chat Right */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 flex-1 min-h-0">
+        {/* Left Side - Question Display */}
+        <div className="flex flex-col min-h-0">
+          <Card className="bg-primary/5 border-primary/20 flex-1 flex flex-col">
+            <CardContent className="flex-1 flex flex-col p-0 min-h-0">
+              <div className="p-6 pb-4 border-b">
+                <h2 className="text-sm font-semibold text-muted-foreground uppercase">Question</h2>
               </div>
+              {generatedVariant ? (
+                <>
+                  <ScrollArea className="flex-1 p-6 min-h-0">
+                    <div className="prose prose-base max-w-none dark:prose-invert">
+                      <div className="text-base leading-relaxed whitespace-pre-wrap break-words font-normal">
+                        {formatQuestionText(generatedVariant)}
+                      </div>
+                    </div>
+                  </ScrollArea>
+                  <div className="p-4 border-t shrink-0">
+                    <p className="text-xs text-muted-foreground italic">✨ Similar question generated for practice</p>
+                  </div>
+                </>
+              ) : (
+                <div className="flex items-center justify-center gap-3 flex-1">
+                  <LoadingSpinner className="w-5 h-5" />
+                  <p className="text-sm text-muted-foreground">Generating similar question...</p>
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>
 
         {/* Right Side - Chat Interface */}
-        <div className="lg:col-span-2 min-h-0">
-          <Card className="h-full flex flex-col">
+        <div className="flex flex-col min-h-0">
+          <Card className="flex-1 flex flex-col">
             <CardContent className="flex-1 flex flex-col p-0 min-h-0">
               <ScrollArea className="flex-1 p-4 min-h-0" viewportRef={scrollAreaViewport}>
                 <div className="space-y-6">
