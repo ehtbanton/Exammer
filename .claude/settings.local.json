@@ -1,9 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "Bash(del \"C:\\Users\\anton\\source\\repos\\Erudate\\src\\ai\\flows\\generate-granular-subsections.ts\")"
-    ],
-    "deny": [],
-    "ask": []
-  }
-}

@@ -47,3 +47,9 @@ firestore-debug.log
 # ide
 .vscode/*
 .vs/
+.claude/
+.idx/
+
+# temporary files
+.modified
+*.log
