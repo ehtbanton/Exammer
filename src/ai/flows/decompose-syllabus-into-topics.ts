@@ -23,7 +23,7 @@ export type DecomposeSyllabusInput = z.infer<typeof DecomposeSyllabusInputSchema
 
 const TopicSchema = z.object({
   name: z.string().describe('The name of the topic.'),
-  description: z.string().describe('A detailed description of what this topic covers, including key concepts and learning objectives.'),
+  description: z.string().describe('A brief 1-2 sentence description of what this topic covers.'),
 });
 
 const PaperTypeSchema = z.object({
@@ -47,22 +47,16 @@ const prompt = ai.definePrompt({
   name: 'decomposeSyllabusPrompt',
   input: {schema: DecomposeSyllabusInputSchema},
   output: {schema: DecomposeSyllabusOutputSchema},
-  prompt: `You are an expert educator helping students to learn effectively for their exams.
+  prompt: `Extract the structure from this exam syllabus:
 
-Please read this syllabus and extract the following information:
-
-1. The subject name (e.g., "Biology", "Computer Science A-Level", "GCSE Mathematics")
-2. The different paper types (e.g., "Paper 1", "Written Exam", "Practical Assessment")
-3. For each paper type, extract the list of topics or main sections covered under it
-4. For each topic, provide a detailed description including key concepts, learning objectives, and what students need to know
+1. Subject name
+2. Paper types (e.g., "Paper 1", "Paper 2")
+3. For each paper type, list the topics covered
+4. For each topic, write a brief 1-2 sentence description
 
 Syllabus: {{media url=syllabusDataUri}}
 
-Structure your output clearly:
-- Identify the subject name from the syllabus
-- Each paper type should contain its name and a list of topics
-- Each topic should contain its name and a comprehensive description of what it covers
-- Descriptions should be detailed enough to give students a clear understanding of the topic scope`,
+Keep descriptions concise - just enough to categorize exam questions later.`,
 });
 
 const decomposeSyllabusFlow = ai.defineFlow(
@@ -72,7 +66,9 @@ const decomposeSyllabusFlow = ai.defineFlow(
     outputSchema: DecomposeSyllabusOutputSchema,
   },
   async input => {
-    const response = await prompt(input);
+    const response = await prompt(input, {
+      model: 'googleai/gemini-2.0-flash-exp', // Use faster experimental model
+    });
     const output = response.output;
 
     // Ensure that the output always has required fields.
