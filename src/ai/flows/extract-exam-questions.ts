@@ -39,10 +39,69 @@ const ExtractExamQuestionsOutputSchema = z.object({
 });
 export type ExtractExamQuestionsOutput = z.infer<typeof ExtractExamQuestionsOutputSchema>;
 
+/**
+ * Configuration for batch processing
+ */
+const BATCH_SIZE = 10; // Process 10 papers per batch
+const MAX_PARALLEL_BATCHES = 10; // Process up to 10 batches in parallel
+
 export async function extractExamQuestions(
   input: ExtractExamQuestionsInput
 ): Promise<ExtractExamQuestionsOutput> {
-  return extractExamQuestionsFlow(input);
+  const { examPapersDataUris, topics } = input;
+
+  // If only 1-2 papers, process normally
+  if (examPapersDataUris.length <= BATCH_SIZE) {
+    return extractExamQuestionsFlow(input);
+  }
+
+  // Otherwise, batch process for reliability
+  console.log(`Processing ${examPapersDataUris.length} papers in batches of ${BATCH_SIZE}...`);
+
+  // Split papers into batches
+  const batches: string[][] = [];
+  for (let i = 0; i < examPapersDataUris.length; i += BATCH_SIZE) {
+    batches.push(examPapersDataUris.slice(i, i + BATCH_SIZE));
+  }
+
+  console.log(`Created ${batches.length} batches`);
+
+  // Process batches in parallel with concurrency control
+  const allQuestions: ExtractExamQuestionsOutput['questions'] = [];
+
+  for (let i = 0; i < batches.length; i += MAX_PARALLEL_BATCHES) {
+    const batchGroup = batches.slice(i, i + MAX_PARALLEL_BATCHES);
+
+    console.log(`Processing batch group ${Math.floor(i / MAX_PARALLEL_BATCHES) + 1}/${Math.ceil(batches.length / MAX_PARALLEL_BATCHES)}`);
+
+    const batchResults = await Promise.all(
+      batchGroup.map(async (batch, batchIndex) => {
+        const actualBatchNumber = i + batchIndex;
+        console.log(`  - Batch ${actualBatchNumber + 1}/${batches.length}: Processing ${batch.length} papers...`);
+
+        try {
+          const result = await extractExamQuestionsFlow({
+            examPapersDataUris: batch,
+            topics,
+          });
+
+          console.log(`  - Batch ${actualBatchNumber + 1}/${batches.length}: Extracted ${result.questions.length} questions`);
+          return result.questions;
+        } catch (error) {
+          console.error(`  - Batch ${actualBatchNumber + 1}/${batches.length}: Error:`, error);
+          // Return empty array on error rather than failing entire operation
+          return [];
+        }
+      })
+    );
+
+    // Merge results from this batch group
+    allQuestions.push(...batchResults.flat());
+  }
+
+  console.log(`Total questions extracted: ${allQuestions.length}`);
+
+  return { questions: allQuestions };
 }
 
 const prompt = ai.definePrompt({
