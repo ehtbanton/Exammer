@@ -70,7 +70,7 @@ const decomposeSyllabusFlow = ai.defineFlow(
     console.log('[Syllabus Processing] Started decomposing syllabus...');
 
     const response = await prompt(input, {
-      model: 'googleai/gemini-2.5-flash',
+      model: 'googleai/gemini-2.5-flash-lite',
     });
     const output = response.output;
 
