@@ -8,9 +8,8 @@
  * - GenerateSimilarQuestionOutput - The return type for the generateSimilarQuestion function.
  */
 
-import {genkit} from 'genkit';
-import {googleAI} from '@genkit-ai/google-genai';
 import {z} from 'genkit';
+import {executeWithManagedKey} from '@/ai/genkit';
 
 const GenerateSimilarQuestionInputSchema = z.object({
   originalQuestionText: z.string().describe('The original exam question to base the variant on.'),
@@ -31,16 +30,13 @@ export async function generateSimilarQuestion(
   const startTime = Date.now();
   console.log('[Process C] Starting similar question generation...');
 
-  const ai = genkit({
-    plugins: [googleAI()],
-    model: 'googleai/gemini-2.5-flash',
-  });
-
-  const prompt = ai.definePrompt({
-    name: 'generateSimilarQuestionPrompt',
-    input: {schema: GenerateSimilarQuestionInputSchema},
-    output: {schema: GenerateSimilarQuestionOutputSchema},
-    prompt: `You are an expert educator creating practice exam questions for students.
+  // Use the global API key manager to execute this flow
+  const result = await executeWithManagedKey(async (ai, flowInput) => {
+    const prompt = ai.definePrompt({
+      name: 'generateSimilarQuestionPrompt',
+      input: {schema: GenerateSimilarQuestionInputSchema},
+      output: {schema: GenerateSimilarQuestionOutputSchema},
+      prompt: `You are an expert educator creating practice exam questions for students.
 
 Your task is to generate a NEW question that is SIMILAR to the original question provided, but NOT IDENTICAL.
 
@@ -67,30 +63,20 @@ For example:
 - If the original asks to "calculate X", the variant should also ask to "calculate X" but with different values
 
 Generate a similar question that follows these guidelines.`,
-  });
+    });
 
-  const flow = ai.defineFlow(
-    {
-      name: 'generateSimilarQuestionFlow',
-      inputSchema: GenerateSimilarQuestionInputSchema,
-      outputSchema: GenerateSimilarQuestionOutputSchema,
-    },
-    async input => {
-      const response = await prompt(input);
-      const output = response.output;
+    const response = await prompt(flowInput);
+    const output = response.output;
 
-      if (!output) {
-        throw new Error('Failed to generate similar question - no output received');
-      }
-
-      return {
-        questionText: output.questionText,
-        summary: output.summary,
-      };
+    if (!output) {
+      throw new Error('Failed to generate similar question - no output received');
     }
-  );
 
-  const result = await flow(input);
+    return {
+      questionText: output.questionText,
+      summary: output.summary,
+    };
+  }, input);
 
   const endTime = Date.now();
   const duration = ((endTime - startTime) / 1000).toFixed(2);

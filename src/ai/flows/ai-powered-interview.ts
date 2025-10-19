@@ -8,8 +8,8 @@
  * - AIPoweredInterviewOutput - The return type for the aiPoweredInterview function.
  */
 
-import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
+import {executeWithManagedKey} from '@/ai/genkit';
 
 const AIPoweredInterviewInputSchema = z.object({
   subsection: z.string().describe('The specific subsection/topic context for the question.'),
@@ -45,62 +45,13 @@ const GenerateQuestionOutputSchema = z.object({
 export type GenerateQuestionOutput = z.infer<typeof GenerateQuestionOutputSchema>;
 
 export async function aiPoweredInterview(input: AIPoweredInterviewInput): Promise<AIPoweredInterviewOutput> {
-  return aiPoweredInterviewFlow(input);
-}
-
-export async function generateQuestion(input: GenerateQuestionInput): Promise<GenerateQuestionOutput> {
-  return generateQuestionFlow(input);
-}
-
-const questionGenerationPrompt = ai.definePrompt({
-  name: 'questionGenerationPrompt',
-  input: {schema: GenerateQuestionInputSchema},
-  output: {schema: GenerateQuestionOutputSchema},
-  prompt: `You are an AI assistant designed to generate exam-style questions for students.
-
-The current subsection is: {{{subsection}}}
-
-Use the following past papers to generate a relevant question:
-{{{pastPapers}}}
-
-Generate a challenging, exam-style question that is appropriate for the subsection. The question should:
-- Be clear and specific
-- Test understanding of key concepts
-- Be similar in style to questions from the past papers
-- Be answerable based on the material covered
-
-Output only the question in the 'question' field.`,
-});
-
-const generateQuestionFlow = ai.defineFlow(
-  {
-    name: 'generateQuestionFlow',
-    inputSchema: GenerateQuestionInputSchema,
-    outputSchema: GenerateQuestionOutputSchema,
-  },
-  async input => {
-    const { subsection, pastPapers } = input;
-
-    const { output } = await questionGenerationPrompt({
-      subsection,
-      pastPapers,
-    });
-
-    if (!output) {
-      throw new Error('AI response was empty.');
-    }
-
-    return {
-      question: output.question,
-    };
-  }
-);
-
-const prompt = ai.definePrompt({
-  name: 'aiPoweredInterviewPrompt',
-  input: {schema: AIPoweredInterviewInputSchema},
-  output: {schema: AIPoweredInterviewOutputSchema},
-  prompt: `You are an AI assistant designed to help students learn material by conducting interview-style conversations. You are helping the student answer a real exam question.
+  // Use the global API key manager to execute this flow
+  return executeWithManagedKey(async (ai, flowInput) => {
+    const prompt = ai.definePrompt({
+      name: 'aiPoweredInterviewPrompt',
+      input: {schema: AIPoweredInterviewInputSchema},
+      output: {schema: AIPoweredInterviewOutputSchema},
+      prompt: `You are an AI assistant designed to help students learn material by conducting interview-style conversations. You are helping the student answer a real exam question.
 
 Topic context: {{{subsection}}}
 
@@ -130,21 +81,14 @@ Output the nextAssistantMessage which contains your next message to the user.
 If the question is fully and correctly answered, set the isCorrect boolean to true and award the final score in the score field (out of 10).
 Also output the updated chatHistory array, including the user answer (if any) and your assistant message.
 `,
-});
+    });
 
-const aiPoweredInterviewFlow = ai.defineFlow(
-  {
-    name: 'aiPoweredInterviewFlow',
-    inputSchema: AIPoweredInterviewInputSchema,
-    outputSchema: AIPoweredInterviewOutputSchema,
-  },
-  async input => {
     const {
       subsection,
       userAnswer,
       previousChatHistory = [],
       question,
-    } = input;
+    } = flowInput;
 
     const {
       output,
@@ -154,7 +98,7 @@ const aiPoweredInterviewFlow = ai.defineFlow(
       previousChatHistory,
       question,
     });
-    
+
     if (!output) {
       throw new Error('AI response was empty.');
     }
@@ -173,5 +117,45 @@ const aiPoweredInterviewFlow = ai.defineFlow(
       score: output.score,
       chatHistory: updatedChatHistory,
     };
-  }
-);
+  }, input);
+}
+
+export async function generateQuestion(input: GenerateQuestionInput): Promise<GenerateQuestionOutput> {
+  // Use the global API key manager to execute this flow
+  return executeWithManagedKey(async (ai, flowInput) => {
+    const questionGenerationPrompt = ai.definePrompt({
+      name: 'questionGenerationPrompt',
+      input: {schema: GenerateQuestionInputSchema},
+      output: {schema: GenerateQuestionOutputSchema},
+      prompt: `You are an AI assistant designed to generate exam-style questions for students.
+
+The current subsection is: {{{subsection}}}
+
+Use the following past papers to generate a relevant question:
+{{{pastPapers}}}
+
+Generate a challenging, exam-style question that is appropriate for the subsection. The question should:
+- Be clear and specific
+- Test understanding of key concepts
+- Be similar in style to questions from the past papers
+- Be answerable based on the material covered
+
+Output only the question in the 'question' field.`,
+    });
+
+    const { subsection, pastPapers } = flowInput;
+
+    const { output } = await questionGenerationPrompt({
+      subsection,
+      pastPapers,
+    });
+
+    if (!output) {
+      throw new Error('AI response was empty.');
+    }
+
+    return {
+      question: output.question,
+    };
+  }, input);
+}

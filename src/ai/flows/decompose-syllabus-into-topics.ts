@@ -9,8 +9,8 @@
  * - DecomposeSyllabusOutput - The return type for the decomposeSyllabus function.
  */
 
-import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
+import {executeWithManagedKey} from '@/ai/genkit';
 
 const DecomposeSyllabusInputSchema = z.object({
   syllabusDataUri: z
@@ -40,14 +40,16 @@ export type DecomposeSyllabusOutput = z.infer<typeof DecomposeSyllabusOutputSche
 export async function decomposeSyllabus(
   input: DecomposeSyllabusInput
 ): Promise<DecomposeSyllabusOutput> {
-  return decomposeSyllabusFlow(input);
-}
+  const startTime = Date.now();
+  console.log('[Syllabus Processing] Started decomposing syllabus...');
 
-const prompt = ai.definePrompt({
-  name: 'decomposeSyllabusPrompt',
-  input: {schema: DecomposeSyllabusInputSchema},
-  output: {schema: DecomposeSyllabusOutputSchema},
-  prompt: `Extract the structure from this exam syllabus:
+  // Use the global API key manager to execute this flow
+  const result = await executeWithManagedKey(async (ai, flowInput) => {
+    const prompt = ai.definePrompt({
+      name: 'decomposeSyllabusPrompt',
+      input: {schema: DecomposeSyllabusInputSchema},
+      output: {schema: DecomposeSyllabusOutputSchema},
+      prompt: `Extract the structure from this exam syllabus:
 
 1. Subject name
 2. Paper types (e.g., "Paper 1", "Paper 2")
@@ -57,19 +59,9 @@ const prompt = ai.definePrompt({
 Syllabus: {{media url=syllabusDataUri}}
 
 Keep descriptions concise - just enough to categorize exam questions later.`,
-});
+    });
 
-const decomposeSyllabusFlow = ai.defineFlow(
-  {
-    name: 'decomposeSyllabusFlow',
-    inputSchema: DecomposeSyllabusInputSchema,
-    outputSchema: DecomposeSyllabusOutputSchema,
-  },
-  async input => {
-    const startTime = Date.now();
-    console.log('[Syllabus Processing] Started decomposing syllabus...');
-
-    const response = await prompt(input, {
+    const response = await prompt(flowInput, {
       model: 'googleai/gemini-2.5-flash-lite',
     });
     const output = response.output;
@@ -78,11 +70,13 @@ const decomposeSyllabusFlow = ai.defineFlow(
     const subjectName = output?.subjectName ?? 'Untitled Subject';
     const paperTypes = output?.paperTypes ?? [];
 
-    const endTime = Date.now();
-    const duration = ((endTime - startTime) / 1000).toFixed(2);
-    console.log(`[Syllabus Processing] Completed in ${duration}s`);
-    console.log(`[Syllabus Processing] Found ${paperTypes.length} paper type(s) with ${paperTypes.reduce((acc, pt) => acc + pt.topics.length, 0)} total topics`);
-
     return { subjectName, paperTypes };
-  }
-);
+  }, input);
+
+  const endTime = Date.now();
+  const duration = ((endTime - startTime) / 1000).toFixed(2);
+  console.log(`[Syllabus Processing] Completed in ${duration}s`);
+  console.log(`[Syllabus Processing] Found ${result.paperTypes.length} paper type(s) with ${result.paperTypes.reduce((acc, pt) => acc + pt.topics.length, 0)} total topics`);
+
+  return result;
+}
