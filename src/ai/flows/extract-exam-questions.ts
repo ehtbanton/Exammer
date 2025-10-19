@@ -11,7 +11,7 @@
 import {genkit} from 'genkit';
 import {googleAI} from '@genkit-ai/google-genai';
 import {z} from 'genkit';
-import {geminiApiKeyManager} from '../gemini-api-key-manager';
+import {geminiApiKeyManager} from '@root/gemini-api-key-manager';
 
 const TopicInfoSchema = z.object({
   name: z.string().describe('The name of the topic.'),

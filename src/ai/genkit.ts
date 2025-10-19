@@ -1,6 +1,6 @@
 import {genkit, Genkit} from 'genkit';
 import {googleAI} from '@genkit-ai/google-genai';
-import {geminiApiKeyManager} from './gemini-api-key-manager';
+import {geminiApiKeyManager} from '@root/gemini-api-key-manager';
 
 // Default AI instance using the first available key
 export const ai = genkit({
