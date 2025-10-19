@@ -172,7 +172,7 @@ export default function InterviewPage() {
   };
 
   return (
-    <div className="container mx-auto h-[calc(100vh-8rem)] flex flex-col">
+    <div className="container mx-auto md:h-[calc(100vh-8rem)] flex flex-col">
       {/* Header with Back Button and Topic */}
       <div className="flex items-center justify-between mb-4 pb-3 border-b">
         <Button variant="ghost" onClick={() => router.push(`/subject/${subjectId}/paper/${encodeURIComponent(paperTypeId)}/topic/${encodeURIComponent(topicId)}`)}>
@@ -185,9 +185,9 @@ export default function InterviewPage() {
       </div>
 
       {/* Main Content - Question Left, Chat Right */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 flex-1 min-h-0">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:flex-1 md:min-h-0">
         {/* Left Side - Question Display */}
-        <div className="flex flex-col min-h-0">
+        <div className="flex flex-col min-h-[40vh] md:min-h-0">
           <Card className="bg-primary/5 border-primary/20 flex-1 flex flex-col">
             <CardContent className="flex-1 flex flex-col p-0 min-h-0">
               <div className="p-6 pb-4 border-b">
@@ -217,7 +217,7 @@ export default function InterviewPage() {
         </div>
 
         {/* Right Side - Chat Interface */}
-        <div className="flex flex-col min-h-0">
+        <div className="flex flex-col min-h-[50vh] md:min-h-0">
           <Card className="flex-1 flex flex-col">
             <CardContent className="flex-1 flex flex-col p-0 min-h-0">
               <ScrollArea className="flex-1 p-4 min-h-0" viewportRef={scrollAreaViewport}>
