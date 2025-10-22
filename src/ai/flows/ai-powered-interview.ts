@@ -97,6 +97,8 @@ Also output the updated chatHistory array, including the user answer (if any) an
       userAnswer,
       previousChatHistory,
       question,
+    }, {
+      model: 'googleai/gemini-2.5-flash-lite',
     });
 
     if (!output) {
@@ -148,6 +150,8 @@ Output only the question in the 'question' field.`,
     const { output } = await questionGenerationPrompt({
       subsection,
       pastPapers,
+    }, {
+      model: 'googleai/gemini-2.5-flash-lite',
     });
 
     if (!output) {

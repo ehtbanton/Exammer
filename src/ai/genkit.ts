@@ -5,7 +5,7 @@ import {geminiApiKeyManager} from '@root/gemini-api-key-manager';
 // Default AI instance using the first available key
 export const ai = genkit({
   plugins: [googleAI()],
-  model: 'googleai/gemini-2.5-flash',
+  model: 'googleai/gemini-2.5-flash-lite',
 });
 
 /**
@@ -15,7 +15,7 @@ export const ai = genkit({
 export function createGenkitInstance(apiKey: string): Genkit {
   return genkit({
     plugins: [googleAI({apiKey})],
-    model: 'googleai/gemini-2.5-flash',
+    model: 'googleai/gemini-2.5-flash-lite',
   });
 }
 

@@ -88,7 +88,7 @@ export async function extractExamQuestions(
           // Create a genkit instance with this specific API key
           const aiInstance = genkit({
             plugins: [googleAI({ apiKey })],
-            model: 'googleai/gemini-2.5-flash',
+            model: 'googleai/gemini-2.5-flash-lite',
           });
 
           // Create flow with this AI instance

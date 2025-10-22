@@ -31,6 +31,7 @@ export async function generateSimilarQuestion(
   console.log('[Process C] Starting similar question generation...');
 
   // Use the global API key manager to execute this flow
+
   const result = await executeWithManagedKey(async (ai, flowInput) => {
     const prompt = ai.definePrompt({
       name: 'generateSimilarQuestionPrompt',
@@ -65,7 +66,9 @@ For example:
 Generate a similar question that follows these guidelines.`,
     });
 
-    const response = await prompt(flowInput);
+    const response = await prompt(flowInput, {
+      model: 'googleai/gemini-2.5-flash-lite',
+    });
     const output = response.output;
 
     if (!output) {
