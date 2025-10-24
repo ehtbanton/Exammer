@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { requireAuth } from '@/lib/auth-helpers';
-import type { Question } from '@/lib/db';
+import type { Question, UserProgress } from '@/lib/db';
 
-// GET /api/topics/[id]/questions - Get all questions for a topic
+// GET /api/topics/[id]/questions - Get all questions for a topic with user progress
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
   try {
     const user = await requireAuth();
@@ -24,11 +24,27 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     }
 
     const questions = await db.all<Question>(
-      'SELECT * FROM questions WHERE topic_id = ?',
+      'SELECT * FROM questions WHERE topic_id = ? ORDER BY created_at ASC',
       [topicId]
     );
 
-    return NextResponse.json(questions);
+    // For each question, fetch user progress
+    const questionsWithProgress = await Promise.all(
+      questions.map(async (question) => {
+        const progress = await db.get<UserProgress>(
+          'SELECT * FROM user_progress WHERE user_id = ? AND question_id = ?',
+          [user.id, question.id]
+        );
+
+        return {
+          ...question,
+          score: progress?.score || 0,
+          attempts: progress?.attempts || 0,
+        };
+      })
+    );
+
+    return NextResponse.json(questionsWithProgress);
   } catch (error: any) {
     if (error.message === 'Unauthorized') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });

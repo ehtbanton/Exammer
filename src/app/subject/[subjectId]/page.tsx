@@ -137,72 +137,79 @@ function SubjectPageContent() {
               <DialogTrigger asChild>
                 <Button variant="secondary">Manage Past Papers</Button>
               </DialogTrigger>
-              <DialogContent className="max-w-md">
+              <DialogContent className="max-w-2xl">
                 <DialogHeader>
-                  <DialogTitle>Upload Past Papers</DialogTitle>
+                  <DialogTitle>Upload Past Exam Papers</DialogTitle>
                   <DialogDescription>
-                    Upload exam papers to automatically extract questions for all topics in "{subject.name}".
+                    Upload past exam papers to extract real exam questions for all topics in "{subject.name}".
                   </DialogDescription>
                 </DialogHeader>
 
                 <div className="space-y-4">
-                  <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
-                    <p className="text-xs text-blue-800 dark:text-blue-200">
-                      Questions will be automatically extracted and sorted into topics.
+                  <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                    <p className="text-sm text-blue-800 dark:text-blue-200">
+                      <strong>Recommended:</strong> Upload at least 1 paper for each paper type.
                     </p>
                   </div>
 
-                  <div className="space-y-3">
-                    {subject.pastPapers.length > 0 && (
-                      <div>
-                        <h4 className="text-sm font-semibold mb-2">Previously Uploaded:</h4>
-                        <div className="max-h-24 overflow-y-auto space-y-1 border rounded-md p-2">
-                          {subject.pastPapers.map(paper => (
-                            <div key={paper.id} className="text-xs p-2 bg-secondary rounded-md">{paper.name}</div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
+                  {subject.pastPapers.length > 0 && (
                     <div>
-                      <Button onClick={() => paperInputRef.current?.click()} variant="outline" className="w-full">
-                        <Upload className="mr-2 h-4 w-4" />
-                        Select Papers to Upload
-                      </Button>
-                      <Input
-                        type="file"
-                        ref={paperInputRef}
-                        className="hidden"
-                        onChange={handlePaperSelect}
-                        accept=".pdf,.txt,.md"
-                        multiple
-                      />
+                      <h4 className="text-sm font-semibold mb-2">Previously Uploaded:</h4>
+                      <div className="max-h-32 overflow-y-auto space-y-1 border rounded-md p-2">
+                        {subject.pastPapers.map(paper => (
+                          <div key={paper.id} className="text-sm p-2 bg-secondary rounded-md">{paper.name}</div>
+                        ))}
+                      </div>
                     </div>
+                  )}
+
+                  <div>
+                    <Button onClick={() => paperInputRef.current?.click()} variant="outline" type="button" className="w-full">
+                      <FileText className="mr-2 h-4 w-4" />
+                      Add Exam Papers
+                    </Button>
+                    <Input
+                      type="file"
+                      ref={paperInputRef}
+                      className="hidden"
+                      onChange={handlePaperSelect}
+                      accept=".pdf,.txt,.md"
+                      multiple
+                    />
 
                     {selectedPapers.length > 0 && (
-                      <div>
-                        <h4 className="text-sm font-semibold mb-2">To Upload:</h4>
-                        <div className="max-h-32 overflow-y-auto space-y-2 border rounded-md p-2">
-                          {selectedPapers.map((paper, index) => (
-                            <div key={index} className="flex items-center justify-between p-2 bg-muted rounded text-sm">
-                              <span className="text-xs truncate flex-1">{paper.name}</span>
-                              <Button variant="ghost" size="sm" onClick={() => removePaper(index)}>
-                                <span className="text-xs">Remove</span>
-                              </Button>
-                            </div>
-                          ))}
-                        </div>
+                      <div className="mt-3 max-h-64 overflow-y-auto border rounded-md p-2 space-y-2">
+                        {selectedPapers.map((paper, index) => (
+                          <div key={index} className="flex items-center justify-between p-2 bg-muted rounded">
+                            <span className="text-sm truncate flex-1 mr-2">{paper.name}</span>
+                            <Button variant="ghost" size="sm" onClick={() => removePaper(index)}>
+                              <span className="text-xs">Remove</span>
+                            </Button>
+                          </div>
+                        ))}
                       </div>
                     )}
                   </div>
 
-                  <Button
-                    onClick={handleUploadPapers}
-                    className="w-full"
-                    disabled={isPaperLoading || selectedPapers.length === 0}
-                  >
-                    {isPaperLoading ? <LoadingSpinner /> : 'Process Papers & Extract Questions'}
-                  </Button>
+                  <div className="flex gap-2 pt-2">
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        setSelectedPapers([]);
+                        setPaperDialogOpen(false);
+                      }}
+                      className="flex-1"
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      onClick={handleUploadPapers}
+                      className="flex-1"
+                      disabled={isPaperLoading || selectedPapers.length === 0}
+                    >
+                      {isPaperLoading ? <LoadingSpinner /> : 'Process Papers & Extract Questions'}
+                    </Button>
+                  </div>
                 </div>
               </DialogContent>
             </Dialog>

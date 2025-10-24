@@ -13,7 +13,7 @@ export async function GET(req: NextRequest) {
       [user.id]
     );
 
-    // For each subject, fetch its past papers and paper types
+    // For each subject, fetch its past papers, paper types, topics, questions, and user progress
     const subjectsWithDetails = await Promise.all(
       subjects.map(async (subject) => {
         const pastPapers = await db.all<PastPaper>(
@@ -26,10 +26,60 @@ export async function GET(req: NextRequest) {
           [subject.id]
         );
 
+        // For each paper type, fetch topics with questions and user progress
+        const paperTypesWithTopics = await Promise.all(
+          paperTypes.map(async (pt) => {
+            const topics = await db.all<any>(
+              'SELECT * FROM topics WHERE paper_type_id = ?',
+              [pt.id]
+            );
+
+            const topicsWithQuestions = await Promise.all(
+              topics.map(async (topic) => {
+                const questions = await db.all<any>(
+                  'SELECT * FROM questions WHERE topic_id = ? ORDER BY created_at ASC',
+                  [topic.id]
+                );
+
+                // Fetch user progress for each question
+                const questionsWithProgress = await Promise.all(
+                  questions.map(async (question) => {
+                    const progress = await db.get<any>(
+                      'SELECT score, attempts FROM user_progress WHERE user_id = ? AND question_id = ?',
+                      [user.id, question.id]
+                    );
+
+                    return {
+                      id: question.id,
+                      question_text: question.question_text,
+                      summary: question.summary,
+                      score: progress?.score || 0,
+                      attempts: progress?.attempts || 0,
+                    };
+                  })
+                );
+
+                return {
+                  id: topic.id,
+                  name: topic.name,
+                  description: topic.description,
+                  examQuestions: questionsWithProgress,
+                };
+              })
+            );
+
+            return {
+              id: pt.id,
+              name: pt.name,
+              topics: topicsWithQuestions,
+            };
+          })
+        );
+
         return {
           ...subject,
           pastPapers,
-          paperTypes,
+          paperTypes: paperTypesWithTopics,
         };
       })
     );

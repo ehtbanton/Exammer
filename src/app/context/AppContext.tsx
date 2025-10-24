@@ -56,7 +56,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
             paperTypes: (sub.paperTypes || []).map((pt: any) => ({
               id: pt.id.toString(),
               name: pt.name,
-              topics: [] // Topics will be loaded separately when needed
+              topics: (pt.topics || []).map((t: any) => ({
+                id: t.id.toString(),
+                name: t.name,
+                description: t.description || '',
+                examQuestions: (t.examQuestions || []).map((q: any) => ({
+                  id: q.id.toString(),
+                  questionText: q.question_text,
+                  summary: q.summary,
+                  score: q.score || 0,
+                  attempts: q.attempts || 0,
+                }))
+              }))
             }))
           }));
           setSubjects(clientSubjects);
@@ -292,31 +303,49 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
           const extractedQuestions = questionsResult.questions;
 
-          // Update subject with questions
-          setSubjects(prev => prev.map(s => {
-            if (s.id !== subjectId) return s;
+          // Persist questions to database and update subject with questions
+          const updatedPaperTypes = await Promise.all(paperTypes.map(async (pt) => {
+            const updatedTopics = await Promise.all(pt.topics.map(async (topic) => {
+              const topicQuestions = extractedQuestions.filter(q => q.topicName === topic.name);
+
+              // Persist each question to the database
+              const createdQuestions = await Promise.all(topicQuestions.map(async (q) => {
+                const response = await fetch(`/api/topics/${topic.id}/questions`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    questionText: q.questionText,
+                    summary: q.summary
+                  })
+                });
+                const dbQuestion = await response.json();
+                return {
+                  id: dbQuestion.id.toString(),
+                  questionText: dbQuestion.question_text,
+                  summary: dbQuestion.summary,
+                  score: 0,
+                  attempts: 0,
+                };
+              }));
+
+              return {
+                ...topic,
+                examQuestions: [...topic.examQuestions, ...createdQuestions],
+              };
+            }));
 
             return {
-              ...s,
-              paperTypes: s.paperTypes.map(pt => ({
-                ...pt,
-                topics: pt.topics.map(topic => {
-                  const topicQuestions = extractedQuestions
-                    .filter(q => q.topicName === topic.name)
-                    .map((q, index) => ({
-                      id: `${topic.name.toLowerCase().replace(/\s+/g, '-')}-q${Date.now()}-${index}`,
-                      questionText: q.questionText,
-                      summary: q.summary,
-                      score: 0,
-                      attempts: 0,
-                    }));
+              ...pt,
+              topics: updatedTopics
+            };
+          }));
 
-                  return {
-                    ...topic,
-                    examQuestions: [...topic.examQuestions, ...topicQuestions],
-                  };
-                }),
-              })),
+          // Update local state with the created questions
+          setSubjects(prev => prev.map(s => {
+            if (s.id !== subjectId) return s;
+            return {
+              ...s,
+              paperTypes: updatedPaperTypes
             };
           }));
 
@@ -408,42 +437,54 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [toast, setLoading]);
 
 
-  const updateExamQuestionScore = useCallback((subjectId: string, paperTypeName: string, topicName: string, questionId: string, score: number) => {
-    setSubjects(prevSubjects => prevSubjects.map(subject => {
-      if (subject.id !== subjectId) return subject;
-      return {
-        ...subject,
-        paperTypes: subject.paperTypes.map(pt => {
-          if (pt.name !== paperTypeName) return pt;
-          return {
-            ...pt,
-            topics: pt.topics.map(topic => {
-              if (topic.name !== topicName) return topic;
-              return {
-                ...topic,
-                examQuestions: topic.examQuestions.map(question => {
-                  if (question.id !== questionId) return question;
+  const updateExamQuestionScore = useCallback(async (subjectId: string, paperTypeName: string, topicName: string, questionId: string, score: number) => {
+    try {
+      // Persist score to database
+      const response = await fetch(`/api/questions/${questionId}/progress`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ score })
+      });
 
-                  // The score from the AI is out of 10
-                  // We treat scoring as an average, starting with an imaginary initial 0/10 score
-                  // Formula: new_percentage = (old_percentage * (n + 1) + score * 10) / (n + 2)
-                  const n = question.attempts || 0;
-                  const oldPercentage = question.score || 0;
-                  const newPercentage = (oldPercentage * (n + 1) + score * 10) / (n + 2);
+      if (!response.ok) {
+        throw new Error('Failed to update score');
+      }
 
-                  return {
-                    ...question,
-                    score: Math.round(newPercentage * 10) / 10, // Round to 1 decimal place
-                    attempts: n + 1
-                  };
-                })
-              };
-            })
-          }
-        })
-      };
-    }));
-  }, []);
+      const updatedProgress = await response.json();
+
+      // Update local state with the new score from the database
+      setSubjects(prevSubjects => prevSubjects.map(subject => {
+        if (subject.id !== subjectId) return subject;
+        return {
+          ...subject,
+          paperTypes: subject.paperTypes.map(pt => {
+            if (pt.name !== paperTypeName) return pt;
+            return {
+              ...pt,
+              topics: pt.topics.map(topic => {
+                if (topic.name !== topicName) return topic;
+                return {
+                  ...topic,
+                  examQuestions: topic.examQuestions.map(question => {
+                    if (question.id !== questionId) return question;
+
+                    return {
+                      ...question,
+                      score: Math.round(updatedProgress.score * 10) / 10, // Round to 1 decimal place
+                      attempts: updatedProgress.attempts
+                    };
+                  })
+                };
+              })
+            }
+          })
+        };
+      }));
+    } catch (error) {
+      console.error('Error updating score:', error);
+      toast({ variant: "destructive", title: "Error", description: "Failed to save score" });
+    }
+  }, [toast]);
 
   const generateQuestionVariant = useCallback(async (subjectId: string, paperTypeId: string, topicId: string, questionId: string): Promise<string> => {
     // Find the question to generate a variant for

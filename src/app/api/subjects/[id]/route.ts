@@ -28,10 +28,60 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
       [subjectId]
     );
 
+    // For each paper type, fetch topics with questions and user progress
+    const paperTypesWithTopics = await Promise.all(
+      paperTypes.map(async (pt) => {
+        const topics = await db.all<any>(
+          'SELECT * FROM topics WHERE paper_type_id = ?',
+          [pt.id]
+        );
+
+        const topicsWithQuestions = await Promise.all(
+          topics.map(async (topic) => {
+            const questions = await db.all<any>(
+              'SELECT * FROM questions WHERE topic_id = ? ORDER BY created_at ASC',
+              [topic.id]
+            );
+
+            // Fetch user progress for each question
+            const questionsWithProgress = await Promise.all(
+              questions.map(async (question) => {
+                const progress = await db.get<any>(
+                  'SELECT score, attempts FROM user_progress WHERE user_id = ? AND question_id = ?',
+                  [user.id, question.id]
+                );
+
+                return {
+                  id: question.id,
+                  question_text: question.question_text,
+                  summary: question.summary,
+                  score: progress?.score || 0,
+                  attempts: progress?.attempts || 0,
+                };
+              })
+            );
+
+            return {
+              id: topic.id,
+              name: topic.name,
+              description: topic.description,
+              examQuestions: questionsWithProgress,
+            };
+          })
+        );
+
+        return {
+          id: pt.id,
+          name: pt.name,
+          topics: topicsWithQuestions,
+        };
+      })
+    );
+
     return NextResponse.json({
       ...subject,
       pastPapers,
-      paperTypes,
+      paperTypes: paperTypesWithTopics,
     });
   } catch (error: any) {
     if (error.message === 'Unauthorized') {
