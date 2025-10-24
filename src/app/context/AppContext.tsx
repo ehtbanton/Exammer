@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
+import { useSession } from 'next-auth/react';
 import type { Subject, Topic, ExamQuestion, PastPaper, PaperType } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { decomposeSyllabus } from '@/ai/flows/decompose-syllabus-into-topics';
@@ -12,7 +13,7 @@ interface AppContextType {
   subjects: Subject[];
   createSubjectFromSyllabus: (syllabusFile: File) => Promise<void>;
   processExamPapers: (subjectId: string, examPapers: File[]) => Promise<void>;
-  deleteSubject: (subjectId: string) => void;
+  deleteSubject: (subjectId: string) => Promise<void>;
   getSubjectById: (subjectId: string) => Subject | undefined;
   addPastPaperToSubject: (subjectId: string, paperFile: File) => Promise<void>;
   updateExamQuestionScore: (subjectId: string, paperTypeName: string, topicName: string, questionId: string, score: number) => void;
@@ -27,69 +28,55 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [loadingStates, setLoadingStates] = useState<Record<string, boolean>>({});
   const { toast } = useToast();
+  const { data: session, status } = useSession();
 
+  // Fetch subjects from API when session changes
   useEffect(() => {
-    try {
-      const storedSubjects = localStorage.getItem('examplify-ai-subjects');
-      if (storedSubjects) {
-        const parsed = JSON.parse(storedSubjects);
-        // Migration: Handle both old subsections structure and new examQuestions structure
-        const migrated = parsed.map((subject: Subject) => ({
-          ...subject,
-          paperTypes: subject.paperTypes.map(pt => ({
-            ...pt,
-            topics: pt.topics.map((topic: any) => ({
-              ...topic,
-              description: topic.description ?? '', // Add description if missing
-              examQuestions: topic.examQuestions ?? [], // Use new structure or empty array
-            }))
-          }))
-        }));
-        setSubjects(migrated);
+    const fetchSubjects = async () => {
+      // Clear subjects if no session
+      if (!session?.user) {
+        setSubjects([]);
+        return;
       }
-    } catch (error) {
-      console.error("Failed to load subjects from localStorage", error);
-      toast({ variant: "destructive", title: "Error", description: "Could not load your saved data." });
+
+      try {
+        const response = await fetch('/api/subjects');
+        if (response.ok) {
+          const apiSubjects = await response.json();
+          // Convert API format to client format
+          const clientSubjects = apiSubjects.map((sub: any) => ({
+            id: sub.id.toString(),
+            name: sub.name,
+            syllabusContent: sub.syllabus_content || '',
+            pastPapers: (sub.pastPapers || []).map((pp: any) => ({
+              id: pp.id.toString(),
+              name: pp.name,
+              content: pp.content
+            })),
+            paperTypes: (sub.paperTypes || []).map((pt: any) => ({
+              id: pt.id.toString(),
+              name: pt.name,
+              topics: [] // Topics will be loaded separately when needed
+            }))
+          }));
+          setSubjects(clientSubjects);
+        } else if (response.status !== 401) {
+          // Only show error if not unauthorized (user not logged in yet)
+          toast({ variant: "destructive", title: "Error", description: "Failed to load subjects" });
+        }
+      } catch (error) {
+        console.error("Failed to fetch subjects:", error);
+      }
+    };
+
+    // Only fetch when session status is authenticated
+    if (status === 'authenticated') {
+      fetchSubjects();
+    } else if (status === 'unauthenticated') {
+      setSubjects([]);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  useEffect(() => {
-    try {
-      // Clean up subjects data before saving to avoid quota issues
-      const cleanedSubjects = subjects.map(subject => ({
-        ...subject,
-        // Remove large PDF content from past papers after they're processed
-        pastPapers: subject.pastPapers.map(paper => ({
-          ...paper,
-          content: paper.content.length > 1000 ? paper.content.substring(0, 1000) + '... [truncated]' : paper.content
-        })),
-        // Keep syllabus content truncated as well
-        syllabusContent: subject.syllabusContent.length > 5000
-          ? subject.syllabusContent.substring(0, 5000) + '... [truncated]'
-          : subject.syllabusContent
-      }));
-
-      localStorage.setItem('examplify-ai-subjects', JSON.stringify(cleanedSubjects));
-    } catch (error) {
-      console.error("Failed to save subjects to localStorage", error);
-      // Try to save with even more aggressive truncation
-      try {
-        const minimalSubjects = subjects.map(subject => ({
-          ...subject,
-          pastPapers: subject.pastPapers.map(paper => ({
-            id: paper.id,
-            name: paper.name,
-            content: '[Content removed to save space]'
-          })),
-          syllabusContent: '[Content removed to save space]'
-        }));
-        localStorage.setItem('examplify-ai-subjects', JSON.stringify(minimalSubjects));
-      } catch (fallbackError) {
-        console.error("Even fallback save failed", fallbackError);
-      }
-    }
-  }, [subjects]);
+  }, [session?.user?.id, status]);
 
   const setLoading = useCallback((key: string, value: boolean) => {
     setLoadingStates(prev => ({ ...prev, [key]: value }));
@@ -105,8 +92,24 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const syllabusDataUri = await fileToDataURI(syllabusFile);
       const syllabusText = await fileToString(syllabusFile);
 
-      // Create a placeholder subject immediately
-      const subjectId = Date.now().toString();
+      // Create subject in database via API
+      const response = await fetch('/api/subjects', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: 'Processing...',
+          syllabusContent: syllabusText
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to create subject');
+      }
+
+      const dbSubject = await response.json();
+      const subjectId = dbSubject.id.toString();
+
+      // Create placeholder subject in local state
       const placeholderSubject: Subject = {
         id: subjectId,
         name: 'Processing...',
@@ -131,34 +134,63 @@ export function AppProvider({ children }: { children: ReactNode }) {
           const result = await decomposeSyllabus({ syllabusDataUri });
           console.log('Syllabus processing complete.');
 
-          // Build paper types with topics but no questions yet
-          const newPaperTypes: PaperType[] = (result.paperTypes || []).map(pt => ({
-            id: pt.name.toLowerCase().replace(/\s+/g, '-'),
-            name: pt.name,
-            topics: (pt.topics || []).map(topic => ({
-              id: topic.name.toLowerCase().replace(/\s+/g, '-'),
-              name: topic.name,
-              description: topic.description,
-              examQuestions: [], // Empty initially
-            })),
-          }));
+          // Update subject name in database
+          await fetch(`/api/subjects/${subjectId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: result.subjectName || 'Untitled Subject' })
+          });
 
-          // Update the subject with the decomposed data
+          // Create paper types in database and get their IDs
+          const createdPaperTypes: PaperType[] = [];
+          for (const pt of result.paperTypes || []) {
+            const ptResponse = await fetch(`/api/subjects/${subjectId}/paper-types`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ name: pt.name })
+            });
+            const dbPaperType = await ptResponse.json();
+
+            // Create topics for this paper type
+            const createdTopics = [];
+            for (const topic of pt.topics || []) {
+              const topicResponse = await fetch(`/api/paper-types/${dbPaperType.id}/topics`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name: topic.name, description: topic.description })
+              });
+              const dbTopic = await topicResponse.json();
+              createdTopics.push({
+                id: dbTopic.id.toString(),
+                name: dbTopic.name,
+                description: dbTopic.description || '',
+                examQuestions: []
+              });
+            }
+
+            createdPaperTypes.push({
+              id: dbPaperType.id.toString(),
+              name: dbPaperType.name,
+              topics: createdTopics
+            });
+          }
+
+          // Update local state with the created data
           setSubjects(prev => prev.map(s =>
             s.id === subjectId
-              ? { ...s, name: result.subjectName || 'Untitled Subject', paperTypes: newPaperTypes }
+              ? { ...s, name: result.subjectName || 'Untitled Subject', paperTypes: createdPaperTypes }
               : s
           ));
 
           // Store result for Process B to use
           const task = backgroundQueue.getTaskById(processAId);
           if (task) {
-            task.result = { paperTypes: newPaperTypes };
+            task.result = { paperTypes: createdPaperTypes };
           }
 
           toast({
             title: "Syllabus Processed",
-            description: `"${result.subjectName}" with ${newPaperTypes.length} paper types identified.`
+            description: `"${result.subjectName}" with ${createdPaperTypes.length} paper types identified.`
           });
         }
       });
@@ -222,17 +254,26 @@ export function AppProvider({ children }: { children: ReactNode }) {
             // Use Process A result if we waited for it
             paperTypes = processATask.result.paperTypes;
           } else {
-            // Otherwise use current subject state
-            const storedSubjects = localStorage.getItem('examplify-ai-subjects');
-            if (!storedSubjects) {
-              throw new Error('No subjects found');
+            // Otherwise fetch from API to get latest paper types with topics
+            const response = await fetch(`/api/subjects/${subjectId}`);
+            if (!response.ok) {
+              throw new Error('Failed to fetch subject');
             }
-            const allSubjects: Subject[] = JSON.parse(storedSubjects);
-            const subject = allSubjects.find(s => s.id === subjectId);
-            if (!subject || subject.paperTypes.length === 0) {
+            const apiSubject = await response.json();
+            if (!apiSubject || !apiSubject.paperTypes || apiSubject.paperTypes.length === 0) {
               throw new Error('No paper types found for question extraction');
             }
-            paperTypes = subject.paperTypes;
+            // Convert API format to client format
+            paperTypes = apiSubject.paperTypes.map((pt: any) => ({
+              id: pt.id.toString(),
+              name: pt.name,
+              topics: (pt.topics || []).map((t: any) => ({
+                id: t.id.toString(),
+                name: t.name,
+                description: t.description || '',
+                examQuestions: []
+              }))
+            }));
           }
 
           // Extract questions from all papers
@@ -303,9 +344,22 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, [subjects, toast, setLoading]);
 
-  const deleteSubject = useCallback((subjectId: string) => {
-    setSubjects(prev => prev.filter(subject => subject.id !== subjectId));
-    toast({ title: "Success", description: "Subject deleted." });
+  const deleteSubject = useCallback(async (subjectId: string) => {
+    try {
+      const response = await fetch(`/api/subjects/${subjectId}`, {
+        method: 'DELETE'
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to delete subject');
+      }
+
+      setSubjects(prev => prev.filter(subject => subject.id !== subjectId));
+      toast({ title: "Success", description: "Subject deleted." });
+    } catch (error) {
+      console.error('Error deleting subject:', error);
+      toast({ variant: "destructive", title: "Error", description: "Failed to delete subject." });
+    }
   }, [toast]);
 
   const getSubjectById = useCallback((subjectId: string) => {

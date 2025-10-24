@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAppContext } from '@/app/context/AppContext';
+import { AuthGuard } from '@/components/AuthGuard';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
@@ -14,6 +15,14 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { getScoreColorStyle } from '@/lib/utils';
 
 export default function TopicPage() {
+  return (
+    <AuthGuard>
+      <TopicPageContent />
+    </AuthGuard>
+  );
+}
+
+function TopicPageContent() {
   const params = useParams();
   const router = useRouter();
   const { subjects, isLoading, setLoading } = useAppContext();

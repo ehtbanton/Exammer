@@ -3,6 +3,7 @@
 import { ChangeEvent, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useAppContext } from '@/app/context/AppContext';
+import { AuthGuard } from '@/components/AuthGuard';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -12,6 +13,14 @@ import LoadingSpinner from '@/components/LoadingSpinner';
 import PageSpinner from '@/components/PageSpinner';
 
 export default function HomePage() {
+  return (
+    <AuthGuard>
+      <HomePageContent />
+    </AuthGuard>
+  );
+}
+
+function HomePageContent() {
   const { subjects, createSubjectFromSyllabus, processExamPapers, deleteSubject, isLoading, setLoading } = useAppContext();
   const [navigatingTo, setNavigatingTo] = useState<string | null>(null);
   const [syllabusFile, setSyllabusFile] = useState<File | null>(null);

@@ -4,6 +4,7 @@ import { ChangeEvent, useRef, useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAppContext } from '@/app/context/AppContext';
+import { AuthGuard } from '@/components/AuthGuard';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -15,6 +16,14 @@ import { getScoreColorStyle, getDefaultBoxStyle } from '@/lib/utils';
 import { PaperType } from '@/lib/types';
 
 export default function SubjectPage() {
+  return (
+    <AuthGuard>
+      <SubjectPageContent />
+    </AuthGuard>
+  );
+}
+
+function SubjectPageContent() {
   const params = useParams();
   const router = useRouter();
   const { subjects, processExamPapers, isLoading, setLoading } = useAppContext();

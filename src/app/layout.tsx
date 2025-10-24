@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import './globals.css';
 import { AppProvider } from '@/app/context/AppContext';
+import { SessionProvider } from '@/components/SessionProvider';
 import { Toaster } from '@/components/ui/toaster';
 import Header from '@/components/Header';
 import { BackgroundTaskIndicator } from '@/components/BackgroundTaskIndicator';
@@ -28,16 +29,18 @@ export default function RootLayout({
         <link href="https://fonts.googleapis.com/css2?family=PT+Sans:ital,wght@0,400;0,700;1,400;1,700&family=Source+Code+Pro:wght@400;700&display=swap" rel="stylesheet" />
       </head>
       <body className={cn('font-body antialiased h-full')}>
-        <AppProvider>
-          <div className="flex flex-col h-full">
-            <Header />
-            <main className="flex-1 overflow-y-auto p-4 sm:p-6 md:p-8">
-              {children}
-            </main>
-          </div>
-          <BackgroundTaskIndicator />
-          <Toaster />
-        </AppProvider>
+        <SessionProvider>
+          <AppProvider>
+            <div className="flex flex-col h-full">
+              <Header />
+              <main className="flex-1 overflow-y-auto p-4 sm:p-6 md:p-8">
+                {children}
+              </main>
+            </div>
+            <BackgroundTaskIndicator />
+            <Toaster />
+          </AppProvider>
+        </SessionProvider>
       </body>
     </html>
   );

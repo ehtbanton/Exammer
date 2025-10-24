@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAppContext } from '@/app/context/AppContext';
+import { AuthGuard } from '@/components/AuthGuard';
 import { aiPoweredInterview, generateQuestion } from '@/ai/flows/ai-powered-interview';
 import type { ChatHistory } from '@/lib/types';
 import { Button } from '@/components/ui/button';
@@ -18,6 +19,14 @@ import { useToast } from '@/hooks/use-toast';
 import PageSpinner from '@/components/PageSpinner';
 
 export default function InterviewPage() {
+  return (
+    <AuthGuard>
+      <InterviewPageContent />
+    </AuthGuard>
+  );
+}
+
+function InterviewPageContent() {
   const params = useParams();
   const router = useRouter();
   const { getSubjectById, updateExamQuestionScore, generateQuestionVariant } = useAppContext();

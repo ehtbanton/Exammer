@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAppContext } from '@/app/context/AppContext';
+import { AuthGuard } from '@/components/AuthGuard';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import PageSpinner from '@/components/PageSpinner';
@@ -12,6 +13,14 @@ import { Topic } from '@/lib/types';
 import { getScoreColorStyle, getDefaultBoxStyle } from '@/lib/utils';
 
 export default function PaperTypePage() {
+  return (
+    <AuthGuard>
+      <PaperTypePageContent />
+    </AuthGuard>
+  );
+}
+
+function PaperTypePageContent() {
   const params = useParams();
   const router = useRouter();
   const { subjects, isLoading, setLoading } = useAppContext();
