@@ -55,5 +55,4 @@ firestore-debug.log
 *.log
 
 # database and user data
-erudate.db
-pending-users.json
+/db/

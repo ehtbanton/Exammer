@@ -2,8 +2,8 @@ import sqlite3 from 'sqlite3';
 import path from 'path';
 import fs from 'fs';
 
-// Database path - in project root
-const DB_PATH = path.join(process.cwd(), 'erudate.db');
+// Database path - in /db folder
+const DB_PATH = path.join(process.cwd(), 'db', 'erudate.db');
 
 // Create a connection pool-like wrapper
 class Database {

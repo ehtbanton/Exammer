@@ -3,7 +3,7 @@ import path from 'path';
 import { db } from './db';
 import type { User } from './db';
 
-const PENDING_USERS_FILE = path.join(process.cwd(), 'pending-users.json');
+const PENDING_USERS_FILE = path.join(process.cwd(), 'db', 'pending-users.json');
 
 interface PendingUser {
   id: number;
