@@ -57,10 +57,16 @@ jobs:
           ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
             ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'EOF'
             cd ${{ secrets.DEPLOY_PATH }}
-            npm ci --production
 
-            # Create db directory if it doesn't exist
-            mkdir -p db
+            # Check if .env file exists
+            if [ ! -f .env ]; then
+              echo "ERROR: .env file not found. Please create .env file on the server with required environment variables."
+              echo "Required variables: NEXTAUTH_URL, NEXTAUTH_SECRET"
+              exit 1
+            fi
+
+            # Install production dependencies
+            npm ci --production
 
             # Restart the application using PM2
             # If PM2 is not set up yet, this will fail - see setup instructions

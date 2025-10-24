@@ -55,4 +55,5 @@ firestore-debug.log
 *.log
 
 # database and user data
-/db/
+/db/*.db
+/db/*.json
