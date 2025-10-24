@@ -53,3 +53,5 @@ firestore-debug.log
 # temporary files
 .modified
 *.log
+
+erudate.db
