@@ -26,7 +26,7 @@ export const authOptions: NextAuthOptions = {
         );
 
         if (!user || !user.password_hash) {
-          throw new Error('Invalid email or password');
+          throw new Error('EMAIL_NOT_FOUND');
         }
 
         const isValid = await compare(credentials.password, user.password_hash);

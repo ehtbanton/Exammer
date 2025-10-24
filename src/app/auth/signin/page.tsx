@@ -33,6 +33,11 @@ function SignInContent() {
       });
 
       if (result?.error) {
+        // If email not found, redirect to signup with email pre-filled
+        if (result.error === 'EMAIL_NOT_FOUND') {
+          router.push(`/auth/signup?email=${encodeURIComponent(email)}`);
+          return;
+        }
         setError(result.error);
       } else if (result?.ok) {
         router.push(callbackUrl);
