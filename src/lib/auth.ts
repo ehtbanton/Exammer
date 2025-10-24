@@ -35,11 +35,6 @@ export const authOptions: NextAuthOptions = {
           throw new Error('Invalid email or password');
         }
 
-        // Check if email is verified
-        if (!user.email_verified) {
-          throw new Error('Please verify your email before signing in');
-        }
-
         return {
           id: user.id.toString(),
           email: user.email,

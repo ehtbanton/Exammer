@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { hash } from 'bcryptjs';
 import { db } from '@/lib/db';
 import type { User } from '@/lib/db';
-import crypto from 'crypto';
 import { syncNewUser } from '@/lib/user-access-sync';
 
 export async function POST(req: NextRequest) {
@@ -40,33 +39,18 @@ export async function POST(req: NextRequest) {
     // Hash password
     const hashedPassword = await hash(password, 12);
 
-    // Create user
+    // Create user with email already verified
     const result = await db.run(
       'INSERT INTO users (email, password_hash, name, email_verified) VALUES (?, ?, ?, ?)',
-      [email, hashedPassword, name || null, 0]
-    );
-
-    // Generate verification token
-    const verificationToken = crypto.randomBytes(32).toString('hex');
-    const expiresAt = Math.floor(Date.now() / 1000) + 24 * 60 * 60; // 24 hours
-
-    await db.run(
-      'INSERT INTO verification_tokens (identifier, token, expires) VALUES (?, ?, ?)',
-      [email, verificationToken, expiresAt]
+      [email, hashedPassword, name || null, 1]
     );
 
     // Sync new user to pending-users.json
     await syncNewUser();
 
-    // TODO: Send verification email
-    // For now, we'll just return the token in development
-    const verificationUrl = `${process.env.NEXTAUTH_URL}/auth/verify-email?token=${verificationToken}&email=${encodeURIComponent(email)}`;
-
     return NextResponse.json({
-      message: 'User created successfully. Please verify your email.',
+      message: 'User created successfully. You can now sign in.',
       userId: result.lastID,
-      // Remove this in production and send via email instead
-      verificationUrl: process.env.NODE_ENV === 'development' ? verificationUrl : undefined,
     });
   } catch (error) {
     console.error('Signup error:', error);
