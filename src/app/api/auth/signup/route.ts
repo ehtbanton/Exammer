@@ -3,6 +3,7 @@ import { hash } from 'bcryptjs';
 import { db } from '@/lib/db';
 import type { User } from '@/lib/db';
 import crypto from 'crypto';
+import { syncNewUser } from '@/lib/user-access-sync';
 
 export async function POST(req: NextRequest) {
   try {
@@ -53,6 +54,9 @@ export async function POST(req: NextRequest) {
       'INSERT INTO verification_tokens (identifier, token, expires) VALUES (?, ?, ?)',
       [email, verificationToken, expiresAt]
     );
+
+    // Sync new user to pending-users.json
+    await syncNewUser();
 
     // TODO: Send verification email
     // For now, we'll just return the token in development

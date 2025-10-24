@@ -5,6 +5,7 @@ import GitHubProvider from 'next-auth/providers/github';
 import { compare } from 'bcryptjs';
 import { db } from '@/lib/db';
 import type { User } from '@/lib/db';
+import { syncNewUser } from '@/lib/user-access-sync';
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -63,9 +64,13 @@ export const authOptions: NextAuthOptions = {
   adapter: {
     async createUser(user: any) {
       const result = await db.run(
-        'INSERT INTO users (email, name, image, email_verified) VALUES (?, ?, ?, ?)',
-        [user.email, user.name || null, user.image || null, user.emailVerified ? 1 : 0]
+        'INSERT INTO users (email, name, image, email_verified, access_level) VALUES (?, ?, ?, ?, ?)',
+        [user.email, user.name || null, user.image || null, user.emailVerified ? 1 : 0, 0]
       );
+
+      // Sync new user to pending-users.json
+      await syncNewUser();
+
       return {
         id: result.lastID.toString(),
         email: user.email!,

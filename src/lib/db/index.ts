@@ -28,11 +28,18 @@ class Database {
     const schemaPath = path.join(process.cwd(), 'src', 'lib', 'db', 'schema.sql');
     const schema = fs.readFileSync(schemaPath, 'utf8');
 
-    this.db!.exec(schema, (err) => {
+    this.db!.exec(schema, async (err) => {
       if (err) {
         console.error('Error running migrations:', err);
       } else {
         console.log('Database schema initialized successfully');
+        // Initialize user access sync system
+        try {
+          const { initializeUserAccessSync } = await import('../user-access-sync');
+          await initializeUserAccessSync();
+        } catch (error) {
+          console.error('Error initializing user access sync:', error);
+        }
       }
     });
   }
@@ -95,6 +102,7 @@ export interface User {
   password_hash?: string;
   name?: string;
   email_verified: number;
+  access_level: number;
   image?: string;
   created_at: number;
   updated_at: number;
