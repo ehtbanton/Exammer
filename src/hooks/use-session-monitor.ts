@@ -3,11 +3,11 @@ import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 
 /**
- * Monitor session validity and redirect if session is invalidated
- * This hook checks the session every 5 seconds
+ * Monitor session validity using Server-Sent Events
+ * Receives real-time notifications when session is invalidated
  */
 export function useSessionMonitor() {
-  const { data: session, status, update } = useSession();
+  const { data: session, status } = useSession();
   const router = useRouter();
 
   useEffect(() => {
@@ -15,26 +15,33 @@ export function useSessionMonitor() {
       return;
     }
 
-    // Check session validity every 5 seconds
-    const interval = setInterval(async () => {
-      try {
-        // Force session update to check if it's still valid
-        const updatedSession = await update();
+    // Connect to SSE endpoint for real-time session events
+    const eventSource = new EventSource('/api/auth/session-events');
 
-        // If session is no longer valid, redirect to signin
-        if (!updatedSession) {
+    eventSource.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+
+        if (data.type === 'connected') {
+          console.log('Connected to session events');
+        } else if (data.type === 'session_invalidated') {
           console.log('Session invalidated, redirecting to signin');
-          router.push('/auth/signin');
+          eventSource.close();
+          router.push('/auth/signin?reason=session_invalidated');
           router.refresh();
         }
       } catch (error) {
-        console.error('Error checking session:', error);
-        // If there's an error, the session might be invalid
-        router.push('/auth/signin');
-        router.refresh();
+        console.error('Error parsing SSE message:', error);
       }
-    }, 5000); // Check every 5 seconds
+    };
 
-    return () => clearInterval(interval);
-  }, [status, update, router]);
+    eventSource.onerror = (error) => {
+      console.error('SSE connection error:', error);
+      eventSource.close();
+    };
+
+    return () => {
+      eventSource.close();
+    };
+  }, [status, router]);
 }

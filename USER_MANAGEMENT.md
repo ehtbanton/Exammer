@@ -4,11 +4,11 @@ This application uses a file-based admin system for managing users. The `db/user
 
 ## How It Works
 
-### Automatic Synchronization
+### Automatic Synchronization (Event-Driven)
 
-1. **Database → File**: The `users.json` file is automatically updated from the database every 5 seconds
-2. **File → Database**: When you edit `users.json`, changes are detected and applied to the database within 250ms
-3. **Session Management**: When users are modified or deleted, their sessions are invalidated and they're automatically logged out within 5 seconds
+1. **Database → File**: The `users.json` file is automatically updated whenever the database changes (new signups, modifications)
+2. **File → Database**: When you edit `users.json`, changes are detected within 250ms and immediately applied to the database
+3. **Session Management**: When users are modified or deleted, their sessions are invalidated immediately and connected clients are notified in real-time via Server-Sent Events (SSE)
 
 ### File Format
 
@@ -146,9 +146,23 @@ The following changes are ignored:
 
 When a user's access level is changed or they're deleted:
 1. Their session is immediately invalidated in the database
-2. Within 5 seconds, their browser detects the invalid session
-3. They're automatically redirected to the signin page
+2. The server sends a real-time notification via Server-Sent Events (SSE)
+3. The user's browser receives the notification instantly and redirects to signin
 4. They see their updated access level on next signin (or can't sign in if deleted)
+
+**Technical Details:**
+- Uses Server-Sent Events (SSE) for real-time push notifications
+- No polling or periodic checks required
+- Instant notification delivery when session is invalidated
+- Clients maintain a persistent connection to `/api/auth/session-events`
+- Connection automatically closes on logout and reconnects on page load
+
+**How It Works:**
+1. File watcher detects `users.json` change (250ms debounce)
+2. Database is updated immediately
+3. Session invalidation triggers event listener
+4. SSE pushes notification to affected user's browser
+5. Browser immediately redirects to signin page
 
 ### Monitoring Changes
 
@@ -192,7 +206,7 @@ Invalidating sessions for users: 3
 1. Check server logs for errors
 2. Verify JSON syntax with a JSON validator
 3. Ensure the file is saved
-4. Wait up to 5 seconds for file watcher to detect changes
+4. Changes should apply within 250ms (file watcher debounce time)
 
 ### File Keeps Resetting
 
@@ -200,8 +214,9 @@ This happens when there's a syntax error. Fix the JSON syntax and try again.
 
 ### User Still Logged In
 
-- The client checks session validity every 5 seconds
-- User will be logged out within 5 seconds of session invalidation
+- The client uses Server-Sent Events for real-time notifications
+- User will be logged out instantly when their session is invalidated
+- If SSE connection is lost, they'll be logged out on next page navigation
 - They can also manually refresh the page to trigger immediate check
 
 ## Example Workflow

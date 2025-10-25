@@ -17,6 +17,19 @@ interface UserData {
 let isWatching = false;
 let isSyncing = false;
 
+// Event emitter for user changes
+type UserChangeListener = (userId?: number) => void;
+const userChangeListeners = new Set<UserChangeListener>();
+
+export function onUserChange(listener: UserChangeListener) {
+  userChangeListeners.add(listener);
+  return () => userChangeListeners.delete(listener);
+}
+
+function notifyUserChange(userId?: number) {
+  userChangeListeners.forEach(listener => listener(userId));
+}
+
 /**
  * Format Unix timestamp to readable date/time
  */
@@ -156,10 +169,15 @@ async function syncFileToDatabase(): Promise<void> {
       for (const userId of affectedUserIds) {
         await db.run('DELETE FROM sessions WHERE user_id = ?', [userId]);
       }
+
+      // Notify listeners about user changes
+      affectedUserIds.forEach(userId => notifyUserChange(userId));
     }
 
-    // Sync back to file to ensure consistency
-    await syncDatabaseToFile();
+    // Sync back to file to ensure consistency (only if there were changes)
+    if (dbUsers.length !== fileUsers.length || affectedUserIds.length > 0) {
+      await syncDatabaseToFile();
+    }
 
   } catch (error) {
     console.error('Error syncing file to database:', error);
@@ -212,16 +230,11 @@ export async function initializeUserAccessSync(): Promise<void> {
       console.log('Created users.json file');
     }
 
-    // Sync database to file
+    // Sync database to file initially
     await syncDatabaseToFile();
 
     // Start watching for file changes
     startFileWatcher();
-
-    // Periodically sync from database (every 5 seconds)
-    setInterval(async () => {
-      await syncDatabaseToFile();
-    }, 5000);
 
   } catch (error) {
     console.error('Error initializing user sync system:', error);
