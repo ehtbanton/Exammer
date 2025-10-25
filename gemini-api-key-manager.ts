@@ -24,6 +24,7 @@ interface KeyState {
   concurrentCount: number;
   requestCount: number;
   windowStart: number;
+  lastRequestTime: number;
 }
 
 export class GeminiApiKeyManager {
@@ -35,17 +36,20 @@ export class GeminiApiKeyManager {
     reject: (error: Error) => void;
   }>;
   private currentKeyIndex: number;
+  private isProcessingQueue: boolean;
 
   // Rate limiting constants
-  private readonly MAX_CONCURRENT_PER_KEY = 2;
+  private readonly MAX_CONCURRENT_PER_KEY = 1;
   private readonly MAX_REQUESTS_PER_MINUTE = 10;
   private readonly MINUTE_MS = 60 * 1000;
+  private readonly MIN_REQUEST_INTERVAL_MS = 1000; // 1 second between requests to same key
 
   private constructor() {
     this.apiKeys = [];
     this.keyStates = new Map();
     this.waitQueue = [];
     this.currentKeyIndex = 0;
+    this.isProcessingQueue = false;
     this.initialize();
   }
 
@@ -94,6 +98,7 @@ export class GeminiApiKeyManager {
         concurrentCount: 0,
         requestCount: 0,
         windowStart: now,
+        lastRequestTime: 0,
       });
     }
 
@@ -119,15 +124,14 @@ export class GeminiApiKeyManager {
    * This method will wait if all keys are currently at their limits
    */
   public async acquireKey(): Promise<string> {
-    // Try to get an available key immediately
-    const availableKey = this.tryGetAvailableKey();
-    if (availableKey) {
-      return availableKey;
-    }
-
-    // No key available, add to wait queue
     return new Promise<string>((resolve, reject) => {
+      // Add to queue
       this.waitQueue.push({ resolve, reject });
+
+      const queuePosition = this.waitQueue.length;
+      if (queuePosition > this.apiKeys.length * this.MAX_CONCURRENT_PER_KEY) {
+        console.log(`[GeminiApiKeyManager] Request queued (position: ${queuePosition})`);
+      }
 
       // Set a timeout to prevent indefinite waiting (5 minutes max)
       const timeout = setTimeout(() => {
@@ -145,6 +149,9 @@ export class GeminiApiKeyManager {
         originalResolve(key);
       };
       this.waitQueue[this.waitQueue.length - 1].resolve = wrappedResolve;
+
+      // Try to process the queue immediately
+      this.processWaitQueue();
     });
   }
 
@@ -163,18 +170,24 @@ export class GeminiApiKeyManager {
 
       // Reset request count if window has passed
       if (now - state.windowStart >= this.MINUTE_MS) {
+        console.log(
+          `[GeminiApiKeyManager] Reset rate limit window for key ${keyIndex + 1}/${this.apiKeys.length}`
+        );
         state.requestCount = 0;
         state.windowStart = now;
       }
 
-      // Check if key is available (concurrency + rate limit)
-      if (
-        state.concurrentCount < this.MAX_CONCURRENT_PER_KEY &&
-        state.requestCount < this.MAX_REQUESTS_PER_MINUTE
-      ) {
-        // Mark key as in use
+      // Check if key is available (concurrency + rate limit + burst protection)
+      const concurrentAvailable = state.concurrentCount < this.MAX_CONCURRENT_PER_KEY;
+      const rateAvailable = state.requestCount < this.MAX_REQUESTS_PER_MINUTE;
+      const timeSinceLastRequest = now - state.lastRequestTime;
+      const burstAvailable = timeSinceLastRequest >= this.MIN_REQUEST_INTERVAL_MS;
+
+      if (concurrentAvailable && rateAvailable && burstAvailable) {
+        // Mark key as in use BEFORE returning
         state.concurrentCount++;
         state.requestCount++;
+        state.lastRequestTime = now;
 
         // Move to next key for round-robin
         this.currentKeyIndex = (keyIndex + 1) % this.apiKeys.length;
@@ -182,10 +195,16 @@ export class GeminiApiKeyManager {
         console.log(
           `[GeminiApiKeyManager] Acquired key ${keyIndex + 1}/${this.apiKeys.length} ` +
           `(concurrent: ${state.concurrentCount}/${this.MAX_CONCURRENT_PER_KEY}, ` +
-          `requests: ${state.requestCount}/${this.MAX_REQUESTS_PER_MINUTE})`
+          `requests: ${state.requestCount}/${this.MAX_REQUESTS_PER_MINUTE}, ` +
+          `last request: ${timeSinceLastRequest}ms ago)`
         );
 
         return key;
+      } else if (!burstAvailable && concurrentAvailable && rateAvailable) {
+        console.log(
+          `[GeminiApiKeyManager] Key ${keyIndex + 1}/${this.apiKeys.length} skipped - ` +
+          `burst protection (last request ${timeSinceLastRequest}ms ago, min ${this.MIN_REQUEST_INTERVAL_MS}ms)`
+        );
       }
     }
 
@@ -217,16 +236,35 @@ export class GeminiApiKeyManager {
    * Process waiting requests when a key becomes available
    */
   private processWaitQueue(): void {
-    while (this.waitQueue.length > 0) {
-      const availableKey = this.tryGetAvailableKey();
-      if (!availableKey) {
-        break; // No keys available, stop processing queue
-      }
+    // Prevent concurrent processing of the queue (avoid race conditions)
+    if (this.isProcessingQueue) {
+      return;
+    }
 
-      const waiter = this.waitQueue.shift();
-      if (waiter) {
-        waiter.resolve(availableKey);
+    this.isProcessingQueue = true;
+
+    try {
+      // Process requests from the queue while keys are available
+      while (this.waitQueue.length > 0) {
+        const availableKey = this.tryGetAvailableKey();
+        if (!availableKey) {
+          const stats = this.getStats();
+          console.log(
+            `[GeminiApiKeyManager] No keys available. Active: ${stats.activeRequests}, Queued: ${stats.queuedRequests}`
+          );
+          break; // No keys available, stop processing queue
+        }
+
+        const waiter = this.waitQueue.shift();
+        if (waiter) {
+          // Resolve the promise synchronously
+          // This ensures the counter increment in tryGetAvailableKey() and
+          // the promise resolution happen in the same synchronous block
+          waiter.resolve(availableKey);
+        }
       }
+    } finally {
+      this.isProcessingQueue = false;
     }
   }
 

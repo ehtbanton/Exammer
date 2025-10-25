@@ -45,8 +45,7 @@ export type ExtractExamQuestionsOutput = z.infer<typeof ExtractExamQuestionsOutp
  * Configuration for batch processing
  * BATCH_SIZE controls how many papers are processed in a single API call
  */
-const BATCH_SIZE = 5; // Number of papers to send in a single API call
-const REQUEST_START_DELAY_MS = 50; // Small delay between starting requests to avoid thundering herd
+const BATCH_SIZE = 1; // Number of papers to send in a single API call
 
 export async function extractExamQuestions(
   input: ExtractExamQuestionsInput
@@ -67,36 +66,28 @@ export async function extractExamQuestions(
 
   // Process all batches using the global API key manager
   const allQuestions: ExtractExamQuestionsOutput['questions'] = [];
-  const batchPromises: Promise<ExtractExamQuestionsOutput['questions']>[] = [];
 
-  for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
-    const batch = batches[batchIndex];
+  // Process batches with promises, letting the API key manager handle queueing
+  const batchPromises = batches.map(async (batch, batchIndex) => {
+    const batchStartTime = Date.now();
+    console.log(`[Question Extraction] Batch ${batchIndex + 1}/${batches.length}: Starting, processing ${batch.length} papers...`);
 
-    // Add pacing delay to avoid burst limits (except for first request)
-    if (batchIndex > 0) {
-      await new Promise(resolve => setTimeout(resolve, REQUEST_START_DELAY_MS));
-    }
+    try {
+      // Use the global API key manager to execute with a managed key
+      // The manager will queue this request if no keys are available
+      const result = await geminiApiKeyManager.withKey(async (apiKey) => {
+        // Create a genkit instance with this specific API key
+        const aiInstance = genkit({
+          plugins: [googleAI({ apiKey })],
+          model: 'googleai/gemini-2.5-flash-lite',
+        });
 
-    // Create a promise for this batch
-    const batchPromise = (async () => {
-      const batchStartTime = Date.now();
-      console.log(`[Question Extraction] Batch ${batchIndex + 1}/${batches.length}: Starting, processing ${batch.length} papers...`);
-
-      try {
-        // Use the global API key manager to execute with a managed key
-        const result = await geminiApiKeyManager.withKey(async (apiKey) => {
-          // Create a genkit instance with this specific API key
-          const aiInstance = genkit({
-            plugins: [googleAI({ apiKey })],
-            model: 'googleai/gemini-2.5-flash-lite',
-          });
-
-          // Create flow with this AI instance
-          const prompt = aiInstance.definePrompt({
-            name: `extractExamQuestionsPrompt-${batchIndex}`,
-            input: {schema: ExtractExamQuestionsInputSchema},
-            output: {schema: ExtractExamQuestionsOutputSchema},
-            prompt: `You are an expert educator analyzing past exam papers to help students prepare for their exams.
+        // Create flow with this AI instance
+        const prompt = aiInstance.definePrompt({
+          name: `extractExamQuestionsPrompt-${batchIndex}`,
+          input: {schema: ExtractExamQuestionsInputSchema},
+          output: {schema: ExtractExamQuestionsOutputSchema},
+          prompt: `You are an expert educator analyzing past exam papers to help students prepare for their exams.
 
 Your task is to:
 1. Read through all the provided exam papers
@@ -121,46 +112,44 @@ Important guidelines:
 - Match each question to the most relevant topic based on the topic descriptions
 - If a question spans multiple topics, choose the primary/most relevant topic
 - Extract ALL questions from ALL papers provided`,
-          });
-
-          const flow = aiInstance.defineFlow(
-            {
-              name: `extractExamQuestionsFlow-${batchIndex}`,
-              inputSchema: ExtractExamQuestionsInputSchema,
-              outputSchema: ExtractExamQuestionsOutputSchema,
-            },
-            async input => {
-              const response = await prompt(input);
-              const output = response.output;
-              const questions = output?.questions ?? [];
-              return { questions };
-            }
-          );
-
-          return await flow({
-            examPapersDataUris: batch,
-            topics,
-          });
         });
 
-        const batchEndTime = Date.now();
-        const batchDuration = ((batchEndTime - batchStartTime) / 1000).toFixed(2);
-        console.log(`[Question Extraction] Batch ${batchIndex + 1}/${batches.length}: Completed in ${batchDuration}s - Extracted ${result.questions.length} questions`);
-        return result.questions;
-      } catch (error) {
-        const batchEndTime = Date.now();
-        const batchDuration = ((batchEndTime - batchStartTime) / 1000).toFixed(2);
-        console.error(`[Question Extraction] Batch ${batchIndex + 1}/${batches.length}: Error after ${batchDuration}s:`, error);
-        return [];
-      }
-    })();
+        const flow = aiInstance.defineFlow(
+          {
+            name: `extractExamQuestionsFlow-${batchIndex}`,
+            inputSchema: ExtractExamQuestionsInputSchema,
+            outputSchema: ExtractExamQuestionsOutputSchema,
+          },
+          async input => {
+            const response = await prompt(input);
+            const output = response.output;
+            const questions = output?.questions ?? [];
+            return { questions };
+          }
+        );
 
-    batchPromises.push(batchPromise);
-  }
+        return await flow({
+          examPapersDataUris: batch,
+          topics,
+        });
+      });
+
+      // Categorize and add questions immediately after this API response
+      const batchEndTime = Date.now();
+      const batchDuration = ((batchEndTime - batchStartTime) / 1000).toFixed(2);
+      console.log(`[Question Extraction] Batch ${batchIndex + 1}/${batches.length}: Completed in ${batchDuration}s - Extracted ${result.questions.length} questions`);
+
+      // Add the categorized questions from this batch immediately
+      allQuestions.push(...result.questions);
+    } catch (error) {
+      const batchEndTime = Date.now();
+      const batchDuration = ((batchEndTime - batchStartTime) / 1000).toFixed(2);
+      console.error(`[Question Extraction] Batch ${batchIndex + 1}/${batches.length}: Error after ${batchDuration}s:`, error);
+    }
+  });
 
   // Wait for all batches to complete
-  const allResults = await Promise.all(batchPromises);
-  allQuestions.push(...allResults.flat());
+  await Promise.all(batchPromises);
 
   console.log(`Total questions extracted: ${allQuestions.length}`);
 
