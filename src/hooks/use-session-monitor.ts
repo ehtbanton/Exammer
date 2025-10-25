@@ -25,10 +25,10 @@ export function useSessionMonitor() {
         if (data.type === 'connected') {
           console.log('Connected to session events');
         } else if (data.type === 'session_invalidated') {
-          console.log('Session invalidated, redirecting to signin');
+          console.log('Session invalidated, refreshing page to reflect changes');
           eventSource.close();
-          router.push('/auth/signin?reason=session_invalidated');
-          router.refresh();
+          // Force a full page refresh to update session state
+          window.location.reload();
         }
       } catch (error) {
         console.error('Error parsing SSE message:', error);

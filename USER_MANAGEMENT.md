@@ -119,18 +119,36 @@ The `users.json` file contains an array of user objects:
 
 ## Error Handling
 
-### Invalid JSON
+### Invalid JSON or Data
 
-If you make a syntax error in `users.json`:
-- The changes are **ignored**
-- The file is automatically reset to match the database
-- Check the server logs for error messages
+If you make an error in `users.json`:
+- The changes are **rejected**
+- The file is **automatically replaced** with the current database state
+- Check the server logs for detailed error messages
 
-**Common mistakes:**
-- Missing comma between objects
-- Trailing comma after last object
-- Unquoted strings
-- Missing brackets
+**Common mistakes that trigger auto-replacement:**
+- **Syntax errors**: Missing comma, trailing comma, unquoted strings, missing brackets
+- **Invalid structure**: Not an array, missing required fields
+- **Invalid data types**: access_level is not a number
+- **Missing fields**: User missing id, email, or access_level
+
+**Example errors:**
+```json
+// ❌ Invalid - missing comma
+[
+  {"id": 1, "email": "user1@example.com", "access_level": 1}
+  {"id": 2, "email": "user2@example.com", "access_level": 0}
+]
+
+// ❌ Invalid - access_level is a string
+{"id": 3, "email": "user3@example.com", "access_level": "1"}
+
+// ✅ Valid
+[
+  {"id": 1, "email": "user1@example.com", "name": "User 1", "access_level": 1, "created_at": "01/25/2025, 10:15:30"},
+  {"id": 2, "email": "user2@example.com", "name": null, "access_level": 0, "created_at": "01/25/2025, 11:20:45"}
+]
+```
 
 ### Invalid Changes
 
@@ -147,8 +165,8 @@ The following changes are ignored:
 When a user's access level is changed or they're deleted:
 1. Their session is immediately invalidated in the database
 2. The server sends a real-time notification via Server-Sent Events (SSE)
-3. The user's browser receives the notification instantly and redirects to signin
-4. They see their updated access level on next signin (or can't sign in if deleted)
+3. All browser tabs/windows signed in as that user receive the notification instantly
+4. Pages automatically refresh to reflect the new access level (or redirect to signin if deleted)
 
 **Technical Details:**
 - Uses Server-Sent Events (SSE) for real-time push notifications
@@ -159,10 +177,12 @@ When a user's access level is changed or they're deleted:
 
 **How It Works:**
 1. File watcher detects `users.json` change (250ms debounce)
-2. Database is updated immediately
-3. Session invalidation triggers event listener
-4. SSE pushes notification to affected user's browser
-5. Browser immediately redirects to signin page
+2. File is validated (JSON syntax, required fields, data types)
+3. If invalid: File is automatically replaced with current database state
+4. If valid: Database is updated immediately
+5. Session invalidation triggers event listener
+6. SSE pushes notification to all tabs/windows signed in as affected user
+7. All tabs automatically refresh to reflect changes
 
 ### Monitoring Changes
 
@@ -215,9 +235,10 @@ This happens when there's a syntax error. Fix the JSON syntax and try again.
 ### User Still Logged In
 
 - The client uses Server-Sent Events for real-time notifications
-- User will be logged out instantly when their session is invalidated
-- If SSE connection is lost, they'll be logged out on next page navigation
-- They can also manually refresh the page to trigger immediate check
+- When access level changes, all browser tabs refresh instantly to show new permissions
+- When user is deleted, all browser tabs refresh and redirect to signin
+- If SSE connection is lost, changes apply on next page navigation
+- Works across multiple browser tabs/windows simultaneously
 
 ## Example Workflow
 
@@ -245,9 +266,9 @@ This happens when there's a syntax error. Fix the JSON syntax and try again.
 To approve multiple users at once:
 1. Open `users.json` in a good text editor
 2. Use find/replace: `"access_level": 0` → `"access_level": 1`
-3. Review the changes
+3. Review the changes carefully
 4. Save the file
-5. All users are updated simultaneously
+5. All affected users' pages refresh instantly with new access
 
 ### Filtering Users
 

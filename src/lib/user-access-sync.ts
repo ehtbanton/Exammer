@@ -100,6 +100,8 @@ async function syncFileToDatabase(): Promise<void> {
       fileUsers = JSON.parse(fileContent);
     } catch (parseError) {
       console.error('Invalid JSON in users.json, reverting to database state');
+      console.error('Parse error:', parseError);
+      isSyncing = false; // Reset flag before resyncing
       await syncDatabaseToFile();
       return;
     }
@@ -107,8 +109,28 @@ async function syncFileToDatabase(): Promise<void> {
     // Validate structure
     if (!Array.isArray(fileUsers)) {
       console.error('users.json must be an array, reverting to database state');
+      isSyncing = false; // Reset flag before resyncing
       await syncDatabaseToFile();
       return;
+    }
+
+    // Validate each user object has required fields
+    for (const user of fileUsers) {
+      if (!user.id || !user.email || user.access_level === undefined) {
+        console.error('Invalid user object in users.json (missing id, email, or access_level), reverting to database state');
+        console.error('Invalid user:', user);
+        isSyncing = false; // Reset flag before resyncing
+        await syncDatabaseToFile();
+        return;
+      }
+      // Validate access_level is a number
+      if (typeof user.access_level !== 'number') {
+        console.error('Invalid access_level (must be a number) in users.json, reverting to database state');
+        console.error('Invalid user:', user);
+        isSyncing = false; // Reset flag before resyncing
+        await syncDatabaseToFile();
+        return;
+      }
     }
 
     // Get current users from database
