@@ -81,15 +81,13 @@ function HomePageContent() {
 
   return (
     <div className="container mx-auto">
-      {subjects.length > 0 && (
-        <div className="flex justify-between items-center mb-8">
-          <h1 className="text-3xl font-bold font-headline">My Workspace</h1>
-          <Button onClick={() => setUploadStage('syllabus')} disabled={isCreatingSubject || uploadStage !== 'initial'}>
-            {isCreatingSubject ? <LoadingSpinner /> : <Upload />}
-            Create New Subject
-          </Button>
-        </div>
-      )}
+      <div className="flex justify-between items-center mb-8">
+        <h1 className="text-3xl font-bold font-headline">My Workspace</h1>
+        <Button onClick={() => setUploadStage('syllabus')} disabled={isCreatingSubject || uploadStage !== 'initial'}>
+          {isCreatingSubject ? <LoadingSpinner /> : <Upload />}
+          Create New Subject
+        </Button>
+      </div>
       <Input
         type="file"
         accept=".pdf,.txt,.md"
@@ -202,34 +200,10 @@ function HomePageContent() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {subjects.length === 0 && otherSubjects.length === 0 ? (
-        <div className="flex items-center justify-center min-h-[60vh]">
-          <Card className="text-center py-12 px-8 max-w-md">
-            <CardContent className="space-y-6">
-              <div>
-                <h2 className="text-2xl font-bold font-headline">Welcome to Erudate!</h2>
-                <p className="text-muted-foreground mt-2">Start your exam preparation journey</p>
-              </div>
-              <Button
-                size="lg"
-                className="w-full text-lg py-6"
-                onClick={() => setUploadStage('syllabus')}
-                disabled={isCreatingSubject}
-              >
-                {isCreatingSubject ? <LoadingSpinner /> : 'Get Started!'}
-              </Button>
-              <p className="text-sm text-muted-foreground">
-                Upload a syllabus to create your first subject
-              </p>
-            </CardContent>
-          </Card>
-        </div>
-      ) : (
-        <>
-          {/* My Workspace Section */}
-          {subjects.length > 0 && (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
-              {subjects.map((subject) => (
+      {/* My Workspace Section */}
+      {subjects.length > 0 ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
+          {subjects.map((subject) => (
               <Card key={subject.id} className="flex flex-col hover:shadow-lg transition-shadow">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2 font-headline">
@@ -285,50 +259,58 @@ function HomePageContent() {
                   )}
                 </CardFooter>
               </Card>
-              ))}
-            </div>
-          )}
+            ))}
+          </div>
+      ) : (
+        <div className="mb-12">
+          <Card className="text-center py-8">
+            <CardContent>
+              <p className="text-muted-foreground">
+                Your workspace is empty. Create a new subject or add one from below.
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
-          {/* Other Subjects Section */}
-          {otherSubjects.length > 0 && (
-            <>
-              <div className="mb-8">
-                <h2 className="text-2xl font-bold font-headline">Other Subjects</h2>
-                <p className="text-muted-foreground text-sm mt-1">
-                  Add subjects created by others to your workspace
-                </p>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {otherSubjects.map((subject) => (
-                  <Card key={subject.id} className="flex flex-col hover:shadow-lg transition-shadow">
-                    <CardHeader>
-                      <CardTitle className="flex items-center gap-2 font-headline">
-                        <BookOpen className="text-primary" />
-                        {subject.name}
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="flex-grow">
-                      <p className="text-sm text-muted-foreground">
-                        {subject.paperTypes.length} paper types identified.
-                      </p>
-                    </CardContent>
-                    <CardFooter className="flex justify-between gap-2">
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        onClick={() => addSubjectToWorkspace(subject.id)}
-                        disabled={isLoading(`add-workspace-${subject.id}`)}
-                        className="flex-1"
-                      >
-                        {isLoading(`add-workspace-${subject.id}`) ? <LoadingSpinner /> : <UserPlus className="mr-2 h-4 w-4" />}
-                        Add to Workspace
-                      </Button>
-                    </CardFooter>
-                  </Card>
-                ))}
-              </div>
-            </>
-          )}
+      {/* Other Subjects Section */}
+      {otherSubjects.length > 0 && (
+        <>
+          <div className="mb-8">
+            <h2 className="text-2xl font-bold font-headline">Other Subjects</h2>
+            <p className="text-muted-foreground text-sm mt-1">
+              Add subjects created by others to your workspace
+            </p>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {otherSubjects.map((subject) => (
+              <Card key={subject.id} className="flex flex-col hover:shadow-lg transition-shadow">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 font-headline">
+                    <BookOpen className="text-primary" />
+                    {subject.name}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="flex-grow">
+                  <p className="text-sm text-muted-foreground">
+                    {subject.paperTypes.length} paper types identified.
+                  </p>
+                </CardContent>
+                <CardFooter className="flex justify-between gap-2">
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => addSubjectToWorkspace(subject.id)}
+                    disabled={isLoading(`add-workspace-${subject.id}`)}
+                    className="flex-1"
+                  >
+                    {isLoading(`add-workspace-${subject.id}`) ? <LoadingSpinner /> : <UserPlus className="mr-2 h-4 w-4" />}
+                    Add to Workspace
+                  </Button>
+                </CardFooter>
+              </Card>
+            ))}
+          </div>
         </>
       )}
     </div>

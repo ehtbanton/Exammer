@@ -9,6 +9,7 @@
     "genkit:watch": "genkit start -- tsx --watch src/ai/dev.ts",
     "build": "cross-env NODE_ENV=production next build",
     "start": "next start -p 8933",
+    "bart": "npm run build && npm run start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
     "migrate:access-level": "node -r ts-node/register src/lib/db/migrate-access-level.ts",
