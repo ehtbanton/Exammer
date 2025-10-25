@@ -3,15 +3,26 @@ import { db } from '@/lib/db';
 import { requireAuth } from '@/lib/auth-helpers';
 import type { Subject, PastPaper, PaperType } from '@/lib/db';
 
-// GET /api/subjects/[id] - Get a specific subject
+// GET /api/subjects/[id] - Get a specific subject (must be in user's workspace)
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
   try {
     const user = await requireAuth();
     const subjectId = params.id;
 
+    // Check if subject is in user's workspace
+    const workspace = await db.get(
+      'SELECT id FROM user_workspaces WHERE user_id = ? AND subject_id = ?',
+      [user.id, subjectId]
+    );
+
+    if (!workspace) {
+      return NextResponse.json({ error: 'Subject not found in workspace' }, { status: 404 });
+    }
+
+    // Get the subject
     const subject = await db.get<Subject>(
-      'SELECT * FROM subjects WHERE id = ? AND user_id = ?',
-      [subjectId, user.id]
+      'SELECT * FROM subjects WHERE id = ?',
+      [subjectId]
     );
 
     if (!subject) {
@@ -92,18 +103,24 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   }
 }
 
-// PUT /api/subjects/[id] - Update a subject
+// PUT /api/subjects/[id] - Update a subject (creators only)
 export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
   try {
     const user = await requireAuth();
     const subjectId = params.id;
     const { name, syllabusContent } = await req.json();
 
-    // Verify ownership
-    const subject = await db.get<Subject>(
-      'SELECT * FROM subjects WHERE id = ? AND user_id = ?',
-      [subjectId, user.id]
+    // Verify user is the creator
+    const workspace = await db.get<{ is_creator: number }>(
+      'SELECT is_creator FROM user_workspaces WHERE user_id = ? AND subject_id = ?',
+      [user.id, subjectId]
     );
+
+    if (!workspace || workspace.is_creator !== 1) {
+      return NextResponse.json({ error: 'Only creators can update subjects' }, { status: 403 });
+    }
+
+    const subject = await db.get<Subject>('SELECT * FROM subjects WHERE id = ?', [subjectId]);
 
     if (!subject) {
       return NextResponse.json({ error: 'Subject not found' }, { status: 404 });
@@ -126,22 +143,23 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
   }
 }
 
-// DELETE /api/subjects/[id] - Delete a subject
+// DELETE /api/subjects/[id] - Delete a subject (creators only, removes from everyone's workspace)
 export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
   try {
     const user = await requireAuth();
     const subjectId = params.id;
 
-    // Verify ownership
-    const subject = await db.get<Subject>(
-      'SELECT * FROM subjects WHERE id = ? AND user_id = ?',
-      [subjectId, user.id]
+    // Verify user is the creator
+    const workspace = await db.get<{ is_creator: number }>(
+      'SELECT is_creator FROM user_workspaces WHERE user_id = ? AND subject_id = ?',
+      [user.id, subjectId]
     );
 
-    if (!subject) {
-      return NextResponse.json({ error: 'Subject not found' }, { status: 404 });
+    if (!workspace || workspace.is_creator !== 1) {
+      return NextResponse.json({ error: 'Only creators can delete subjects' }, { status: 403 });
     }
 
+    // Delete the subject (CASCADE will remove from all workspaces and delete related data)
     await db.run('DELETE FROM subjects WHERE id = ?', [subjectId]);
 
     return NextResponse.json({ message: 'Subject deleted successfully' });

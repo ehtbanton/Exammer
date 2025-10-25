@@ -3,7 +3,7 @@ import { db } from '@/lib/db';
 import { requireAuth } from '@/lib/auth-helpers';
 import type { Subject, PaperType } from '@/lib/db';
 
-// POST /api/subjects/[id]/paper-types - Add a paper type to a subject
+// POST /api/subjects/[id]/paper-types - Add a paper type to a subject (creators only)
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   try {
     const user = await requireAuth();
@@ -14,14 +14,14 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       return NextResponse.json({ error: 'Name is required' }, { status: 400 });
     }
 
-    // Verify ownership
-    const subject = await db.get<Subject>(
-      'SELECT * FROM subjects WHERE id = ? AND user_id = ?',
-      [subjectId, user.id]
+    // Verify user is the creator
+    const workspace = await db.get<{ is_creator: number }>(
+      'SELECT is_creator FROM user_workspaces WHERE user_id = ? AND subject_id = ?',
+      [user.id, subjectId]
     );
 
-    if (!subject) {
-      return NextResponse.json({ error: 'Subject not found' }, { status: 404 });
+    if (!workspace || workspace.is_creator !== 1) {
+      return NextResponse.json({ error: 'Only creators can add paper types' }, { status: 403 });
     }
 
     const result = await db.run(

@@ -33,6 +33,7 @@ export interface Subject {
   id: string;
   name: string;
   syllabusContent: string | null;
+  isCreator?: boolean; // True if current user created this subject
   pastPapers: PastPaper[];
   paperTypes: PaperType[];
 }

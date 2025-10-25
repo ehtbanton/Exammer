@@ -3,23 +3,31 @@ import { db } from '@/lib/db';
 import { requireAuth } from '@/lib/auth-helpers';
 import type { Topic } from '@/lib/db';
 
-// GET /api/paper-types/[id]/topics - Get all topics for a paper type
+// GET /api/paper-types/[id]/topics - Get all topics for a paper type (workspace members)
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
   try {
     const user = await requireAuth();
     const paperTypeId = params.id;
 
-    // Verify user owns the subject that this paper_type belongs to
-    const ownership = await db.get<{ user_id: number }>(
-      `SELECT s.user_id
+    // Verify subject is in user's workspace
+    const workspace = await db.get<{ subject_id: number }>(
+      `SELECT pt.subject_id
        FROM paper_types pt
-       JOIN subjects s ON pt.subject_id = s.id
        WHERE pt.id = ?`,
       [paperTypeId]
     );
 
-    if (!ownership || ownership.user_id.toString() !== user.id) {
+    if (!workspace) {
       return NextResponse.json({ error: 'Paper type not found' }, { status: 404 });
+    }
+
+    const inWorkspace = await db.get(
+      'SELECT id FROM user_workspaces WHERE user_id = ? AND subject_id = ?',
+      [user.id, workspace.subject_id]
+    );
+
+    if (!inWorkspace) {
+      return NextResponse.json({ error: 'Paper type not found in workspace' }, { status: 404 });
     }
 
     const topics = await db.all<Topic>(
@@ -37,7 +45,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   }
 }
 
-// POST /api/paper-types/[id]/topics - Add a topic to a paper type
+// POST /api/paper-types/[id]/topics - Add a topic to a paper type (creators only)
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   try {
     const user = await requireAuth();
@@ -48,17 +56,24 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       return NextResponse.json({ error: 'Name is required' }, { status: 400 });
     }
 
-    // Verify user owns the subject that this paper_type belongs to
-    const ownership = await db.get<{ user_id: number }>(
-      `SELECT s.user_id
-       FROM paper_types pt
-       JOIN subjects s ON pt.subject_id = s.id
-       WHERE pt.id = ?`,
+    // Get subject_id for this paper type
+    const paperType = await db.get<{ subject_id: number }>(
+      'SELECT subject_id FROM paper_types WHERE id = ?',
       [paperTypeId]
     );
 
-    if (!ownership || ownership.user_id.toString() !== user.id) {
+    if (!paperType) {
       return NextResponse.json({ error: 'Paper type not found' }, { status: 404 });
+    }
+
+    // Verify user is the creator
+    const workspace = await db.get<{ is_creator: number }>(
+      'SELECT is_creator FROM user_workspaces WHERE user_id = ? AND subject_id = ?',
+      [user.id, paperType.subject_id]
+    );
+
+    if (!workspace || workspace.is_creator !== 1) {
+      return NextResponse.json({ error: 'Only creators can add topics' }, { status: 403 });
     }
 
     const result = await db.run(

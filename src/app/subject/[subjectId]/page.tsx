@@ -11,7 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import PageSpinner from '@/components/PageSpinner';
-import { ArrowLeft, BookCopy, FileText, List, Upload } from 'lucide-react';
+import { ArrowLeft, BookCopy, FileText, List, Upload, Crown } from 'lucide-react';
 import { getScoreColorStyle, getDefaultBoxStyle } from '@/lib/utils';
 import { PaperType } from '@/lib/types';
 
@@ -110,112 +110,123 @@ function SubjectPageContent() {
         <ArrowLeft />
         Back to Subjects
       </Button>
-      <h1 className="text-3xl font-bold font-headline mb-2">{subject.name}</h1>
-      <p className="text-muted-foreground mb-8">Manage your subject, syllabus, and past papers</p>
+      <div className="flex items-center gap-2 mb-2">
+        <h1 className="text-3xl font-bold font-headline">{subject.name}</h1>
+        {subject.isCreator && (
+          <span title="Created by you">
+            <Crown className="h-6 w-6 text-yellow-500" />
+          </span>
+        )}
+      </div>
+      <p className="text-muted-foreground mb-8">
+        {subject.isCreator ? 'Manage your subject, syllabus, and past papers' : 'View and practice questions from this subject'}
+      </p>
 
-      {/* Syllabus and Past Papers Info */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
-        <Card className="md:col-span-1">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2"><FileText /> Syllabus Info</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-green-600">Syllabus uploaded and {subject.paperTypes.length} paper types identified.</p>
-          </CardContent>
-        </Card>
+      {/* Syllabus and Past Papers Info - Only show for creators */}
+      {subject.isCreator && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
+          <Card className="md:col-span-1">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2"><FileText /> Syllabus Info</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-green-600">Syllabus uploaded and {subject.paperTypes.length} paper types identified.</p>
+            </CardContent>
+          </Card>
 
-        <Card className="md:col-span-2">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2"><List /> Past Papers</CardTitle>
-            <CardDescription>Upload past exam papers for the whole subject for better question generation.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <p className="text-muted-foreground">{subject.pastPapers.length} paper(s) uploaded.</p>
-          </CardContent>
-          <CardFooter>
-            <Dialog open={isPaperDialogOpen} onOpenChange={setPaperDialogOpen}>
-              <DialogTrigger asChild>
-                <Button variant="secondary">Manage Past Papers</Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-2xl">
-                <DialogHeader>
-                  <DialogTitle>Upload Past Exam Papers</DialogTitle>
-                  <DialogDescription>
-                    Upload past exam papers to extract real exam questions for all topics in "{subject.name}".
-                  </DialogDescription>
-                </DialogHeader>
+          <Card className="md:col-span-2">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2"><List /> Past Papers</CardTitle>
+              <CardDescription>Upload past exam papers for the whole subject for better question generation.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <p className="text-muted-foreground">{subject.pastPapers.length} paper(s) uploaded.</p>
+            </CardContent>
+            <CardFooter>
+              <Dialog open={isPaperDialogOpen} onOpenChange={setPaperDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="secondary">Manage Past Papers</Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-2xl">
+                  <DialogHeader>
+                    <DialogTitle>Upload Past Exam Papers</DialogTitle>
+                    <DialogDescription>
+                      Upload past exam papers to extract real exam questions for all topics in "{subject.name}".
+                    </DialogDescription>
+                  </DialogHeader>
 
-                <div className="space-y-4">
-                  <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-                    <p className="text-sm text-blue-800 dark:text-blue-200">
-                      <strong>Recommended:</strong> Upload at least 1 paper for each paper type.
-                    </p>
-                  </div>
-
-                  {subject.pastPapers.length > 0 && (
-                    <div>
-                      <h4 className="text-sm font-semibold mb-2">Previously Uploaded:</h4>
-                      <div className="max-h-32 overflow-y-auto space-y-1 border rounded-md p-2">
-                        {subject.pastPapers.map(paper => (
-                          <div key={paper.id} className="text-sm p-2 bg-secondary rounded-md">{paper.name}</div>
-                        ))}
-                      </div>
+                  <div className="space-y-4">
+                    <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                      <p className="text-sm text-blue-800 dark:text-blue-200">
+                        <strong>Recommended:</strong> Upload at least 1 paper for each paper type.
+                      </p>
                     </div>
-                  )}
 
-                  <div>
-                    <Button onClick={() => paperInputRef.current?.click()} variant="outline" type="button" className="w-full">
-                      <FileText className="mr-2 h-4 w-4" />
-                      Add Exam Papers
-                    </Button>
-                    <Input
-                      type="file"
-                      ref={paperInputRef}
-                      className="hidden"
-                      onChange={handlePaperSelect}
-                      accept=".pdf,.txt,.md"
-                      multiple
-                    />
-
-                    {selectedPapers.length > 0 && (
-                      <div className="mt-3 max-h-64 overflow-y-auto border rounded-md p-2 space-y-2">
-                        {selectedPapers.map((paper, index) => (
-                          <div key={index} className="flex items-center justify-between p-2 bg-muted rounded">
-                            <span className="text-sm truncate flex-1 mr-2">{paper.name}</span>
-                            <Button variant="ghost" size="sm" onClick={() => removePaper(index)}>
-                              <span className="text-xs">Remove</span>
-                            </Button>
-                          </div>
-                        ))}
+                    {subject.pastPapers.length > 0 && (
+                      <div>
+                        <h4 className="text-sm font-semibold mb-2">Previously Uploaded:</h4>
+                        <div className="max-h-32 overflow-y-auto space-y-1 border rounded-md p-2">
+                          {subject.pastPapers.map(paper => (
+                            <div key={paper.id} className="text-sm p-2 bg-secondary rounded-md">{paper.name}</div>
+                          ))}
+                        </div>
                       </div>
                     )}
-                  </div>
 
-                  <div className="flex gap-2 pt-2">
-                    <Button
-                      variant="outline"
-                      onClick={() => {
-                        setSelectedPapers([]);
-                        setPaperDialogOpen(false);
-                      }}
-                      className="flex-1"
-                    >
-                      Cancel
-                    </Button>
-                    <Button
-                      onClick={handleUploadPapers}
-                      className="flex-1"
-                      disabled={isPaperLoading || selectedPapers.length === 0}
-                    >
-                      {isPaperLoading ? <LoadingSpinner /> : 'Process Papers & Extract Questions'}
-                    </Button>
+                    <div>
+                      <Button onClick={() => paperInputRef.current?.click()} variant="outline" type="button" className="w-full">
+                        <FileText className="mr-2 h-4 w-4" />
+                        Add Exam Papers
+                      </Button>
+                      <Input
+                        type="file"
+                        ref={paperInputRef}
+                        className="hidden"
+                        onChange={handlePaperSelect}
+                        accept=".pdf,.txt,.md"
+                        multiple
+                      />
+
+                      {selectedPapers.length > 0 && (
+                        <div className="mt-3 max-h-64 overflow-y-auto border rounded-md p-2 space-y-2">
+                          {selectedPapers.map((paper, index) => (
+                            <div key={index} className="flex items-center justify-between p-2 bg-muted rounded">
+                              <span className="text-sm truncate flex-1 mr-2">{paper.name}</span>
+                              <Button variant="ghost" size="sm" onClick={() => removePaper(index)}>
+                                <span className="text-xs">Remove</span>
+                              </Button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex gap-2 pt-2">
+                      <Button
+                        variant="outline"
+                        onClick={() => {
+                          setSelectedPapers([]);
+                          setPaperDialogOpen(false);
+                        }}
+                        className="flex-1"
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        onClick={handleUploadPapers}
+                        className="flex-1"
+                        disabled={isPaperLoading || selectedPapers.length === 0}
+                      >
+                        {isPaperLoading ? <LoadingSpinner /> : 'Process Papers & Extract Questions'}
+                      </Button>
+                    </div>
                   </div>
-                </div>
-              </DialogContent>
-            </Dialog>
-          </CardFooter>
-        </Card>
-      </div>
+                </DialogContent>
+              </Dialog>
+            </CardFooter>
+          </Card>
+        </div>
+      )}
 
       <div>
         <h2 className="text-2xl font-bold font-headline mb-4 flex items-center gap-2"><BookCopy /> Paper Types</h2>

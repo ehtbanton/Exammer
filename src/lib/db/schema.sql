@@ -46,15 +46,25 @@ CREATE TABLE IF NOT EXISTS verification_tokens (
   PRIMARY KEY (identifier, token)
 );
 
--- Subjects table
+-- Subjects table (V1: workspace architecture - subjects are public, users link via user_workspaces)
 CREATE TABLE IF NOT EXISTS subjects (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  user_id INTEGER NOT NULL,
   name TEXT NOT NULL,
   syllabus_content TEXT,
   created_at INTEGER DEFAULT (unixepoch()),
-  updated_at INTEGER DEFAULT (unixepoch()),
-  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+  updated_at INTEGER DEFAULT (unixepoch())
+);
+
+-- User workspaces table (V1: links users to subjects in their workspace)
+CREATE TABLE IF NOT EXISTS user_workspaces (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL,
+  subject_id INTEGER NOT NULL,
+  is_creator INTEGER DEFAULT 0,
+  added_at INTEGER DEFAULT (unixepoch()),
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  FOREIGN KEY (subject_id) REFERENCES subjects(id) ON DELETE CASCADE,
+  UNIQUE(user_id, subject_id)
 );
 
 -- Past papers table
@@ -113,7 +123,9 @@ CREATE TABLE IF NOT EXISTS user_progress (
 CREATE INDEX IF NOT EXISTS idx_accounts_user_id ON accounts(user_id);
 CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id);
 CREATE INDEX IF NOT EXISTS idx_sessions_token ON sessions(session_token);
-CREATE INDEX IF NOT EXISTS idx_subjects_user_id ON subjects(user_id);
+CREATE INDEX IF NOT EXISTS idx_subjects_name ON subjects(name);
+CREATE INDEX IF NOT EXISTS idx_user_workspaces_user_id ON user_workspaces(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_workspaces_subject_id ON user_workspaces(subject_id);
 CREATE INDEX IF NOT EXISTS idx_past_papers_subject_id ON past_papers(subject_id);
 CREATE INDEX IF NOT EXISTS idx_paper_types_subject_id ON paper_types(subject_id);
 CREATE INDEX IF NOT EXISTS idx_topics_paper_type_id ON topics(paper_type_id);

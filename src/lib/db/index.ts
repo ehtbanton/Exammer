@@ -8,40 +8,102 @@ const DB_PATH = path.join(process.cwd(), 'db', 'erudate.db');
 // Create a connection pool-like wrapper
 class Database {
   private db: sqlite3.Database | null = null;
+  private initPromise: Promise<void> | null = null;
 
   constructor() {
-    this.initialize();
+    this.initPromise = this.initialize();
   }
 
-  private initialize() {
-    this.db = new sqlite3.Database(DB_PATH, (err) => {
-      if (err) {
-        console.error('Error opening database:', err);
-      } else {
-        console.log('Connected to SQLite database at', DB_PATH);
-        this.runMigrations();
-      }
-    });
+  private async initialize(): Promise<void> {
+    // First, ensure schema file is applied (creates tables with IF NOT EXISTS)
+    await this.applyBaseSchema();
+
+    // Then run versioned migrations
+    await this.runVersionedMigrations();
+
+    // Finally, initialize user access sync
+    await this.initializeUserAccessSync();
   }
 
-  private runMigrations() {
-    const schemaPath = path.join(process.cwd(), 'src', 'lib', 'db', 'schema.sql');
-    const schema = fs.readFileSync(schemaPath, 'utf8');
-
-    this.db!.exec(schema, async (err) => {
-      if (err) {
-        console.error('Error running migrations:', err);
-      } else {
-        console.log('Database schema initialized successfully');
-        // Initialize user access sync system
-        try {
-          const { initializeUserAccessSync } = await import('../user-access-sync');
-          await initializeUserAccessSync();
-        } catch (error) {
-          console.error('Error initializing user access sync:', error);
+  private applyBaseSchema(): Promise<void> {
+    return new Promise((resolve, reject) => {
+      this.db = new sqlite3.Database(DB_PATH, async (err) => {
+        if (err) {
+          console.error('Error opening database:', err);
+          reject(err);
+          return;
         }
-      }
+
+        console.log('Connected to SQLite database at', DB_PATH);
+
+        const schemaPath = path.join(process.cwd(), 'src', 'lib', 'db', 'schema.sql');
+        const schema = fs.readFileSync(schemaPath, 'utf8');
+
+        this.db!.exec(schema, (err) => {
+          if (err) {
+            console.error('Error applying base schema:', err);
+            reject(err);
+          } else {
+            console.log('Base schema applied successfully');
+            resolve();
+          }
+        });
+      });
     });
+  }
+
+  private async runVersionedMigrations(): Promise<void> {
+    try {
+      const { runMigrations } = await import('../../../db/migrate');
+
+      // Close current connection before migration
+      if (this.db) {
+        await new Promise<void>((resolve, reject) => {
+          this.db!.close((err) => {
+            if (err) reject(err);
+            else {
+              this.db = null;
+              resolve();
+            }
+          });
+        });
+      }
+
+      // Run migrations
+      await runMigrations();
+
+      // Reopen connection
+      await new Promise<void>((resolve, reject) => {
+        this.db = new sqlite3.Database(DB_PATH, (err) => {
+          if (err) {
+            console.error('Error reopening database after migration:', err);
+            reject(err);
+          } else {
+            console.log('Database reconnected after migration');
+            resolve();
+          }
+        });
+      });
+    } catch (error) {
+      console.error('Error running versioned migrations:', error);
+      throw error;
+    }
+  }
+
+  private async initializeUserAccessSync(): Promise<void> {
+    try {
+      const { initializeUserAccessSync } = await import('../user-access-sync');
+      await initializeUserAccessSync();
+    } catch (error) {
+      console.error('Error initializing user access sync:', error);
+    }
+  }
+
+  // Wait for initialization to complete
+  async ready(): Promise<void> {
+    if (this.initPromise) {
+      await this.initPromise;
+    }
   }
 
   // Run a query that returns multiple rows
@@ -138,11 +200,18 @@ export interface VerificationToken {
 
 export interface Subject {
   id: number;
-  user_id: number;
   name: string;
   syllabus_content?: string;
   created_at: number;
   updated_at: number;
+}
+
+export interface UserWorkspace {
+  id: number;
+  user_id: number;
+  subject_id: number;
+  is_creator: number;
+  added_at: number;
 }
 
 export interface PastPaper {

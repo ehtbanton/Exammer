@@ -3,15 +3,44 @@ import { db } from '@/lib/db';
 import { requireAuth } from '@/lib/auth-helpers';
 import type { Subject, PastPaper, PaperType } from '@/lib/db';
 
-// GET /api/subjects - Get all subjects for the authenticated user
+// GET /api/subjects - Get subjects in user's workspace (includes query param for filtering)
 export async function GET(req: NextRequest) {
   try {
     const user = await requireAuth();
+    const { searchParams } = new URL(req.url);
+    const filter = searchParams.get('filter'); // 'workspace', 'created', 'other', or null (all workspace)
 
-    const subjects = await db.all<Subject>(
-      'SELECT * FROM subjects WHERE user_id = ? ORDER BY created_at DESC',
-      [user.id]
-    );
+    let subjects: Subject[];
+
+    if (filter === 'other') {
+      // Get subjects NOT in user's workspace
+      subjects = await db.all<Subject>(
+        `SELECT s.*, 0 as is_creator FROM subjects s
+         WHERE s.id NOT IN (
+           SELECT subject_id FROM user_workspaces WHERE user_id = ?
+         )
+         ORDER BY s.created_at DESC`,
+        [user.id]
+      );
+    } else if (filter === 'created') {
+      // Get subjects created by user
+      subjects = await db.all<Subject>(
+        `SELECT s.*, uw.is_creator FROM subjects s
+         INNER JOIN user_workspaces uw ON s.id = uw.subject_id
+         WHERE uw.user_id = ? AND uw.is_creator = 1
+         ORDER BY s.created_at DESC`,
+        [user.id]
+      );
+    } else {
+      // Default: Get all subjects in user's workspace
+      subjects = await db.all<Subject>(
+        `SELECT s.*, uw.is_creator FROM subjects s
+         INNER JOIN user_workspaces uw ON s.id = uw.subject_id
+         WHERE uw.user_id = ?
+         ORDER BY s.created_at DESC`,
+        [user.id]
+      );
+    }
 
     // For each subject, fetch its past papers, paper types, topics, questions, and user progress
     const subjectsWithDetails = await Promise.all(
@@ -94,7 +123,7 @@ export async function GET(req: NextRequest) {
   }
 }
 
-// POST /api/subjects - Create a new subject
+// POST /api/subjects - Create a new subject and add to user's workspace
 export async function POST(req: NextRequest) {
   try {
     const user = await requireAuth();
@@ -104,12 +133,21 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Subject name is required' }, { status: 400 });
     }
 
+    // Create the subject
     const result = await db.run(
-      'INSERT INTO subjects (user_id, name, syllabus_content) VALUES (?, ?, ?)',
-      [user.id, name, syllabusContent || null]
+      'INSERT INTO subjects (name, syllabus_content) VALUES (?, ?)',
+      [name, syllabusContent || null]
     );
 
-    const subject = await db.get<Subject>('SELECT * FROM subjects WHERE id = ?', [result.lastID]);
+    const subjectId = result.lastID;
+
+    // Add to user's workspace as creator
+    await db.run(
+      'INSERT INTO user_workspaces (user_id, subject_id, is_creator) VALUES (?, ?, 1)',
+      [user.id, subjectId]
+    );
+
+    const subject = await db.get<Subject>('SELECT * FROM subjects WHERE id = ?', [subjectId]);
 
     return NextResponse.json(subject, { status: 201 });
   } catch (error: any) {

@@ -11,9 +11,12 @@ import { backgroundQueue } from '@/lib/background-queue';
 
 interface AppContextType {
   subjects: Subject[];
+  otherSubjects: Subject[];
   createSubjectFromSyllabus: (syllabusFile: File) => Promise<void>;
   processExamPapers: (subjectId: string, examPapers: File[]) => Promise<void>;
   deleteSubject: (subjectId: string) => Promise<void>;
+  addSubjectToWorkspace: (subjectId: string) => Promise<void>;
+  removeSubjectFromWorkspace: (subjectId: string) => Promise<void>;
   getSubjectById: (subjectId: string) => Subject | undefined;
   addPastPaperToSubject: (subjectId: string, paperFile: File) => Promise<void>;
   updateExamQuestionScore: (subjectId: string, paperTypeName: string, topicName: string, questionId: string, score: number) => void;
@@ -26,9 +29,10 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const [subjects, setSubjects] = useState<Subject[]>([]);
+  const [otherSubjects, setOtherSubjects] = useState<Subject[]>([]);
   const [loadingStates, setLoadingStates] = useState<Record<string, boolean>>({});
   const { toast } = useToast();
-  const { data: session, status } = useSession();
+  const { data: session, status} = useSession();
 
   // Fetch subjects from API when session changes
   useEffect(() => {
@@ -36,18 +40,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
       // Clear subjects if no session
       if (!session?.user) {
         setSubjects([]);
+        setOtherSubjects([]);
         return;
       }
 
       try {
-        const response = await fetch('/api/subjects');
-        if (response.ok) {
-          const apiSubjects = await response.json();
-          // Convert API format to client format
+        // Fetch workspace subjects
+        const workspaceResponse = await fetch('/api/subjects');
+        if (workspaceResponse.ok) {
+          const apiSubjects = await workspaceResponse.json();
           const clientSubjects = apiSubjects.map((sub: any) => ({
             id: sub.id.toString(),
             name: sub.name,
             syllabusContent: sub.syllabus_content || '',
+            isCreator: sub.is_creator === 1,
             pastPapers: (sub.pastPapers || []).map((pp: any) => ({
               id: pp.id.toString(),
               name: pp.name,
@@ -71,12 +77,44 @@ export function AppProvider({ children }: { children: ReactNode }) {
             }))
           }));
           setSubjects(clientSubjects);
-        } else if (response.status !== 401) {
-          // Only show error if not unauthorized (user not logged in yet)
-          toast({ variant: "destructive", title: "Error", description: "Failed to load subjects" });
+        }
+
+        // Fetch other subjects (not in workspace)
+        const otherResponse = await fetch('/api/subjects?filter=other');
+        if (otherResponse.ok) {
+          const apiOtherSubjects = await otherResponse.json();
+          const clientOtherSubjects = apiOtherSubjects.map((sub: any) => ({
+            id: sub.id.toString(),
+            name: sub.name,
+            syllabusContent: sub.syllabus_content || '',
+            isCreator: false,
+            pastPapers: (sub.pastPapers || []).map((pp: any) => ({
+              id: pp.id.toString(),
+              name: pp.name,
+              content: pp.content
+            })),
+            paperTypes: (sub.paperTypes || []).map((pt: any) => ({
+              id: pt.id.toString(),
+              name: pt.name,
+              topics: (pt.topics || []).map((t: any) => ({
+                id: t.id.toString(),
+                name: t.name,
+                description: t.description || '',
+                examQuestions: (t.examQuestions || []).map((q: any) => ({
+                  id: q.id.toString(),
+                  questionText: q.question_text,
+                  summary: q.summary,
+                  score: q.score || 0,
+                  attempts: q.attempts || 0,
+                }))
+              }))
+            }))
+          }));
+          setOtherSubjects(clientOtherSubjects);
         }
       } catch (error) {
         console.error("Failed to fetch subjects:", error);
+        toast({ variant: "destructive", title: "Error", description: "Failed to load subjects" });
       }
     };
 
@@ -85,6 +123,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       fetchSubjects();
     } else if (status === 'unauthenticated') {
       setSubjects([]);
+      setOtherSubjects([]);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session?.user?.id, status]);
@@ -514,8 +553,58 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return result.questionText;
   }, [subjects]);
 
+  const addSubjectToWorkspace = useCallback(async (subjectId: string) => {
+    try {
+      const response = await fetch('/api/workspace', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ subjectId })
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to add subject to workspace');
+      }
+
+      // Move subject from otherSubjects to subjects
+      const subject = otherSubjects.find(s => s.id === subjectId);
+      if (subject) {
+        setOtherSubjects(prev => prev.filter(s => s.id !== subjectId));
+        setSubjects(prev => [{ ...subject, isCreator: false }, ...prev]);
+        toast({ title: "Success", description: "Subject added to workspace" });
+      }
+    } catch (error: any) {
+      console.error('Error adding subject to workspace:', error);
+      toast({ variant: "destructive", title: "Error", description: error.message });
+    }
+  }, [otherSubjects, toast]);
+
+  const removeSubjectFromWorkspace = useCallback(async (subjectId: string) => {
+    try {
+      const response = await fetch(`/api/workspace?subjectId=${subjectId}`, {
+        method: 'DELETE'
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to remove subject from workspace');
+      }
+
+      // Move subject from subjects to otherSubjects
+      const subject = subjects.find(s => s.id === subjectId);
+      if (subject) {
+        setSubjects(prev => prev.filter(s => s.id !== subjectId));
+        setOtherSubjects(prev => [{ ...subject, isCreator: false }, ...prev]);
+        toast({ title: "Success", description: "Subject removed from workspace" });
+      }
+    } catch (error: any) {
+      console.error('Error removing subject from workspace:', error);
+      toast({ variant: "destructive", title: "Error", description: error.message });
+    }
+  }, [subjects, toast]);
+
   return (
-    <AppContext.Provider value={{ subjects, createSubjectFromSyllabus, processExamPapers, deleteSubject, getSubjectById, addPastPaperToSubject, updateExamQuestionScore, generateQuestionVariant, isLoading, setLoading }}>
+    <AppContext.Provider value={{ subjects, otherSubjects, createSubjectFromSyllabus, processExamPapers, deleteSubject, addSubjectToWorkspace, removeSubjectFromWorkspace, getSubjectById, addPastPaperToSubject, updateExamQuestionScore, generateQuestionVariant, isLoading, setLoading }}>
       {children}
     </AppContext.Provider>
   );

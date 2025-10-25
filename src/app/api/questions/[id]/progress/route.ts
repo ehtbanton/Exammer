@@ -3,15 +3,15 @@ import { db } from '@/lib/db';
 import { requireAuth } from '@/lib/auth-helpers';
 import type { UserProgress } from '@/lib/db';
 
-// GET /api/questions/[id]/progress - Get user progress for a question
+// GET /api/questions/[id]/progress - Get user progress for a question (workspace members)
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
   try {
     const user = await requireAuth();
     const questionId = params.id;
 
-    // Verify user owns the subject that this question belongs to
-    const ownership = await db.get<{ user_id: number }>(
-      `SELECT s.user_id
+    // Get subject_id for this question
+    const questionInfo = await db.get<{ subject_id: number }>(
+      `SELECT s.id as subject_id
        FROM questions q
        JOIN topics t ON q.topic_id = t.id
        JOIN paper_types pt ON t.paper_type_id = pt.id
@@ -20,8 +20,18 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
       [questionId]
     );
 
-    if (!ownership || ownership.user_id.toString() !== user.id) {
+    if (!questionInfo) {
       return NextResponse.json({ error: 'Question not found' }, { status: 404 });
+    }
+
+    // Verify subject is in user's workspace
+    const inWorkspace = await db.get(
+      'SELECT id FROM user_workspaces WHERE user_id = ? AND subject_id = ?',
+      [user.id, questionInfo.subject_id]
+    );
+
+    if (!inWorkspace) {
+      return NextResponse.json({ error: 'Question not found in workspace' }, { status: 404 });
     }
 
     const progress = await db.get<UserProgress>(
@@ -43,7 +53,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   }
 }
 
-// POST /api/questions/[id]/progress - Update user progress for a question
+// POST /api/questions/[id]/progress - Update user progress for a question (workspace members)
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   try {
     const user = await requireAuth();
@@ -54,9 +64,9 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       return NextResponse.json({ error: 'Score must be a number between 0 and 10' }, { status: 400 });
     }
 
-    // Verify user owns the subject that this question belongs to
-    const ownership = await db.get<{ user_id: number }>(
-      `SELECT s.user_id
+    // Get subject_id for this question
+    const questionInfo = await db.get<{ subject_id: number }>(
+      `SELECT s.id as subject_id
        FROM questions q
        JOIN topics t ON q.topic_id = t.id
        JOIN paper_types pt ON t.paper_type_id = pt.id
@@ -65,8 +75,18 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       [questionId]
     );
 
-    if (!ownership || ownership.user_id.toString() !== user.id) {
+    if (!questionInfo) {
       return NextResponse.json({ error: 'Question not found' }, { status: 404 });
+    }
+
+    // Verify subject is in user's workspace
+    const inWorkspace = await db.get(
+      'SELECT id FROM user_workspaces WHERE user_id = ? AND subject_id = ?',
+      [user.id, questionInfo.subject_id]
+    );
+
+    if (!inWorkspace) {
+      return NextResponse.json({ error: 'Question not found in workspace' }, { status: 404 });
     }
 
     // Get current progress

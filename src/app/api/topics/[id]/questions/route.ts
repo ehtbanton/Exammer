@@ -3,15 +3,15 @@ import { db } from '@/lib/db';
 import { requireAuth } from '@/lib/auth-helpers';
 import type { Question, UserProgress } from '@/lib/db';
 
-// GET /api/topics/[id]/questions - Get all questions for a topic with user progress
+// GET /api/topics/[id]/questions - Get all questions for a topic with user progress (workspace members)
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
   try {
     const user = await requireAuth();
     const topicId = params.id;
 
-    // Verify user owns the subject that this topic belongs to (through paper_type)
-    const ownership = await db.get<{ user_id: number }>(
-      `SELECT s.user_id
+    // Get subject_id for this topic
+    const topicInfo = await db.get<{ subject_id: number }>(
+      `SELECT s.id as subject_id
        FROM topics t
        JOIN paper_types pt ON t.paper_type_id = pt.id
        JOIN subjects s ON pt.subject_id = s.id
@@ -19,8 +19,18 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
       [topicId]
     );
 
-    if (!ownership || ownership.user_id.toString() !== user.id) {
+    if (!topicInfo) {
       return NextResponse.json({ error: 'Topic not found' }, { status: 404 });
+    }
+
+    // Verify subject is in user's workspace
+    const inWorkspace = await db.get(
+      'SELECT id FROM user_workspaces WHERE user_id = ? AND subject_id = ?',
+      [user.id, topicInfo.subject_id]
+    );
+
+    if (!inWorkspace) {
+      return NextResponse.json({ error: 'Topic not found in workspace' }, { status: 404 });
     }
 
     const questions = await db.all<Question>(
@@ -54,7 +64,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   }
 }
 
-// POST /api/topics/[id]/questions - Add a question to a topic
+// POST /api/topics/[id]/questions - Add a question to a topic (creators only)
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   try {
     const user = await requireAuth();
@@ -65,9 +75,9 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       return NextResponse.json({ error: 'Question text and summary are required' }, { status: 400 });
     }
 
-    // Verify user owns the subject that this topic belongs to (through paper_type)
-    const ownership = await db.get<{ user_id: number }>(
-      `SELECT s.user_id
+    // Get subject_id for this topic
+    const topicInfo = await db.get<{ subject_id: number }>(
+      `SELECT s.id as subject_id
        FROM topics t
        JOIN paper_types pt ON t.paper_type_id = pt.id
        JOIN subjects s ON pt.subject_id = s.id
@@ -75,8 +85,18 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       [topicId]
     );
 
-    if (!ownership || ownership.user_id.toString() !== user.id) {
+    if (!topicInfo) {
       return NextResponse.json({ error: 'Topic not found' }, { status: 404 });
+    }
+
+    // Verify user is the creator
+    const workspace = await db.get<{ is_creator: number }>(
+      'SELECT is_creator FROM user_workspaces WHERE user_id = ? AND subject_id = ?',
+      [user.id, topicInfo.subject_id]
+    );
+
+    if (!workspace || workspace.is_creator !== 1) {
+      return NextResponse.json({ error: 'Only creators can add questions' }, { status: 403 });
     }
 
     const result = await db.run(

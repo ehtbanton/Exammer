@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogHeader, AlertDialogTitle, AlertDialogFooter, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Upload, Trash2, BookOpen, FileText } from 'lucide-react';
+import { Upload, Trash2, BookOpen, FileText, Plus, UserPlus, UserMinus, Crown } from 'lucide-react';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import PageSpinner from '@/components/PageSpinner';
 
@@ -21,7 +21,7 @@ export default function HomePage() {
 }
 
 function HomePageContent() {
-  const { subjects, createSubjectFromSyllabus, processExamPapers, deleteSubject, isLoading, setLoading } = useAppContext();
+  const { subjects, otherSubjects, createSubjectFromSyllabus, processExamPapers, deleteSubject, addSubjectToWorkspace, removeSubjectFromWorkspace, isLoading, setLoading } = useAppContext();
   const [navigatingTo, setNavigatingTo] = useState<string | null>(null);
   const [syllabusFile, setSyllabusFile] = useState<File | null>(null);
   const [uploadStage, setUploadStage] = useState<'initial' | 'syllabus' | 'papers'>('initial');
@@ -83,7 +83,7 @@ function HomePageContent() {
     <div className="container mx-auto">
       {subjects.length > 0 && (
         <div className="flex justify-between items-center mb-8">
-          <h1 className="text-3xl font-bold font-headline">Your Subjects</h1>
+          <h1 className="text-3xl font-bold font-headline">My Workspace</h1>
           <Button onClick={() => setUploadStage('syllabus')} disabled={isCreatingSubject || uploadStage !== 'initial'}>
             {isCreatingSubject ? <LoadingSpinner /> : <Upload />}
             Create New Subject
@@ -202,7 +202,7 @@ function HomePageContent() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {subjects.length === 0 ? (
+      {subjects.length === 0 && otherSubjects.length === 0 ? (
         <div className="flex items-center justify-center min-h-[60vh]">
           <Card className="text-center py-12 px-8 max-w-md">
             <CardContent className="space-y-6">
@@ -225,48 +225,111 @@ function HomePageContent() {
           </Card>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {subjects.map((subject) => (
-            <Card key={subject.id} className="flex flex-col hover:shadow-lg transition-shadow">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 font-headline">
-                  <BookOpen className="text-primary" />
-                  {subject.name}
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="flex-grow">
-                <p className="text-sm text-muted-foreground">
-                  {subject.paperTypes.length} paper types identified.
-                </p>
-              </CardContent>
-              <CardFooter className="flex justify-between">
-                <Button asChild variant="default" size="sm" onClick={() => handleNavigate(subject.id)}>
-                  <Link href={`/subject/${subject.id}`}>Manage</Link>
-                </Button>
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <Button variant="destructive" size="icon">
-                      <Trash2 />
-                      <span className="sr-only">Delete Subject</span>
+        <>
+          {/* My Workspace Section */}
+          {subjects.length > 0 && (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
+              {subjects.map((subject) => (
+              <Card key={subject.id} className="flex flex-col hover:shadow-lg transition-shadow">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 font-headline">
+                    <BookOpen className="text-primary" />
+                    {subject.name}
+                    {subject.isCreator && (
+                      <span title="Created by you">
+                        <Crown className="h-4 w-4 text-yellow-500" />
+                      </span>
+                    )}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="flex-grow">
+                  <p className="text-sm text-muted-foreground">
+                    {subject.paperTypes.length} paper types identified.
+                  </p>
+                </CardContent>
+                <CardFooter className="flex justify-between gap-2">
+                  <Button asChild variant="default" size="sm" onClick={() => handleNavigate(subject.id)}>
+                    <Link href={`/subject/${subject.id}`}>Manage</Link>
+                  </Button>
+                  {subject.isCreator ? (
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button variant="destructive" size="icon">
+                          <Trash2 />
+                          <span className="sr-only">Delete Subject</span>
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            This will permanently delete the "{subject.name}" subject and all its data. This action cannot be undone.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction onClick={() => deleteSubject(subject.id)}>Delete</AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  ) : (
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={() => removeSubjectFromWorkspace(subject.id)}
+                      disabled={isLoading(`remove-workspace-${subject.id}`)}
+                    >
+                      {isLoading(`remove-workspace-${subject.id}`) ? <LoadingSpinner /> : <UserMinus />}
+                      <span className="sr-only">Remove from Workspace</span>
                     </Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        This will permanently delete the "{subject.name}" subject and all its data. This action cannot be undone.
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>Cancel</AlertDialogCancel>
-                      <AlertDialogAction onClick={() => deleteSubject(subject.id)}>Delete</AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
-              </CardFooter>
-            </Card>
-          ))}
-        </div>
+                  )}
+                </CardFooter>
+              </Card>
+              ))}
+            </div>
+          )}
+
+          {/* Other Subjects Section */}
+          {otherSubjects.length > 0 && (
+            <>
+              <div className="mb-8">
+                <h2 className="text-2xl font-bold font-headline">Other Subjects</h2>
+                <p className="text-muted-foreground text-sm mt-1">
+                  Add subjects created by others to your workspace
+                </p>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {otherSubjects.map((subject) => (
+                  <Card key={subject.id} className="flex flex-col hover:shadow-lg transition-shadow">
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2 font-headline">
+                        <BookOpen className="text-primary" />
+                        {subject.name}
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="flex-grow">
+                      <p className="text-sm text-muted-foreground">
+                        {subject.paperTypes.length} paper types identified.
+                      </p>
+                    </CardContent>
+                    <CardFooter className="flex justify-between gap-2">
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => addSubjectToWorkspace(subject.id)}
+                        disabled={isLoading(`add-workspace-${subject.id}`)}
+                        className="flex-1"
+                      >
+                        {isLoading(`add-workspace-${subject.id}`) ? <LoadingSpinner /> : <UserPlus className="mr-2 h-4 w-4" />}
+                        Add to Workspace
+                      </Button>
+                    </CardFooter>
+                  </Card>
+                ))}
+              </div>
+            </>
+          )}
+        </>
       )}
     </div>
   );
