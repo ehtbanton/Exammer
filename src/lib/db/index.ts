@@ -107,7 +107,8 @@ class Database {
   }
 
   // Run a query that returns multiple rows
-  all<T = any>(sql: string, params: any[] = []): Promise<T[]> {
+  async all<T = any>(sql: string, params: any[] = []): Promise<T[]> {
+    await this.ready();
     return new Promise((resolve, reject) => {
       this.db!.all(sql, params, (err, rows) => {
         if (err) reject(err);
@@ -117,7 +118,8 @@ class Database {
   }
 
   // Run a query that returns a single row
-  get<T = any>(sql: string, params: any[] = []): Promise<T | undefined> {
+  async get<T = any>(sql: string, params: any[] = []): Promise<T | undefined> {
+    await this.ready();
     return new Promise((resolve, reject) => {
       this.db!.get(sql, params, (err, row) => {
         if (err) reject(err);
@@ -127,7 +129,8 @@ class Database {
   }
 
   // Run a query that doesn't return rows (INSERT, UPDATE, DELETE)
-  run(sql: string, params: any[] = []): Promise<{ lastID: number; changes: number }> {
+  async run(sql: string, params: any[] = []): Promise<{ lastID: number; changes: number }> {
+    await this.ready();
     return new Promise((resolve, reject) => {
       this.db!.run(sql, params, function(err) {
         if (err) reject(err);

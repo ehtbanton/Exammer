@@ -43,16 +43,17 @@ jobs:
 
       - name: Deploy to Oracle Cloud
         run: |
-          # Deploy the built application
-          rsync -avz --delete \
+          # Deploy the built application (without --delete to preserve database and env files)
+          rsync -avz \
             -e "ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no" \
             --exclude 'node_modules' \
             --exclude '.git' \
             --exclude '.env' \
+            --exclude '.env.local' \
             --exclude '.next/cache' \
-            --exclude 'db/*.db' \
-            --exclude 'db/*.db-*' \
-            --exclude 'db/users.json' \
+            --exclude 'db/' \
+            --exclude '.pm2' \
+            --exclude '*.log' \
             ./ ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:~/Exammer/
 
       - name: Install dependencies and restart app on server
@@ -68,15 +69,17 @@ jobs:
               exit 1
             fi
 
-            # Install production dependencies
-            npm ci --production
+            # Install dependencies (preserves existing dev dependencies)
+            npm install --omit=dev
 
             # Restart the application using PM2
-            # If PM2 is not set up yet, this will fail - see setup instructions
             pm2 restart exammer-deploy || pm2 start npm --name "exammer-deploy" -- start -- -p 8933
 
             # Save PM2 process list
             pm2 save
+
+            # Show PM2 status
+            pm2 list
           EOF
 
       - name: Cleanup
