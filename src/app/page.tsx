@@ -223,7 +223,7 @@ function HomePageContent() {
                 </CardContent>
                 <CardFooter className="flex justify-between gap-2">
                   <Button asChild variant="default" size="sm" onClick={() => handleNavigate(subject.id)}>
-                    <Link href={`/subject/${subject.id}`}>Manage</Link>
+                    <Link href={`/subject/${subject.id}`}>Study</Link>
                   </Button>
                   {subject.isCreator ? (
                     <AlertDialog>
