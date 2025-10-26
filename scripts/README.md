@@ -1,6 +1,6 @@
 # Database Migration Scripts
 
-This directory contains scripts for managing database migrations in Erudate.
+This directory contains scripts for managing database migrations in Exammer.
 
 ## Available Scripts
 
@@ -60,13 +60,13 @@ npm run test:migration
 
 1. **Backup database**
    ```bash
-   cp db/erudate.db db/erudate.db.backup
+   cp db/exammer.db db/exammer.db.backup
    ```
 
 2. **Test migration on backup**
    ```bash
    # Make a test copy
-   cp db/erudate.db db/erudate-test.db
+   cp db/exammer.db db/exammer-test.db
 
    # Run migration script on test copy
    # (temporarily change DB_PATH in script)
@@ -98,24 +98,24 @@ If `npm run migrate:db` fails:
 1. **Check file permissions**
    ```bash
    # Windows
-   icacls db\erudate.db
+   icacls db\exammer.db
 
    # Linux/Mac
-   ls -la db/erudate.db
+   ls -la db/exammer.db
    ```
 
 2. **Check database integrity**
    ```bash
-   sqlite3 db/erudate.db "PRAGMA integrity_check;"
+   sqlite3 db/exammer.db "PRAGMA integrity_check;"
    ```
 
 3. **Restore from backup**
    ```bash
    # Windows
-   copy db\erudate.db.backup db\erudate.db
+   copy db\exammer.db.backup db\exammer.db
 
    # Linux/Mac
-   cp db/erudate.db.backup db/erudate.db
+   cp db/exammer.db.backup db/exammer.db
    ```
 
 ### Test Script Fails
@@ -129,12 +129,12 @@ If `npm run test:migration` reports failures:
 
 2. **Check error details** - The test output shows what's missing
 
-3. **Verify database path** - Ensure database is at `db/erudate.db`
+3. **Verify database path** - Ensure database is at `db/exammer.db`
 
 ### Common Issues
 
 **Issue:** "Database file not found"
-- **Solution:** Ensure `db/erudate.db` exists, run the app once to create it
+- **Solution:** Ensure `db/exammer.db` exists, run the app once to create it
 
 **Issue:** "Error opening database: database is locked"
 - **Solution:** Stop the application before running manual migration

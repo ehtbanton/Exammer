@@ -14,7 +14,7 @@ import sqlite3 from 'sqlite3';
 import path from 'path';
 import fs from 'fs';
 
-const DB_PATH = path.join(process.cwd(), 'db', 'erudate.db');
+const DB_PATH = path.join(process.cwd(), 'db', 'exammer.db');
 
 interface ColumnInfo {
   cid: number;

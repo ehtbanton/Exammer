@@ -19,8 +19,8 @@ export const config = {
      * - _next/static (static files)
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
-     * - erudate.png (logo)
+     * - exammer.png (logo)
      */
-    '/((?!auth|api/auth|_next/static|_next/image|favicon.ico|erudate.png).*)',
+    '/((?!auth|api/auth|_next/static|_next/image|favicon.ico|exammer.png).*)',
   ],
 };

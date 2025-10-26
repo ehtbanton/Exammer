@@ -3,7 +3,7 @@ import path from 'path';
 import fs from 'fs';
 
 // Database path - in /db folder
-const DB_PATH = path.join(process.cwd(), 'db', 'erudate.db');
+const DB_PATH = path.join(process.cwd(), 'db', 'exammer.db');
 
 // Create a connection pool-like wrapper
 class Database {

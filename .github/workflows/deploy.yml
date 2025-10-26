@@ -71,7 +71,7 @@ jobs:
 
             # Restart the application using PM2
             # If PM2 is not set up yet, this will fail - see setup instructions
-            pm2 restart erudate || pm2 start npm --name "erudate" -- start -- -p 8933
+            pm2 restart exammer || pm2 start npm --name "exammer" -- start -- -p 8933
 
             # Save PM2 process list
             pm2 save

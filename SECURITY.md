@@ -2,7 +2,7 @@
 
 ## Overview
 
-Erudate implements a comprehensive multi-user authentication and authorization system with strict data isolation between users. This document explains the security model, data architecture, and access control mechanisms.
+Exammer implements a comprehensive multi-user authentication and authorization system with strict data isolation between users. This document explains the security model, data architecture, and access control mechanisms.
 
 ## Authentication
 
@@ -158,7 +158,7 @@ WHERE q.id = ?
 - `/auth/verify-request`
 - `/auth/reset-password`
 - `/api/auth/*` (NextAuth routes)
-- Static assets (`_next/static`, `_next/image`, `favicon.ico`, `erudate.png`)
+- Static assets (`_next/static`, `_next/image`, `favicon.ico`, `exammer.png`)
 
 ### Implementation
 ```typescript
@@ -176,7 +176,7 @@ export default withAuth({
 
 export const config = {
   matcher: [
-    '/((?!auth|api/auth|_next/static|_next/image|favicon.ico|erudate.png).*)',
+    '/((?!auth|api/auth|_next/static|_next/image|favicon.ico|exammer.png).*)',
   ],
 };
 ```
@@ -265,7 +265,7 @@ GITHUB_CLIENT_SECRET=<github-oauth-client-secret>
 **Optional (for email):**
 ```env
 EMAIL_SERVER=smtp://username:password@smtp.example.com:587
-EMAIL_FROM=noreply@erudate.com
+EMAIL_FROM=noreply@exammer.com
 ```
 
 ## Database Security
@@ -279,11 +279,11 @@ EMAIL_FROM=noreply@erudate.com
 5. **Password hashing** - bcrypt with 12 rounds (never store plaintext)
 
 ### Database File Location
-- **Path**: `./erudate.db` (project root)
+- **Path**: `./exammer.db` (project root)
 - **Permissions**: Should be readable/writable only by application user
 - **Backups**: Recommended for production deployments
 
 ## Contact
 
 For security concerns or to report vulnerabilities, please create an issue at:
-https://github.com/your-org/erudate/issues
+https://github.com/your-org/exammer/issues

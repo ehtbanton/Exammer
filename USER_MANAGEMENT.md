@@ -188,7 +188,7 @@ When a user's access level is changed or they're deleted:
 
 Check the server logs to see sync activity:
 ```bash
-pm2 logs erudate
+pm2 logs exammer
 ```
 
 You'll see messages like:
@@ -202,7 +202,7 @@ Invalidating sessions for users: 3
 ## File Location
 
 - **Local Development**: `./db/users.json`
-- **Production Server**: `/path/to/erudate/db/users.json`
+- **Production Server**: `/path/to/exammer/db/users.json`
 
 ## Best Practices
 

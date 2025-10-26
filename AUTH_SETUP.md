@@ -200,7 +200,7 @@ curl -H "Cookie: next-auth.session-token=<user-b-token>" \
 npm install -g sqlite3
 
 # Open database
-sqlite3 erudate.db
+sqlite3 exammer.db
 
 # View all users
 SELECT id, email, name, email_verified FROM users;
@@ -311,7 +311,7 @@ GITHUB_CLIENT_SECRET=<your-github-client-secret>
 
 ```env
 EMAIL_SERVER=smtp://username:password@smtp.example.com:587
-EMAIL_FROM=noreply@erudate.com
+EMAIL_FROM=noreply@exammer.com
 ```
 
 ## Next Steps

@@ -242,7 +242,7 @@ Your app now has **three layers of authentication:**
 - `src/app/auth/verify-email/page.tsx` - Added Suspense boundary
 
 ### Database
-- `erudate.db` - Deleted and recreated with new schema
+- `exammer.db` - Deleted and recreated with new schema
 
 ## Quick Start
 

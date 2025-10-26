@@ -157,7 +157,7 @@ User 2 sees NO subjects (correct!) ✅
 ### Check Database Directly
 
 ```bash
-sqlite3 erudate.db
+sqlite3 exammer.db
 
 # View all users
 SELECT id, email FROM users;

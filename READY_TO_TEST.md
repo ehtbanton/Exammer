@@ -156,7 +156,7 @@ Redirect to
 - ✅ Auth pages - Added Suspense boundaries
 
 ### Database
-- ✅ `erudate.db` - Recreated with correct schema
+- ✅ `exammer.db` - Recreated with correct schema
 
 ## Environment Variables
 

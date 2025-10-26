@@ -228,7 +228,7 @@ npm run dev
 - [ ] Expected: Cannot see User A's subject
 
 ### ✅ Database Structure
-- [ ] Run `sqlite3 erudate.db`
+- [ ] Run `sqlite3 exammer.db`
 - [ ] Query: `SELECT * FROM users;`
 - [ ] Query: `SELECT * FROM subjects;`
 - [ ] Verify users can create subjects

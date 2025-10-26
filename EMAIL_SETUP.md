@@ -1,10 +1,10 @@
 # Email Configuration Guide - Custom API
 
-This guide explains how to configure email for user verification and password reset functionality in Erudate using your custom email API.
+This guide explains how to configure email for user verification and password reset functionality in Exammer using your custom email API.
 
 ## Overview
 
-Erudate sends verification emails when users sign up by making HTTP POST requests to your custom email API endpoint. You have full control over how emails are sent.
+Exammer sends verification emails when users sign up by making HTTP POST requests to your custom email API endpoint. You have full control over how emails are sent.
 
 ## Configuration
 
@@ -44,7 +44,7 @@ Your email API must accept POST requests with the following format:
 {
   "from": "noreply@yourdomain.com",
   "to": "user@example.com",
-  "subject": "Verify your email - Erudate",
+  "subject": "Verify your email - Exammer",
   "text": "Plain text version of the email...",
   "html": "<!DOCTYPE html><html>...</html>"
 }
@@ -122,9 +122,9 @@ app.listen(3001, () => {
 1. **Create your email service:**
    - Use the example above as a starting point
    - Add error handling, logging, rate limiting
-   - Deploy to a server (same server as Erudate or separate)
+   - Deploy to a server (same server as Exammer or separate)
 
-2. **Configure Erudate:**
+2. **Configure Exammer:**
    ```bash
    EMAIL_API_URL=https://your-server.com/api/send
    EMAIL_API_KEY=your-secret-api-key
@@ -224,7 +224,7 @@ app.post('/api/send', async (req, res) => {
 2. **SSH into your Oracle Cloud server:**
    ```bash
    ssh user@your-server
-   cd /path/to/erudate
+   cd /path/to/exammer
    ```
 
 3. **Edit the `.env` file:**
@@ -246,7 +246,7 @@ app.post('/api/send', async (req, res) => {
 
 5. **Save and restart the app:**
    ```bash
-   pm2 restart erudate
+   pm2 restart exammer
    ```
 
 6. **Verify email is working:**
@@ -254,7 +254,7 @@ app.post('/api/send', async (req, res) => {
    - Check your email for the verification link
    - Check PM2 logs if you don't receive an email:
      ```bash
-     pm2 logs erudate
+     pm2 logs exammer
      ```
 
 ## Email Templates
@@ -262,12 +262,12 @@ app.post('/api/send', async (req, res) => {
 The app sends these emails to your API:
 
 ### Verification Email
-- **Subject:** "Verify your email - Erudate"
+- **Subject:** "Verify your email - Exammer"
 - **Content:** Welcome message with verification button/link (HTML + text)
 - **Expiration:** 24 hours
 
 ### Password Reset Email (Future)
-- **Subject:** "Reset your password - Erudate"
+- **Subject:** "Reset your password - Exammer"
 - **Content:** Password reset button/link (HTML + text)
 - **Expiration:** 1 hour
 
@@ -311,10 +311,10 @@ npm run dev
 ```bash
 # SSH to server
 ssh user@your-server
-cd /path/to/erudate
+cd /path/to/exammer
 
 # Check logs
-pm2 logs erudate --lines 100
+pm2 logs exammer --lines 100
 
 # Test signup
 # Monitor logs for email sending confirmation
@@ -323,7 +323,7 @@ pm2 logs erudate --lines 100
 ## Troubleshooting
 
 **No email received:**
-1. Check PM2 logs: `pm2 logs erudate`
+1. Check PM2 logs: `pm2 logs exammer`
 2. Verify `EMAIL_API_URL`, `EMAIL_API_KEY`, and `EMAIL_FROM` are set correctly
 3. Test your email API directly with curl:
    ```bash
@@ -348,7 +348,7 @@ pm2 logs erudate --lines 100
 
 ## FAQ
 
-**Q: Can I use Erudate without configuring email?**
+**Q: Can I use Exammer without configuring email?**
 A: Yes, but only in development mode. The verification URLs will be logged to the console. In production, you must configure email or users won't be able to verify their accounts.
 
 **Q: Do I need to implement my own email API?**
@@ -361,7 +361,7 @@ A: Yes! You can run your email API on the same Oracle Cloud server. Just use a d
 A: The signup will still succeed, but users won't receive verification emails. The app logs errors but continues processing. Make sure your email API is reliable!
 
 **Q: Can I use environment variables in my email API?**
-A: Yes, your email API is separate from Erudate and can have its own `.env` file with SMTP credentials, API keys, etc.
+A: Yes, your email API is separate from Exammer and can have its own `.env` file with SMTP credentials, API keys, etc.
 
 **Q: How do I secure my email API?**
 A: Use the `EMAIL_API_KEY` to authenticate requests. Your email API should verify this key before sending emails. Also use HTTPS and implement rate limiting.

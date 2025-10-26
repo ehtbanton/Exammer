@@ -55,9 +55,9 @@ export async function sendEmail({ to, subject, text, html }: EmailOptions): Prom
  * Send verification email
  */
 export async function sendVerificationEmail(email: string, verificationUrl: string): Promise<void> {
-  const subject = 'Verify your email - Erudate';
+  const subject = 'Verify your email - Exammer';
   const text = `
-Welcome to Erudate!
+Welcome to Exammer!
 
 Please verify your email address by clicking the link below:
 
@@ -101,7 +101,7 @@ If you didn't create an account, you can safely ignore this email.
 </head>
 <body>
   <div class="container">
-    <h1>Welcome to Erudate!</h1>
+    <h1>Welcome to Exammer!</h1>
     <p>Please verify your email address by clicking the button below:</p>
     <a href="${verificationUrl}" class="button">Verify Email</a>
     <p>Or copy and paste this link into your browser:</p>
@@ -122,9 +122,9 @@ If you didn't create an account, you can safely ignore this email.
  * Send password reset email
  */
 export async function sendPasswordResetEmail(email: string, resetUrl: string): Promise<void> {
-  const subject = 'Reset your password - Erudate';
+  const subject = 'Reset your password - Exammer';
   const text = `
-You requested to reset your password for your Erudate account.
+You requested to reset your password for your Exammer account.
 
 Click the link below to reset your password:
 
@@ -169,7 +169,7 @@ If you didn't request a password reset, you can safely ignore this email.
 <body>
   <div class="container">
     <h1>Reset Your Password</h1>
-    <p>You requested to reset your password for your Erudate account.</p>
+    <p>You requested to reset your password for your Exammer account.</p>
     <a href="${resetUrl}" class="button">Reset Password</a>
     <p>Or copy and paste this link into your browser:</p>
     <p style="word-break: break-all; color: #0070f3;">${resetUrl}</p>

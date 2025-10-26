@@ -1,10 +1,10 @@
 # Database Migration Guide
 
-This document explains how the database migration system works in Erudate and how to handle database schema updates.
+This document explains how the database migration system works in Exammer and how to handle database schema updates.
 
 ## Overview
 
-Erudate uses SQLite as its database and includes an automatic migration system that runs when the application starts. The migration system ensures that your database schema is up-to-date with the latest changes.
+Exammer uses SQLite as its database and includes an automatic migration system that runs when the application starts. The migration system ensures that your database schema is up-to-date with the latest changes.
 
 ## Automatic Migration
 
@@ -24,7 +24,7 @@ This process happens automatically in `src/lib/db/index.ts` during the Database 
 You'll see logs like this in your console when migrations run:
 
 ```
-Connected to SQLite database at db/erudate.db
+Connected to SQLite database at db/exammer.db
 Database schema initialized successfully
 Checking for database migrations...
 [MIGRATION] is_public column already exists, skipping migration
@@ -51,7 +51,7 @@ npm run migrate:db
 ```
 
 This will:
-- Connect to your database at `db/erudate.db`
+- Connect to your database at `db/exammer.db`
 - Check which migrations are needed
 - Apply any missing migrations
 - Verify data integrity
@@ -60,7 +60,7 @@ This will:
 ### Expected Output
 
 ```
-Connected to database at: C:\Users\...\db\erudate.db
+Connected to database at: C:\Users\...\db\exammer.db
 
 === Starting Database Migration ===
 
@@ -134,7 +134,7 @@ If automatic migration fails:
 1. **Check console logs** - Look for `[MIGRATION ERROR]` messages
 2. **Run manual migration** - Execute `npm run migrate:db`
 3. **Check file permissions** - Ensure the database file is writable
-4. **Verify database integrity** - Use `sqlite3 db/erudate.db "PRAGMA integrity_check;"`
+4. **Verify database integrity** - Use `sqlite3 db/exammer.db "PRAGMA integrity_check;"`
 
 ### Database Backup
 
@@ -142,10 +142,10 @@ Before running migrations, it's recommended to backup your database:
 
 ```bash
 # Windows
-copy db\erudate.db db\erudate.db.backup
+copy db\exammer.db db\exammer.db.backup
 
 # Linux/Mac
-cp db/erudate.db db/erudate.db.backup
+cp db/exammer.db db/exammer.db.backup
 ```
 
 ### Restore from Backup
@@ -154,10 +154,10 @@ If something goes wrong:
 
 ```bash
 # Windows
-copy db\erudate.db.backup db\erudate.db
+copy db\exammer.db.backup db\exammer.db
 
 # Linux/Mac
-cp db/erudate.db.backup db/erudate.db
+cp db/exammer.db.backup db/exammer.db
 ```
 
 ## Adding New Migrations
