@@ -91,7 +91,7 @@ function TopicPageContent() {
           {topic.examQuestions.map(question => (
               <Card
                 key={question.id}
-                className="hover:shadow-md transition-all cursor-pointer border-2"
+                className="hover:shadow-[0_0_0_4px_white] transition-all cursor-pointer border-2"
                 style={getScoreColorStyle(question.score)}
                 onClick={() => handleNavigate(question.id)}
               >

@@ -239,7 +239,7 @@ function SubjectPageContent() {
               return (
                 <Card
                   key={paperType.id}
-                  className="hover:shadow-md transition-all cursor-pointer h-full border-2"
+                  className="hover:shadow-[0_0_0_4px_white] transition-all cursor-pointer h-full border-2"
                   style={hasScore ? getScoreColorStyle(avgScore) : getDefaultBoxStyle()}
                   onClick={() => handleNavigate(paperType.id)}
                 >

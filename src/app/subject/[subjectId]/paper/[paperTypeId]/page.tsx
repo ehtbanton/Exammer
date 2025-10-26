@@ -91,7 +91,7 @@ function PaperTypePageContent() {
               return (
                 <Link key={topic.id} href={`/subject/${subjectId}/paper/${encodeURIComponent(paperTypeId)}/topic/${encodeURIComponent(topic.id)}`} onClick={() => handleNavigate(topic.id)} className="block hover:no-underline">
                   <Card
-                    className="hover:shadow-md transition-all h-full border-2"
+                    className="hover:shadow-[0_0_0_4px_white] transition-all h-full border-2"
                     style={hasScore ? getScoreColorStyle(avgScore) : getDefaultBoxStyle()}
                   >
                     <CardHeader>
