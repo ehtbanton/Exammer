@@ -1,11 +1,11 @@
 'use server';
 
 /**
- * @fileOverview Extracts and categorizes exam questions from uploaded past papers into topics.
+ * @fileOverview Extracts and categorizes exam questions from a single exam paper.
  *
- * - extractExamQuestions - A function that extracts discrete exam questions and sorts them into topics.
+ * - extractExamQuestions - A function that determines the paper type from the exam title and extracts discrete exam questions, sorting them into topics.
  * - ExtractExamQuestionsInput - The input type for the extractExamQuestions function.
- * - ExtractExamQuestionsOutput - The return type for the extractExamQuestions function.
+ * - ExtractExamQuestionsOutput - The return type for the extractExamQuestions function, including the determined paper type name.
  */
 
 import {genkit} from 'genkit';
@@ -18,12 +18,19 @@ const TopicInfoSchema = z.object({
   description: z.string().describe('The description of what this topic covers.'),
 });
 
+const PaperTypeInfoSchema = z.object({
+  name: z.string().describe('The name of the paper type.'),
+});
+
 const ExtractExamQuestionsInputSchema = z.object({
-  examPapersDataUris: z
-    .array(z.string())
+  examPaperDataUri: z
+    .string()
     .describe(
-      "An array of exam papers in PDF format, as data URIs that must include a MIME type and use Base64 encoding. Expected format: 'data:<mimetype>;base64,<encoded_data>'"
+      "A single exam paper in PDF format, as a data URI that must include a MIME type and use Base64 encoding. Expected format: 'data:<mimetype>;base64,<encoded_data>'"
     ),
+  paperTypes: z
+    .array(PaperTypeInfoSchema)
+    .describe('The list of paper types from the syllabus that this exam paper could belong to.'),
   topics: z
     .array(TopicInfoSchema)
     .describe('The list of topics from the syllabus to categorize questions into.'),
@@ -37,121 +44,96 @@ const ExamQuestionSchema = z.object({
 });
 
 const ExtractExamQuestionsOutputSchema = z.object({
+  paperTypeName: z.string().describe('The name of the paper type that this exam paper belongs to, determined from the exam paper title.'),
   questions: z.array(ExamQuestionSchema).describe('A list of all discrete exam questions extracted and categorized by topic.'),
 });
 export type ExtractExamQuestionsOutput = z.infer<typeof ExtractExamQuestionsOutputSchema>;
 
-/**
- * Configuration for batch processing
- * BATCH_SIZE controls how many papers are processed in a single API call
- */
-const BATCH_SIZE = 1; // Number of papers to send in a single API call
-
 export async function extractExamQuestions(
   input: ExtractExamQuestionsInput
 ): Promise<ExtractExamQuestionsOutput> {
-  const { examPapersDataUris, topics } = input;
+  const { examPaperDataUri, paperTypes, topics } = input;
 
-  // Get the number of API keys from the global manager
-  const numKeys = geminiApiKeyManager.getKeyCount();
-  console.log(`Processing ${examPapersDataUris.length} papers using ${numKeys} API key(s)...`);
+  console.log(`[Question Extraction] Processing single exam paper...`);
 
-  // Split papers into batches
-  const batches: string[][] = [];
-  for (let i = 0; i < examPapersDataUris.length; i += BATCH_SIZE) {
-    batches.push(examPapersDataUris.slice(i, i + BATCH_SIZE));
-  }
+  const startTime = Date.now();
 
-  console.log(`Created ${batches.length} batches of ${BATCH_SIZE} papers each`);
+  try {
+    // Use the global API key manager to execute with a managed key
+    const result = await geminiApiKeyManager.withKey(async (apiKey) => {
+      // Create a genkit instance with this specific API key
+      const aiInstance = genkit({
+        plugins: [googleAI({ apiKey })],
+        model: 'googleai/gemini-2.5-flash-lite',
+      });
 
-  // Process all batches using the global API key manager
-  const allQuestions: ExtractExamQuestionsOutput['questions'] = [];
-
-  // Process batches with promises, letting the API key manager handle queueing
-  const batchPromises = batches.map(async (batch, batchIndex) => {
-    const batchStartTime = Date.now();
-    console.log(`[Question Extraction] Batch ${batchIndex + 1}/${batches.length}: Starting, processing ${batch.length} papers...`);
-
-    try {
-      // Use the global API key manager to execute with a managed key
-      // The manager will queue this request if no keys are available
-      const result = await geminiApiKeyManager.withKey(async (apiKey) => {
-        // Create a genkit instance with this specific API key
-        const aiInstance = genkit({
-          plugins: [googleAI({ apiKey })],
-          model: 'googleai/gemini-2.5-flash-lite',
-        });
-
-        // Create flow with this AI instance
-        const prompt = aiInstance.definePrompt({
-          name: `extractExamQuestionsPrompt-${batchIndex}`,
-          input: {schema: ExtractExamQuestionsInputSchema},
-          output: {schema: ExtractExamQuestionsOutputSchema},
-          prompt: `You are an expert educator analyzing past exam papers to help students prepare for their exams.
+      // Create flow with this AI instance
+      const prompt = aiInstance.definePrompt({
+        name: 'extractExamQuestionsPrompt',
+        input: {schema: ExtractExamQuestionsInputSchema},
+        output: {schema: ExtractExamQuestionsOutputSchema},
+        prompt: `You are an expert educator analyzing a past exam paper to help students prepare for their exams.
 
 Your task is to:
-1. Read through all the provided exam papers
+1. Determine which paper type this exam paper belongs to by examining the exam paper title/header
 2. Extract each discrete, complete exam question (including all parts like a, b, c, etc.)
 3. For each question, write a brief one-sentence summary
 4. Categorize each question into the most appropriate topic from the provided list
+
+Available paper types:
+{{#each paperTypes}}
+- {{name}}
+{{/each}}
 
 Topics available for categorization:
 {{#each topics}}
 - {{name}}: {{description}}
 {{/each}}
 
-Exam Papers:
-{{#each examPapersDataUris}}
-{{media url=this}}
-{{/each}}
+Exam Paper:
+{{media url=examPaperDataUri}}
 
 Important guidelines:
+- Identify the paper type from the exam paper title (e.g., "Paper 1", "Paper 2", "Advanced Paper")
 - Each question should be complete and standalone
 - If a question has multiple parts (a, b, c), include all parts in the questionText
 - The summary should be concise but informative (one sentence)
 - Match each question to the most relevant topic based on the topic descriptions
 - If a question spans multiple topics, choose the primary/most relevant topic
-- Extract ALL questions from ALL papers provided`,
-        });
-
-        const flow = aiInstance.defineFlow(
-          {
-            name: `extractExamQuestionsFlow-${batchIndex}`,
-            inputSchema: ExtractExamQuestionsInputSchema,
-            outputSchema: ExtractExamQuestionsOutputSchema,
-          },
-          async input => {
-            const response = await prompt(input);
-            const output = response.output;
-            const questions = output?.questions ?? [];
-            return { questions };
-          }
-        );
-
-        return await flow({
-          examPapersDataUris: batch,
-          topics,
-        });
+- Extract ALL questions from the provided exam paper`,
       });
 
-      // Categorize and add questions immediately after this API response
-      const batchEndTime = Date.now();
-      const batchDuration = ((batchEndTime - batchStartTime) / 1000).toFixed(2);
-      console.log(`[Question Extraction] Batch ${batchIndex + 1}/${batches.length}: Completed in ${batchDuration}s - Extracted ${result.questions.length} questions`);
+      const flow = aiInstance.defineFlow(
+        {
+          name: 'extractExamQuestionsFlow',
+          inputSchema: ExtractExamQuestionsInputSchema,
+          outputSchema: ExtractExamQuestionsOutputSchema,
+        },
+        async input => {
+          const response = await prompt(input);
+          const output = response.output;
+          const paperTypeName = output?.paperTypeName ?? 'Unknown';
+          const questions = output?.questions ?? [];
+          return { paperTypeName, questions };
+        }
+      );
 
-      // Add the categorized questions from this batch immediately
-      allQuestions.push(...result.questions);
-    } catch (error) {
-      const batchEndTime = Date.now();
-      const batchDuration = ((batchEndTime - batchStartTime) / 1000).toFixed(2);
-      console.error(`[Question Extraction] Batch ${batchIndex + 1}/${batches.length}: Error after ${batchDuration}s:`, error);
-    }
-  });
+      return await flow({
+        examPaperDataUri,
+        paperTypes,
+        topics,
+      });
+    });
 
-  // Wait for all batches to complete
-  await Promise.all(batchPromises);
+    const endTime = Date.now();
+    const duration = ((endTime - startTime) / 1000).toFixed(2);
+    console.log(`[Question Extraction] Completed in ${duration}s - Paper Type: ${result.paperTypeName}, Extracted ${result.questions.length} questions`);
 
-  console.log(`Total questions extracted: ${allQuestions.length}`);
-
-  return { questions: allQuestions };
+    return result;
+  } catch (error) {
+    const endTime = Date.now();
+    const duration = ((endTime - startTime) / 1000).toFixed(2);
+    console.error(`[Question Extraction] Error after ${duration}s:`, error);
+    throw error;
+  }
 }

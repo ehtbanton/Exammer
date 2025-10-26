@@ -335,17 +335,36 @@ export function AppProvider({ children }: { children: ReactNode }) {
             throw new Error('No topics found for question extraction');
           }
 
-          const questionsResult = await extractExamQuestions({
-            examPapersDataUris,
-            topics: topicsInfo,
-          });
+          const paperTypesInfo = paperTypes.map(pt => ({ name: pt.name }));
 
-          const extractedQuestions = questionsResult.questions;
+          // Process each exam paper individually
+          const allExtractedQuestions: Array<{ paperTypeName: string; questionText: string; summary: string; topicName: string }> = [];
+
+          for (let i = 0; i < examPapersDataUris.length; i++) {
+            const questionsResult = await extractExamQuestions({
+              examPaperDataUri: examPapersDataUris[i],
+              paperTypes: paperTypesInfo,
+              topics: topicsInfo,
+            });
+
+            // Add paper type info to each question for later categorization
+            questionsResult.questions.forEach(q => {
+              allExtractedQuestions.push({
+                paperTypeName: questionsResult.paperTypeName,
+                questionText: q.questionText,
+                summary: q.summary,
+                topicName: q.topicName,
+              });
+            });
+          }
 
           // Persist questions to database and update subject with questions
           const updatedPaperTypes = await Promise.all(paperTypes.map(async (pt) => {
             const updatedTopics = await Promise.all(pt.topics.map(async (topic) => {
-              const topicQuestions = extractedQuestions.filter(q => q.topicName === topic.name);
+              // Filter questions that belong to this paper type AND this topic
+              const topicQuestions = allExtractedQuestions.filter(
+                q => q.paperTypeName === pt.name && q.topicName === topic.name
+              );
 
               // Persist each question to the database
               const createdQuestions = await Promise.all(topicQuestions.map(async (q) => {
@@ -390,7 +409,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
           toast({
             title: "Questions Extracted",
-            description: `Extracted ${extractedQuestions.length} questions from ${examPapers.length} paper(s).`
+            description: `Extracted ${allExtractedQuestions.length} questions from ${examPapers.length} paper(s).`
           });
         }
       });
