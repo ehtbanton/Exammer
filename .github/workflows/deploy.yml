@@ -52,6 +52,7 @@ jobs:
             --exclude '.next/cache' \
             --exclude 'db/*.db' \
             --exclude 'db/*.db-*' \
+            --exclude 'db/users.json' \
             ./ ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:~/Exammer/
 
       - name: Install dependencies and restart app on server
