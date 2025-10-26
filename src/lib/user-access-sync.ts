@@ -16,6 +16,7 @@ interface UserData {
 
 let isWatching = false;
 let isSyncing = false;
+let isWritingToFile = false;
 
 // Event emitter for user changes
 type UserChangeListener = (userId?: number) => void;
@@ -52,6 +53,7 @@ function formatTimestamp(unixTimestamp: number): string {
 export async function syncDatabaseToFile(): Promise<void> {
   if (isSyncing) return;
   isSyncing = true;
+  isWritingToFile = true;
 
   try {
     // Get all users from database
@@ -76,9 +78,13 @@ export async function syncDatabaseToFile(): Promise<void> {
     );
 
     console.log(`Synced ${usersList.length} user(s) to users.json`);
+
+    // Wait a bit to ensure file watcher doesn't trigger
+    await new Promise(resolve => setTimeout(resolve, 300));
   } catch (error) {
     console.error('Error syncing database to file:', error);
   } finally {
+    isWritingToFile = false;
     isSyncing = false;
   }
 }
@@ -101,16 +107,16 @@ async function syncFileToDatabase(): Promise<void> {
     } catch (parseError) {
       console.error('Invalid JSON in users.json, reverting to database state');
       console.error('Parse error:', parseError);
-      isSyncing = false; // Reset flag before resyncing
-      await syncDatabaseToFile();
+      // Don't await here - let it run in background to avoid blocking
+      syncDatabaseToFile().catch(console.error);
       return;
     }
 
     // Validate structure
     if (!Array.isArray(fileUsers)) {
       console.error('users.json must be an array, reverting to database state');
-      isSyncing = false; // Reset flag before resyncing
-      await syncDatabaseToFile();
+      // Don't await here - let it run in background to avoid blocking
+      syncDatabaseToFile().catch(console.error);
       return;
     }
 
@@ -119,16 +125,16 @@ async function syncFileToDatabase(): Promise<void> {
       if (!user.id || !user.email || user.access_level === undefined) {
         console.error('Invalid user object in users.json (missing id, email, or access_level), reverting to database state');
         console.error('Invalid user:', user);
-        isSyncing = false; // Reset flag before resyncing
-        await syncDatabaseToFile();
+        // Don't await here - let it run in background to avoid blocking
+        syncDatabaseToFile().catch(console.error);
         return;
       }
       // Validate access_level is a number
       if (typeof user.access_level !== 'number') {
         console.error('Invalid access_level (must be a number) in users.json, reverting to database state');
         console.error('Invalid user:', user);
-        isSyncing = false; // Reset flag before resyncing
-        await syncDatabaseToFile();
+        // Don't await here - let it run in background to avoid blocking
+        syncDatabaseToFile().catch(console.error);
         return;
       }
     }
@@ -222,6 +228,11 @@ function startFileWatcher(): void {
 
     fsSync.watch(USERS_FILE, async (eventType) => {
       if (eventType === 'change') {
+        // Ignore changes we made ourselves
+        if (isWritingToFile || isSyncing) {
+          return;
+        }
+
         // Debounce to avoid multiple rapid calls
         if (debounceTimeout) {
           clearTimeout(debounceTimeout);

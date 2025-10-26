@@ -4,10 +4,10 @@ import { requireAuth } from '@/lib/auth-helpers';
 import type { Question, UserProgress } from '@/lib/db';
 
 // GET /api/topics/[id]/questions - Get all questions for a topic with user progress (workspace members)
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const user = await requireAuth();
-    const topicId = params.id;
+    const { id: topicId } = await params;
 
     // Get subject_id for this topic
     const topicInfo = await db.get<{ subject_id: number }>(
@@ -65,10 +65,10 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 }
 
 // POST /api/topics/[id]/questions - Add a question to a topic (creators only)
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const user = await requireAuth();
-    const topicId = params.id;
+    const { id: topicId } = await params;
     const { questionText, summary } = await req.json();
 
     if (!questionText || !summary) {

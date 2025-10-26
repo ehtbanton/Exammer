@@ -150,15 +150,12 @@ function SubjectPageContent() {
           <Card className="md:col-span-2">
             <CardHeader>
               <CardTitle className="flex items-center gap-2"><List /> Past Papers</CardTitle>
-              <CardDescription>Upload past exam papers for the whole subject for better question generation.</CardDescription>
+              <CardDescription>Resets existing past papers that were previously uploaded.</CardDescription>
             </CardHeader>
-            <CardContent>
-              <p className="text-muted-foreground">{subject.pastPapers.length} paper(s) uploaded.</p>
-            </CardContent>
             <CardFooter>
               <Dialog open={isPaperDialogOpen} onOpenChange={setPaperDialogOpen}>
                 <DialogTrigger asChild>
-                  <Button variant="secondary">Manage Past Papers</Button>
+                  <Button variant="secondary">Add All Past Papers</Button>
                 </DialogTrigger>
                 <DialogContent className="max-w-2xl">
                   <DialogHeader>
@@ -174,17 +171,6 @@ function SubjectPageContent() {
                         <strong>Recommended:</strong> Upload at least 1 paper for each paper type.
                       </p>
                     </div>
-
-                    {subject.pastPapers.length > 0 && (
-                      <div>
-                        <h4 className="text-sm font-semibold mb-2">Previously Uploaded:</h4>
-                        <div className="max-h-32 overflow-y-auto space-y-1 border rounded-md p-2">
-                          {subject.pastPapers.map(paper => (
-                            <div key={paper.id} className="text-sm p-2 bg-secondary rounded-md">{paper.name}</div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
 
                     <div>
                       <Button onClick={() => paperInputRef.current?.click()} variant="outline" type="button" className="w-full">
