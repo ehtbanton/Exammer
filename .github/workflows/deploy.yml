@@ -50,14 +50,15 @@ jobs:
             --exclude '.git' \
             --exclude '.env' \
             --exclude '.next/cache' \
-            --exclude 'db' \
-            ./ ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:${{ secrets.DEPLOY_PATH }}/
+            --exclude 'db/*.db' \
+            --exclude 'db/*.db-*' \
+            ./ ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:~/Exammer/
 
       - name: Install dependencies and restart app on server
         run: |
           ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
             ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'EOF'
-            cd ${{ secrets.DEPLOY_PATH }}
+            cd ~/Exammer
 
             # Check if .env file exists
             if [ ! -f .env ]; then
@@ -71,7 +72,7 @@ jobs:
 
             # Restart the application using PM2
             # If PM2 is not set up yet, this will fail - see setup instructions
-            pm2 restart exammer || pm2 start npm --name "exammer" -- start -- -p 8933
+            pm2 restart exammer-deploy || pm2 start npm --name "exammer-deploy" -- start -- -p 8933
 
             # Save PM2 process list
             pm2 save
