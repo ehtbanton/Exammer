@@ -14,6 +14,8 @@ import PageSpinner from '@/components/PageSpinner';
 import { ArrowLeft, BookCopy, FileText, List, Upload, Crown } from 'lucide-react';
 import { getScoreColorStyle, getDefaultBoxStyle } from '@/lib/utils';
 import { PaperType } from '@/lib/types';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 
 export default function SubjectPage() {
   return (
@@ -34,6 +36,7 @@ function SubjectPageContent() {
   const paperInputRef = useRef<HTMLInputElement>(null);
   const [isPaperDialogOpen, setPaperDialogOpen] = useState(false);
   const [selectedPapers, setSelectedPapers] = useState<File[]>([]);
+  const [hideEmptyPapers, setHideEmptyPapers] = useState(true);
 
   useEffect(() => {
     // Reset loading state on mount in case user navigated back
@@ -103,6 +106,16 @@ function SubjectPageContent() {
     if (totalQuestions === 0) return null;
     return totalScore / totalQuestions;
   };
+
+  // Check if a paper type has any questions
+  const paperTypeHasQuestions = (paperType: PaperType): boolean => {
+    return paperType.topics.some(t => t.examQuestions && t.examQuestions.length > 0);
+  };
+
+  // Filter papers based on toggle
+  const filteredPaperTypes = hideEmptyPapers
+    ? subject?.paperTypes.filter(paperTypeHasQuestions) || []
+    : subject?.paperTypes || [];
 
   return (
     <div className="container mx-auto">
@@ -229,10 +242,20 @@ function SubjectPageContent() {
       )}
 
       <div>
-        <h2 className="text-2xl font-bold font-headline mb-4 flex items-center gap-2"><BookCopy /> Paper Types</h2>
-        {subject.paperTypes.length > 0 ? (
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-2xl font-bold font-headline flex items-center gap-2"><BookCopy /> Paper Types</h2>
+          <div className="flex items-center gap-2">
+            <Switch
+              id="hide-empty-papers"
+              checked={hideEmptyPapers}
+              onCheckedChange={setHideEmptyPapers}
+            />
+            <Label htmlFor="hide-empty-papers" className="text-sm">Hide papers without questions</Label>
+          </div>
+        </div>
+        {filteredPaperTypes.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {subject.paperTypes.map(paperType => {
+            {filteredPaperTypes.map(paperType => {
               const avgScore = getPaperTypeAverageScore(paperType);
               const hasScore = avgScore !== null;
 

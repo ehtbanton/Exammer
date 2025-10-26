@@ -11,6 +11,8 @@ import PageSpinner from '@/components/PageSpinner';
 import { ArrowLeft, BookCopy } from 'lucide-react';
 import { Topic } from '@/lib/types';
 import { getScoreColorStyle, getDefaultBoxStyle } from '@/lib/utils';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 
 export default function PaperTypePage() {
   return (
@@ -32,6 +34,7 @@ function PaperTypePageContent() {
   const paperType = subject?.paperTypes.find(p => p.id === paperTypeId);
 
   const [navigatingTo, setNavigatingTo] = useState<string | null>(null);
+  const [hideEmptyTopics, setHideEmptyTopics] = useState(true);
 
   useEffect(() => {
     // Reset loading state on mount in case user navigated back
@@ -71,6 +74,11 @@ function PaperTypePageContent() {
     return sum / allQuestions.length;
   };
 
+  // Filter topics based on toggle
+  const filteredTopics = hideEmptyTopics
+    ? paperType?.topics.filter(topic => topic.examQuestions && topic.examQuestions.length > 0) || []
+    : paperType?.topics || [];
+
   return (
     <div className="container mx-auto">
       <Button variant="ghost" onClick={() => router.push(`/subject/${subjectId}`)} className="mb-4">
@@ -81,10 +89,20 @@ function PaperTypePageContent() {
       <p className="text-muted-foreground mb-8">Topics for {subject.name}</p>
 
       <div>
-        <h2 className="text-2xl font-bold font-headline mb-4 flex items-center gap-2"><BookCopy /> Topics</h2>
-        {paperType.topics.length > 0 ? (
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-2xl font-bold font-headline flex items-center gap-2"><BookCopy /> Topics</h2>
+          <div className="flex items-center gap-2">
+            <Switch
+              id="hide-empty-topics"
+              checked={hideEmptyTopics}
+              onCheckedChange={setHideEmptyTopics}
+            />
+            <Label htmlFor="hide-empty-topics" className="text-sm">Hide topics without questions</Label>
+          </div>
+        </div>
+        {filteredTopics.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {paperType.topics.map((topic: Topic) => {
+            {filteredTopics.map((topic: Topic) => {
               const avgScore = getTopicAverageScore(topic);
               const hasScore = avgScore !== null;
 
