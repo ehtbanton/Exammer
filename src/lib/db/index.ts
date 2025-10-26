@@ -15,14 +15,23 @@ class Database {
   }
 
   private async initialize(): Promise<void> {
-    // First, ensure schema file is applied (creates tables with IF NOT EXISTS)
-    await this.applyBaseSchema();
+    try {
+      console.log('Starting database initialization...');
 
-    // Then run versioned migrations
-    await this.runVersionedMigrations();
+      // First, ensure schema file is applied (creates tables with IF NOT EXISTS)
+      await this.applyBaseSchema();
 
-    // Finally, initialize user access sync
-    await this.initializeUserAccessSync();
+      // Then run versioned migrations
+      await this.runVersionedMigrations();
+
+      // Finally, initialize user access sync
+      await this.initializeUserAccessSync();
+
+      console.log('Database initialization completed successfully');
+    } catch (error) {
+      console.error('CRITICAL: Database initialization failed:', error);
+      throw error;
+    }
   }
 
   private applyBaseSchema(): Promise<void> {
@@ -93,9 +102,16 @@ class Database {
   private async initializeUserAccessSync(): Promise<void> {
     try {
       const { initializeUserAccessSync } = await import('../user-access-sync');
-      await initializeUserAccessSync();
+      // Run user access sync initialization in the background without blocking
+      initializeUserAccessSync().then(() => {
+        console.log('User access sync initialized');
+      }).catch((error) => {
+        console.error('Error initializing user access sync (non-blocking):', error);
+      });
+      // Don't wait for it to complete
     } catch (error) {
-      console.error('Error initializing user access sync:', error);
+      console.error('Error importing user access sync:', error);
+      // Don't throw - user sync is not critical for database operations
     }
   }
 
@@ -103,6 +119,9 @@ class Database {
   async ready(): Promise<void> {
     if (this.initPromise) {
       await this.initPromise;
+    }
+    if (!this.db) {
+      throw new Error('Database connection is not available after initialization');
     }
   }
 

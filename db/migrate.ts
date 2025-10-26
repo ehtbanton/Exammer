@@ -34,8 +34,9 @@ interface VersionSpec {
 }
 
 export class DatabaseMigrator {
-  private db: sqlite3.Database;
+  private db!: sqlite3.Database;
   private versionSpec: VersionSpec;
+  private initPromise: Promise<void>;
 
   constructor(dbPath: string = DB_PATH) {
     // Load version specification
@@ -45,16 +46,25 @@ export class DatabaseMigrator {
 
     this.versionSpec = JSON.parse(fs.readFileSync(VERSION_FILE, 'utf8'));
 
-    // Open database connection
-    this.db = new sqlite3.Database(dbPath, (err) => {
-      if (err) {
-        console.error('Error opening database:', err);
-        throw err;
-      }
+    // Open database connection asynchronously
+    this.initPromise = new Promise((resolve, reject) => {
+      this.db = new sqlite3.Database(dbPath, (err) => {
+        if (err) {
+          console.error('Error opening database for migration:', err);
+          reject(err);
+        } else {
+          resolve();
+        }
+      });
     });
   }
 
-  private all<T = any>(sql: string, params: any[] = []): Promise<T[]> {
+  private async ready(): Promise<void> {
+    await this.initPromise;
+  }
+
+  private async all<T = any>(sql: string, params: any[] = []): Promise<T[]> {
+    await this.ready();
     return new Promise((resolve, reject) => {
       this.db.all(sql, params, (err, rows) => {
         if (err) reject(err);
@@ -63,7 +73,8 @@ export class DatabaseMigrator {
     });
   }
 
-  private run(sql: string, params: any[] = []): Promise<{ lastID: number; changes: number }> {
+  private async run(sql: string, params: any[] = []): Promise<{ lastID: number; changes: number }> {
+    await this.ready();
     return new Promise((resolve, reject) => {
       this.db.run(sql, params, function(err) {
         if (err) reject(err);
@@ -72,7 +83,8 @@ export class DatabaseMigrator {
     });
   }
 
-  private get<T = any>(sql: string, params: any[] = []): Promise<T | undefined> {
+  private async get<T = any>(sql: string, params: any[] = []): Promise<T | undefined> {
+    await this.ready();
     return new Promise((resolve, reject) => {
       this.db.get(sql, params, (err, row) => {
         if (err) reject(err);
@@ -262,7 +274,8 @@ export class DatabaseMigrator {
     }
   }
 
-  close(): Promise<void> {
+  async close(): Promise<void> {
+    await this.ready();
     return new Promise((resolve, reject) => {
       this.db.close((err) => {
         if (err) reject(err);

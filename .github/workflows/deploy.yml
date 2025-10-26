@@ -51,7 +51,9 @@ jobs:
             --exclude '.env' \
             --exclude '.env.local' \
             --exclude '.next/cache' \
-            --exclude 'db/' \
+            --exclude 'db/*.db' \
+            --exclude 'db/*.db-*' \
+            --exclude 'db/users.json' \
             --exclude '.pm2' \
             --exclude '*.log' \
             ./ ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:~/Exammer/
