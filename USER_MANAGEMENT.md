@@ -36,8 +36,9 @@ The `users.json` file contains an array of user objects:
 ### Access Levels
 
 - **0**: Pending/Restricted access (default for new signups)
-- **1**: Full access
-- **2**: Admin access (future use)
+- **1**: Full access (standard users)
+- **2**: Full access (reserved for future premium features)
+- **3**: Admin access (includes debug terminal at /t)
 
 ## Managing Users
 

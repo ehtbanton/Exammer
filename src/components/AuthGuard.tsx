@@ -53,7 +53,8 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
     return <PageSpinner />;
   }
 
-  // Show access denied page for level 0 users
+  // Show access denied page for level 0 users (pending/restricted)
+  // Allow access for levels 1, 2, and 3
   if (accessLevel === 0) {
     return <AccessDeniedPage />;
   }

@@ -62,6 +62,12 @@ class Database {
   }
 
   private async runVersionedMigrations(): Promise<void> {
+    // Skip migrations if disabled via environment variable
+    if (process.env.SKIP_DB_MIGRATIONS === 'true') {
+      console.log('Database migrations skipped (SKIP_DB_MIGRATIONS=true)');
+      return;
+    }
+
     try {
       const { runMigrations } = await import('../../../db/migrate');
 

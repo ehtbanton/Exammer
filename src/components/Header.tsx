@@ -3,6 +3,8 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { useSession, signOut } from 'next-auth/react';
+import { usePathname } from 'next/navigation';
+import { useEffect, useState } from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import {
@@ -13,10 +15,31 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { LogOut, User } from 'lucide-react';
+import { LogOut, User, Terminal, ArrowLeft } from 'lucide-react';
 
 export default function Header() {
   const { data: session, status } = useSession();
+  const pathname = usePathname();
+  const [accessLevel, setAccessLevel] = useState<number | null>(null);
+
+  // Fetch access level when authenticated
+  useEffect(() => {
+    if (status === 'authenticated') {
+      const fetchAccessLevel = async () => {
+        try {
+          const response = await fetch('/api/auth/access-level');
+          if (response.ok) {
+            const data = await response.json();
+            setAccessLevel(data.accessLevel);
+          }
+        } catch (error) {
+          console.error('Error fetching access level:', error);
+        }
+      };
+
+      fetchAccessLevel();
+    }
+  }, [status]);
 
   const getUserInitials = (name?: string | null, email?: string | null) => {
     if (name) {
@@ -33,6 +56,8 @@ export default function Header() {
     return 'U';
   };
 
+  const isDebugPage = pathname === '/t';
+
   return (
     <header className="bg-card border-b sticky top-0 z-10">
       <div className="container mx-auto px-4 sm:px-6 md:px-8">
@@ -46,7 +71,27 @@ export default function Header() {
             {status === 'loading' ? (
               <div className="h-8 w-8 rounded-full bg-gray-200 animate-pulse" />
             ) : session ? (
-              <DropdownMenu>
+              <>
+                {/* Debug/Back button for level 3 users */}
+                {accessLevel === 3 && (
+                  isDebugPage ? (
+                    <Button variant="outline" size="sm" asChild>
+                      <Link href="/">
+                        <ArrowLeft className="h-4 w-4 mr-2" />
+                        Back
+                      </Link>
+                    </Button>
+                  ) : (
+                    <Button variant="outline" size="sm" asChild>
+                      <Link href="/t">
+                        <Terminal className="h-4 w-4 mr-2" />
+                        Logs
+                      </Link>
+                    </Button>
+                  )
+                )}
+
+                <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" className="relative h-10 w-10 rounded-full">
                     <Avatar className="h-10 w-10">
@@ -74,6 +119,7 @@ export default function Header() {
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
+              </>
             ) : (
               <div className="flex items-center gap-2">
                 <Button variant="ghost" asChild>
