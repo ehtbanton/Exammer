@@ -14,14 +14,18 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       return NextResponse.json({ error: 'Name and content are required' }, { status: 400 });
     }
 
-    // Verify ownership
-    const subject = await db.get<Subject>(
-      'SELECT * FROM subjects WHERE id = ? AND user_id = ?',
-      [subjectId, user.id]
+    // Verify ownership via user_workspaces
+    const workspace = await db.get<{ is_creator: number }>(
+      'SELECT is_creator FROM user_workspaces WHERE user_id = ? AND subject_id = ?',
+      [user.id, subjectId]
     );
 
-    if (!subject) {
-      return NextResponse.json({ error: 'Subject not found' }, { status: 404 });
+    if (!workspace) {
+      return NextResponse.json({ error: 'Subject not found or access denied' }, { status: 404 });
+    }
+
+    if (workspace.is_creator !== 1) {
+      return NextResponse.json({ error: 'Only creators can add past papers' }, { status: 403 });
     }
 
     const result = await db.run(

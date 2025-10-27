@@ -267,17 +267,34 @@ export function AppProvider({ children }: { children: ReactNode }) {
       // Pre-process exam papers for storage
       const examPapersDataUris = await Promise.all(examPapers.map(file => fileToDataURI(file)));
 
+      // Persist past papers to database
       const pastPapers: PastPaper[] = [];
       for (const paperFile of examPapers) {
         const paperContent = await fileToString(paperFile);
+
+        // Save to database via API
+        const response = await fetch(`/api/subjects/${subjectId}/papers`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: paperFile.name,
+            content: paperContent
+          })
+        });
+
+        if (!response.ok) {
+          throw new Error(`Failed to save past paper: ${paperFile.name}`);
+        }
+
+        const dbPaper = await response.json();
         pastPapers.push({
-          id: Date.now().toString() + Math.random(),
-          name: paperFile.name,
-          content: paperContent,
+          id: dbPaper.id.toString(),
+          name: dbPaper.name,
+          content: dbPaper.content,
         });
       }
 
-      // Store past papers immediately
+      // Update local state with persisted papers
       setSubjects(prev => prev.map(s =>
         s.id === subjectId ? { ...s, pastPapers: [...s.pastPapers, ...pastPapers] } : s
       ));
@@ -358,13 +375,36 @@ export function AppProvider({ children }: { children: ReactNode }) {
             });
           }
 
+          // Log extraction summary
+          console.log(`[Process B] Extracted ${allExtractedQuestions.length} total questions`);
+          console.log(`[Process B] Available paper types:`, paperTypes.map(pt => pt.name));
+
+          // Log sample of what AI returned for debugging
+          if (allExtractedQuestions.length > 0) {
+            const sample = allExtractedQuestions.slice(0, 3);
+            console.log(`[Process B] Sample extracted questions:`);
+            sample.forEach((q, i) => {
+              console.log(`  ${i+1}. Paper: "${q.paperTypeName}" | Topic: "${q.topicName}"`);
+            });
+          }
+
           // Persist questions to database and update subject with questions
           const updatedPaperTypes = await Promise.all(paperTypes.map(async (pt) => {
             const updatedTopics = await Promise.all(pt.topics.map(async (topic) => {
               // Filter questions that belong to this paper type AND this topic
-              const topicQuestions = allExtractedQuestions.filter(
-                q => q.paperTypeName === pt.name && q.topicName === topic.name
-              );
+              // Use fuzzy matching to handle variations in AI output
+              const topicQuestions = allExtractedQuestions.filter(q => {
+                const matchesPaperType = q.paperTypeName === pt.name ||
+                                       pt.name.includes(q.paperTypeName) ||
+                                       q.paperTypeName.includes(pt.name);
+
+                const matchesTopic = topic.name.toLowerCase().includes(q.topicName.toLowerCase()) ||
+                                    q.topicName.toLowerCase().includes(topic.name.toLowerCase());
+
+                return matchesPaperType && matchesTopic;
+              });
+
+              console.log(`[Process B] Topic "${topic.name}" (${pt.name}): ${topicQuestions.length} questions matched`);
 
               // Persist each question to the database
               const createdQuestions = await Promise.all(topicQuestions.map(async (q) => {
@@ -376,7 +416,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
                     summary: q.summary
                   })
                 });
+
+                if (!response.ok) {
+                  const errorData = await response.json();
+                  console.error(`Failed to save question to topic ${topic.id}:`, errorData);
+                  throw new Error(`Failed to save question: ${errorData.error || 'Unknown error'}`);
+                }
+
                 const dbQuestion = await response.json();
+                console.log(`Saved question ${dbQuestion.id} to topic ${topic.id}`);
                 return {
                   id: dbQuestion.id.toString(),
                   questionText: dbQuestion.question_text,
@@ -398,6 +446,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
             };
           }));
 
+          // Count total questions saved
+          const totalSaved = updatedPaperTypes.reduce((total, pt) =>
+            total + pt.topics.reduce((ptTotal, topic) => ptTotal + topic.examQuestions.length, 0), 0
+          );
+          console.log(`[Process B] Successfully saved ${totalSaved} questions to database`);
+
           // Update local state with the created questions
           setSubjects(prev => prev.map(s => {
             if (s.id !== subjectId) return s;
@@ -409,7 +463,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
           toast({
             title: "Questions Extracted",
-            description: `Extracted ${allExtractedQuestions.length} questions from ${examPapers.length} paper(s).`
+            description: `Saved ${totalSaved} questions from ${examPapers.length} paper(s) to database.`
           });
         }
       });
@@ -477,18 +531,36 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setLoading(loadingKey, true);
     try {
       const paperContent = await fileToString(paperFile);
+
+      // Persist to database via API
+      const response = await fetch(`/api/subjects/${subjectId}/papers`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: paperFile.name,
+          content: paperContent
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to save past paper to database');
+      }
+
+      const dbPaper = await response.json();
       const newPaper: PastPaper = {
-        id: Date.now().toString(),
-        name: paperFile.name,
-        content: paperContent,
+        id: dbPaper.id.toString(),
+        name: dbPaper.name,
+        content: dbPaper.content,
       };
+
+      // Update local state with persisted paper
       setSubjects(prevSubjects => prevSubjects.map(subject =>
         subject.id === subjectId ? { ...subject, pastPapers: [...subject.pastPapers, newPaper] } : subject
       ));
       toast({ title: "Past Paper Added", description: `"${paperFile.name}" has been uploaded.` });
     } catch (error) {
       console.error(error);
-      toast({ variant: "destructive", title: "Upload Error", description: "Failed to read past paper." });
+      toast({ variant: "destructive", title: "Upload Error", description: "Failed to save past paper." });
     } finally {
       setLoading(loadingKey, false);
     }
