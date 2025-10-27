@@ -44,13 +44,15 @@ export class GeminiApiKeyManager {
   private readonly MINUTE_MS = 60 * 1000;
   private readonly MIN_REQUEST_INTERVAL_MS = 1000; // 1 second between requests to same key
 
+  private initialized: boolean = false;
+
   private constructor() {
     this.apiKeys = [];
     this.keyStates = new Map();
     this.waitQueue = [];
     this.currentKeyIndex = 0;
     this.isProcessingQueue = false;
-    this.initialize();
+    // Don't initialize here - lazy initialization will happen on first use
   }
 
   /**
@@ -61,6 +63,17 @@ export class GeminiApiKeyManager {
       GeminiApiKeyManager.instance = new GeminiApiKeyManager();
     }
     return GeminiApiKeyManager.instance;
+  }
+
+  /**
+   * Ensure the manager is initialized (lazy initialization)
+   */
+  private ensureInitialized(): void {
+    if (this.initialized) {
+      return;
+    }
+    this.initialize();
+    this.initialized = true;
   }
 
   /**
@@ -109,6 +122,7 @@ export class GeminiApiKeyManager {
    * Get the number of available API keys
    */
   public getKeyCount(): number {
+    this.ensureInitialized();
     return this.apiKeys.length;
   }
 
@@ -116,6 +130,7 @@ export class GeminiApiKeyManager {
    * Get all API keys (useful for creating genkit instances)
    */
   public getAllKeys(): string[] {
+    this.ensureInitialized();
     return [...this.apiKeys];
   }
 
@@ -124,6 +139,7 @@ export class GeminiApiKeyManager {
    * This method will wait if all keys are currently at their limits
    */
   public async acquireKey(): Promise<string> {
+    this.ensureInitialized();
     return new Promise<string>((resolve, reject) => {
       // Add to queue
       this.waitQueue.push({ resolve, reject });
@@ -295,6 +311,7 @@ export class GeminiApiKeyManager {
       available: boolean;
     }>;
   } {
+    this.ensureInitialized();
     const now = Date.now();
     let activeRequests = 0;
     const keyDetails = this.apiKeys.map((key, index) => {
