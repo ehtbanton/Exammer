@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogHeader, AlertDialogTitle, AlertDialogFooter, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Upload, Trash2, BookOpen, FileText, Plus, UserPlus, UserMinus, Crown } from 'lucide-react';
+import { Upload, Trash2, BookOpen, FileText, Plus, UserPlus, UserMinus, Crown, Search } from 'lucide-react';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import PageSpinner from '@/components/PageSpinner';
 
@@ -21,11 +21,13 @@ export default function HomePage() {
 }
 
 function HomePageContent() {
-  const { subjects, otherSubjects, createSubjectFromSyllabus, processExamPapers, deleteSubject, addSubjectToWorkspace, removeSubjectFromWorkspace, isLoading, setLoading } = useAppContext();
+  const { subjects, otherSubjects, createSubjectFromSyllabus, processExamPapers, deleteSubject, addSubjectToWorkspace, removeSubjectFromWorkspace, searchSubjects, isLoading, setLoading } = useAppContext();
   const [navigatingTo, setNavigatingTo] = useState<string | null>(null);
   const [syllabusFile, setSyllabusFile] = useState<File | null>(null);
   const [uploadStage, setUploadStage] = useState<'initial' | 'syllabus' | 'papers'>('initial');
   const [examPapers, setExamPapers] = useState<File[]>([]);
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [hasSearched, setHasSearched] = useState<boolean>(false);
   const syllabusInputRef = useRef<HTMLInputElement>(null);
   const examPapersInputRef = useRef<HTMLInputElement>(null);
 
@@ -71,6 +73,19 @@ function HomePageContent() {
     setNavigatingTo(subjectId);
     // No need for router push here, Link component will handle it.
     // The loading state will be shown until the new page takes over.
+  };
+
+  const handleSearch = async () => {
+    if (searchQuery.trim()) {
+      await searchSubjects(searchQuery);
+      setHasSearched(true);
+    }
+  };
+
+  const handleSearchKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      handleSearch();
+    }
   };
 
   if (navigatingTo && isLoading(`navigate-${navigatingTo}`)) {
@@ -273,44 +288,73 @@ function HomePageContent() {
         </div>
       )}
 
-      {/* Other Subjects Section */}
-      {otherSubjects.length > 0 && (
+      {/* Search Subjects Section */}
+      <div className="mb-8 mt-12">
+        <h2 className="text-2xl font-bold font-headline mb-4">Find More Subjects</h2>
+        <p className="text-muted-foreground text-sm mb-4">
+          Search for subjects created by others and add them to your workspace
+        </p>
+        <div className="flex gap-2 max-w-2xl">
+          <Input
+            type="text"
+            placeholder="Search for subjects..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            onKeyPress={handleSearchKeyPress}
+            className="flex-1"
+          />
+          <Button
+            onClick={handleSearch}
+            disabled={isLoading('search-subjects') || !searchQuery.trim()}
+          >
+            {isLoading('search-subjects') ? <LoadingSpinner /> : <Search className="mr-2 h-4 w-4" />}
+            Search
+          </Button>
+        </div>
+      </div>
+
+      {/* Search Results */}
+      {hasSearched && (
         <>
-          <div className="mb-8">
-            <h2 className="text-2xl font-bold font-headline">Other Subjects</h2>
-            <p className="text-muted-foreground text-sm mt-1">
-              Add subjects created by others to your workspace
-            </p>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {otherSubjects.map((subject) => (
-              <Card key={subject.id} className="flex flex-col hover:shadow-lg transition-shadow">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 font-headline">
-                    <BookOpen className="text-primary" />
-                    {subject.name}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="flex-grow">
-                  <p className="text-sm text-muted-foreground">
-                    {subject.paperTypes.length} paper types identified.
-                  </p>
-                </CardContent>
-                <CardFooter className="flex justify-between gap-2">
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => addSubjectToWorkspace(subject.id)}
-                    disabled={isLoading(`add-workspace-${subject.id}`)}
-                    className="flex-1"
-                  >
-                    {isLoading(`add-workspace-${subject.id}`) ? <LoadingSpinner /> : <UserPlus className="mr-2 h-4 w-4" />}
-                    Add to Workspace
-                  </Button>
-                </CardFooter>
-              </Card>
-            ))}
-          </div>
+          {otherSubjects.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {otherSubjects.map((subject) => (
+                <Card key={subject.id} className="flex flex-col hover:shadow-lg transition-shadow">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2 font-headline">
+                      <BookOpen className="text-primary" />
+                      {subject.name}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="flex-grow">
+                    <p className="text-sm text-muted-foreground">
+                      {subject.paperTypes.length} paper types identified.
+                    </p>
+                  </CardContent>
+                  <CardFooter className="flex justify-between gap-2">
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => addSubjectToWorkspace(subject.id)}
+                      disabled={isLoading(`add-workspace-${subject.id}`)}
+                      className="flex-1"
+                    >
+                      {isLoading(`add-workspace-${subject.id}`) ? <LoadingSpinner /> : <UserPlus className="mr-2 h-4 w-4" />}
+                      Add to Workspace
+                    </Button>
+                  </CardFooter>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <Card className="text-center py-8">
+              <CardContent>
+                <p className="text-muted-foreground">
+                  No subjects found matching "{searchQuery}". Try a different search term.
+                </p>
+              </CardContent>
+            </Card>
+          )}
         </>
       )}
     </div>

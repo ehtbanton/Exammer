@@ -9,19 +9,32 @@ export async function GET(req: NextRequest) {
     const user = await requireAuth();
     const { searchParams } = new URL(req.url);
     const filter = searchParams.get('filter'); // 'workspace', 'created', 'other', or null (all workspace)
+    const search = searchParams.get('search'); // optional search query
 
     let subjects: Subject[];
 
     if (filter === 'other') {
-      // Get subjects NOT in user's workspace
-      subjects = await db.all<Subject>(
-        `SELECT s.*, 0 as is_creator FROM subjects s
-         WHERE s.id NOT IN (
-           SELECT subject_id FROM user_workspaces WHERE user_id = ?
-         )
-         ORDER BY s.created_at DESC`,
-        [user.id]
-      );
+      // Get subjects NOT in user's workspace, with optional search
+      if (search && search.trim()) {
+        subjects = await db.all<Subject>(
+          `SELECT s.*, 0 as is_creator FROM subjects s
+           WHERE s.id NOT IN (
+             SELECT subject_id FROM user_workspaces WHERE user_id = ?
+           )
+           AND s.name LIKE ?
+           ORDER BY s.created_at DESC`,
+          [user.id, `%${search.trim()}%`]
+        );
+      } else {
+        subjects = await db.all<Subject>(
+          `SELECT s.*, 0 as is_creator FROM subjects s
+           WHERE s.id NOT IN (
+             SELECT subject_id FROM user_workspaces WHERE user_id = ?
+           )
+           ORDER BY s.created_at DESC`,
+          [user.id]
+        );
+      }
     } else if (filter === 'created') {
       // Get subjects created by user
       subjects = await db.all<Subject>(

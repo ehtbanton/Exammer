@@ -17,6 +17,7 @@ interface AppContextType {
   deleteSubject: (subjectId: string) => Promise<void>;
   addSubjectToWorkspace: (subjectId: string) => Promise<void>;
   removeSubjectFromWorkspace: (subjectId: string) => Promise<void>;
+  searchSubjects: (query: string) => Promise<void>;
   getSubjectById: (subjectId: string) => Subject | undefined;
   addPastPaperToSubject: (subjectId: string, paperFile: File) => Promise<void>;
   updateExamQuestionScore: (subjectId: string, paperTypeName: string, topicName: string, questionId: string, score: number) => void;
@@ -45,7 +46,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }
 
       try {
-        // Fetch workspace subjects
+        // Fetch workspace subjects only
         const workspaceResponse = await fetch('/api/subjects');
         if (workspaceResponse.ok) {
           const apiSubjects = await workspaceResponse.json();
@@ -78,40 +79,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           }));
           setSubjects(clientSubjects);
         }
-
-        // Fetch other subjects (not in workspace)
-        const otherResponse = await fetch('/api/subjects?filter=other');
-        if (otherResponse.ok) {
-          const apiOtherSubjects = await otherResponse.json();
-          const clientOtherSubjects = apiOtherSubjects.map((sub: any) => ({
-            id: sub.id.toString(),
-            name: sub.name,
-            syllabusContent: sub.syllabus_content || '',
-            isCreator: false,
-            pastPapers: (sub.pastPapers || []).map((pp: any) => ({
-              id: pp.id.toString(),
-              name: pp.name,
-              content: pp.content
-            })),
-            paperTypes: (sub.paperTypes || []).map((pt: any) => ({
-              id: pt.id.toString(),
-              name: pt.name,
-              topics: (pt.topics || []).map((t: any) => ({
-                id: t.id.toString(),
-                name: t.name,
-                description: t.description || '',
-                examQuestions: (t.examQuestions || []).map((q: any) => ({
-                  id: q.id.toString(),
-                  questionText: q.question_text,
-                  summary: q.summary,
-                  score: q.score || 0,
-                  attempts: q.attempts || 0,
-                }))
-              }))
-            }))
-          }));
-          setOtherSubjects(clientOtherSubjects);
-        }
+        // Don't fetch other subjects automatically anymore
       } catch (error) {
         console.error("Failed to fetch subjects:", error);
         toast({ variant: "destructive", title: "Error", description: "Failed to load subjects" });
@@ -694,8 +662,61 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, [subjects, toast]);
 
+  const searchSubjects = useCallback(async (query: string) => {
+    const loadingKey = 'search-subjects';
+    setLoading(loadingKey, true);
+
+    try {
+      // Fetch subjects not in workspace with optional search query
+      const url = query
+        ? `/api/subjects?filter=other&search=${encodeURIComponent(query)}`
+        : '/api/subjects?filter=other';
+
+      const response = await fetch(url);
+
+      if (!response.ok) {
+        throw new Error('Failed to search subjects');
+      }
+
+      const apiOtherSubjects = await response.json();
+      const clientOtherSubjects = apiOtherSubjects.map((sub: any) => ({
+        id: sub.id.toString(),
+        name: sub.name,
+        syllabusContent: sub.syllabus_content || '',
+        isCreator: false,
+        pastPapers: (sub.pastPapers || []).map((pp: any) => ({
+          id: pp.id.toString(),
+          name: pp.name,
+          content: pp.content
+        })),
+        paperTypes: (sub.paperTypes || []).map((pt: any) => ({
+          id: pt.id.toString(),
+          name: pt.name,
+          topics: (pt.topics || []).map((t: any) => ({
+            id: t.id.toString(),
+            name: t.name,
+            description: t.description || '',
+            examQuestions: (t.examQuestions || []).map((q: any) => ({
+              id: q.id.toString(),
+              questionText: q.question_text,
+              summary: q.summary,
+              score: q.score || 0,
+              attempts: q.attempts || 0,
+            }))
+          }))
+        }))
+      }));
+      setOtherSubjects(clientOtherSubjects);
+    } catch (error) {
+      console.error('Error searching subjects:', error);
+      toast({ variant: "destructive", title: "Error", description: "Failed to search subjects" });
+    } finally {
+      setLoading(loadingKey, false);
+    }
+  }, [toast, setLoading]);
+
   return (
-    <AppContext.Provider value={{ subjects, otherSubjects, createSubjectFromSyllabus, processExamPapers, deleteSubject, addSubjectToWorkspace, removeSubjectFromWorkspace, getSubjectById, addPastPaperToSubject, updateExamQuestionScore, generateQuestionVariant, isLoading, setLoading }}>
+    <AppContext.Provider value={{ subjects, otherSubjects, createSubjectFromSyllabus, processExamPapers, deleteSubject, addSubjectToWorkspace, removeSubjectFromWorkspace, searchSubjects, getSubjectById, addPastPaperToSubject, updateExamQuestionScore, generateQuestionVariant, isLoading, setLoading }}>
       {children}
     </AppContext.Provider>
   );
