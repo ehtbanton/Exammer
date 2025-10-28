@@ -42,9 +42,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
       if (!session?.user) {
         setSubjects([]);
         setOtherSubjects([]);
+        setLoadingStates(prev => ({ ...prev, 'fetch-subjects': false }));
         return;
       }
 
+      setLoadingStates(prev => ({ ...prev, 'fetch-subjects': true }));
       try {
         // Fetch workspace subjects only
         const workspaceResponse = await fetch('/api/subjects');
@@ -83,6 +85,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       } catch (error) {
         console.error("Failed to fetch subjects:", error);
         toast({ variant: "destructive", title: "Error", description: "Failed to load subjects" });
+      } finally {
+        setLoadingStates(prev => ({ ...prev, 'fetch-subjects': false }));
       }
     };
 
@@ -92,6 +96,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     } else if (status === 'unauthenticated') {
       setSubjects([]);
       setOtherSubjects([]);
+      setLoadingStates(prev => ({ ...prev, 'fetch-subjects': false }));
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session?.user?.id, status]);

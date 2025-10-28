@@ -29,7 +29,7 @@ export default function InterviewPage() {
 function InterviewPageContent() {
   const params = useParams();
   const router = useRouter();
-  const { getSubjectById, updateExamQuestionScore, generateQuestionVariant } = useAppContext();
+  const { getSubjectById, updateExamQuestionScore, generateQuestionVariant, isLoading: isAppLoading } = useAppContext();
   const { toast } = useToast();
 
   const subjectId = params.subjectId as string;
@@ -156,7 +156,8 @@ function InterviewPageContent() {
   };
 
   if (!subject || !topic || !examQuestion) {
-    if (isLoading) return <PageSpinner />;
+    // Show loading while subjects are being fetched OR while generating question
+    if (isLoading || isAppLoading('fetch-subjects')) return <PageSpinner />;
     return (
       <div className="text-center">
         <h1 className="text-2xl font-bold">Question not found</h1>

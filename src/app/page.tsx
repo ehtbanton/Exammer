@@ -1,6 +1,6 @@
 "use client";
 
-import { ChangeEvent, useRef, useState } from 'react';
+import { ChangeEvent, useRef, useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useAppContext } from '@/app/context/AppContext';
 import { AuthGuard } from '@/components/AuthGuard';
@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogHeader, AlertDialogTitle, AlertDialogFooter, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Upload, Trash2, BookOpen, FileText, Plus, UserPlus, UserMinus, Crown, Search } from 'lucide-react';
+import { Upload, Trash2, BookOpen, FileText, Plus, UserPlus, UserMinus, Crown } from 'lucide-react';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import PageSpinner from '@/components/PageSpinner';
 
@@ -75,18 +75,20 @@ function HomePageContent() {
     // The loading state will be shown until the new page takes over.
   };
 
-  const handleSearch = async () => {
-    if (searchQuery.trim()) {
-      await searchSubjects(searchQuery);
-      setHasSearched(true);
-    }
-  };
+  // Auto-search with debouncing whenever searchQuery changes
+  useEffect(() => {
+    const delaySearch = setTimeout(async () => {
+      if (searchQuery.trim()) {
+        await searchSubjects(searchQuery);
+        setHasSearched(true);
+      } else {
+        // Clear results if search query is empty
+        setHasSearched(false);
+      }
+    }, 300); // 300ms debounce
 
-  const handleSearchKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
-      handleSearch();
-    }
-  };
+    return () => clearTimeout(delaySearch);
+  }, [searchQuery, searchSubjects]);
 
   if (navigatingTo && isLoading(`navigate-${navigatingTo}`)) {
     return <PageSpinner />;
@@ -294,22 +296,20 @@ function HomePageContent() {
         <p className="text-muted-foreground text-sm mb-4">
           Search for subjects created by others and add them to your workspace
         </p>
-        <div className="flex gap-2 max-w-2xl">
+        <div className="max-w-2xl">
           <Input
             type="text"
-            placeholder="Search for subjects..."
+            placeholder="Search for subjects... (auto-search as you type)"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            onKeyPress={handleSearchKeyPress}
-            className="flex-1"
+            className="w-full"
           />
-          <Button
-            onClick={handleSearch}
-            disabled={isLoading('search-subjects') || !searchQuery.trim()}
-          >
-            {isLoading('search-subjects') ? <LoadingSpinner /> : <Search className="mr-2 h-4 w-4" />}
-            Search
-          </Button>
+          {isLoading('search-subjects') && (
+            <div className="mt-2 flex items-center gap-2 text-sm text-muted-foreground">
+              <LoadingSpinner />
+              <span>Searching...</span>
+            </div>
+          )}
         </div>
       </div>
 

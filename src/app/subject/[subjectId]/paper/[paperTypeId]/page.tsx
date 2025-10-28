@@ -54,6 +54,11 @@ function PaperTypePageContent() {
     return <PageSpinner />;
   }
 
+  // Show loading spinner while subjects are being fetched
+  if (isLoading('fetch-subjects')) {
+    return <PageSpinner />;
+  }
+
   if (!subject || !paperType) {
     return (
       <div className="text-center">

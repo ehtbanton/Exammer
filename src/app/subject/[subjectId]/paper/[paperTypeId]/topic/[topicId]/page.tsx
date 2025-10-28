@@ -56,6 +56,11 @@ function TopicPageContent() {
     return <PageSpinner />;
   }
 
+  // Show loading spinner while subjects are being fetched
+  if (isLoading('fetch-subjects')) {
+    return <PageSpinner />;
+  }
+
   if (!subject || !topic) {
     return (
       <div className="text-center">
