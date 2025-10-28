@@ -12,11 +12,13 @@ import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import LoadingSpinner from '@/components/LoadingSpinner';
-import { Send, User, Bot, ArrowLeft } from 'lucide-react';
+import { Send, User, Bot, ArrowLeft, MessageSquare, PenTool } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import PageSpinner from '@/components/PageSpinner';
+import { Whiteboard } from '@/components/whiteboard';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 export default function InterviewPage() {
   return (
@@ -47,6 +49,7 @@ function InterviewPageContent() {
   const [isLoading, setIsLoading] = useState(true);
   const [isCompleted, setIsCompleted] = useState(false);
   const [generatedVariant, setGeneratedVariant] = useState<string | null>(null);
+  const [inputMode, setInputMode] = useState<'text' | 'whiteboard'>('text');
 
   const scrollAreaViewport = useRef<HTMLDivElement>(null);
   const hasInitialized = useRef<string | false>(false);
@@ -113,20 +116,25 @@ function InterviewPageContent() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [subject?.id, examQuestion?.id]);
 
-  const handleSendMessage = async () => {
-    if (!userInput.trim() || !subject || !examQuestion || isLoading || !generatedVariant) return;
+  const handleSendMessage = async (imageData?: string) => {
+    if ((!userInput.trim() && !imageData) || !subject || !examQuestion || isLoading || !generatedVariant) return;
 
     setIsLoading(true);
     const currentInput = userInput;
     setUserInput('');
 
-    const newHistory: ChatHistory = [...chatHistory, { role: 'user', content: currentInput }];
+    const newHistory: ChatHistory = [...chatHistory, {
+      role: 'user',
+      content: currentInput || 'Whiteboard drawing',
+      imageUrl: imageData,
+    }];
     setChatHistory(newHistory);
 
     try {
       const res = await aiPoweredInterview({
         subsection: examQuestion.summary,
-        userAnswer: currentInput,
+        userAnswer: currentInput || undefined,
+        userImage: imageData,
         previousChatHistory: chatHistory,
         question: generatedVariant, // Always use the generated variant
       });
@@ -242,6 +250,13 @@ function InterviewPageContent() {
                       <div className={cn("rounded-lg px-4 py-3 max-w-lg whitespace-pre-wrap break-words",
                         message.role === 'assistant' ? "bg-secondary text-secondary-foreground" : "bg-primary text-primary-foreground"
                       )}>
+                        {message.imageUrl && (
+                          <img
+                            src={message.imageUrl}
+                            alt="Whiteboard drawing"
+                            className="max-w-full h-auto rounded mb-2"
+                          />
+                        )}
                         <p className="text-sm">{message.content}</p>
                       </div>
                       {message.role === 'user' && (
@@ -269,18 +284,38 @@ function InterviewPageContent() {
                 </div>
               </ScrollArea>
               <div className="p-4 border-t shrink-0">
-                <div className="flex items-center gap-2">
-                  <Input
-                    placeholder="Type your answer..."
-                    value={userInput}
-                    onChange={(e) => setUserInput(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
-                    disabled={isLoading || isCompleted}
-                  />
-                  <Button onClick={handleSendMessage} disabled={isLoading || isCompleted || !userInput.trim()}>
-                    {isLoading ? <LoadingSpinner /> : <Send />}
-                  </Button>
-                </div>
+                <Tabs value={inputMode} onValueChange={(v) => setInputMode(v as 'text' | 'whiteboard')}>
+                  <TabsList className="grid w-full grid-cols-2 mb-3">
+                    <TabsTrigger value="text" disabled={isLoading || isCompleted}>
+                      <MessageSquare className="h-4 w-4 mr-2" />
+                      Text
+                    </TabsTrigger>
+                    <TabsTrigger value="whiteboard" disabled={isLoading || isCompleted}>
+                      <PenTool className="h-4 w-4 mr-2" />
+                      Whiteboard
+                    </TabsTrigger>
+                  </TabsList>
+                  <TabsContent value="text" className="mt-0">
+                    <div className="flex items-center gap-2">
+                      <Input
+                        placeholder="Type your answer..."
+                        value={userInput}
+                        onChange={(e) => setUserInput(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
+                        disabled={isLoading || isCompleted}
+                      />
+                      <Button onClick={() => handleSendMessage()} disabled={isLoading || isCompleted || !userInput.trim()}>
+                        {isLoading ? <LoadingSpinner /> : <Send />}
+                      </Button>
+                    </div>
+                  </TabsContent>
+                  <TabsContent value="whiteboard" className="mt-0">
+                    <Whiteboard
+                      onSubmit={handleSendMessage}
+                      disabled={isLoading || isCompleted}
+                    />
+                  </TabsContent>
+                </Tabs>
               </div>
             </CardContent>
           </Card>

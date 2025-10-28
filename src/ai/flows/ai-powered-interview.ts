@@ -14,9 +14,11 @@ import {executeWithManagedKey} from '@/ai/genkit';
 const AIPoweredInterviewInputSchema = z.object({
   subsection: z.string().describe('The specific subsection/topic context for the question.'),
   userAnswer: z.string().optional().describe('The user answer to the current question, if any.'),
+  userImage: z.string().optional().describe('Base64-encoded image of the user whiteboard answer, if any.'),
   previousChatHistory: z.array(z.object({
     role: z.enum(['user', 'assistant']),
     content: z.string(),
+    imageUrl: z.string().optional(),
   })).optional().describe('The previous chat history between the user and the assistant.'),
   question: z.string().describe('The exam question being asked to the student.'),
 });
@@ -29,6 +31,7 @@ const AIPoweredInterviewOutputSchema = z.object({
   chatHistory: z.array(z.object({
     role: z.enum(['user', 'assistant']),
     content: z.string(),
+    imageUrl: z.string().optional(),
   })).describe('The chat history between the user and the assistant, including the question and all messages.'),
 });
 export type AIPoweredInterviewOutput = z.infer<typeof AIPoweredInterviewOutputSchema>;
@@ -60,12 +63,18 @@ The exam question the student is working on:
 
 Here's the previous chat history:
 {{#each previousChatHistory}}
-  {{role}}: {{{content}}}
+  {{role}}: {{{content}}}{{#if imageUrl}} [Image provided]{{/if}}
 {{/each}}
 
 {{#if userAnswer}}
   The user has provided the following answer:
   {{{userAnswer}}}
+{{/if}}
+{{#if userImage}}
+  The user has also provided a whiteboard drawing (image will be included in the request).
+{{/if}}
+
+{{#if userAnswer}}
 
   Based on this answer and typical exam marking criteria for this type of question, provide the next step in the interview process:
   - If the answer is correct and complete according to exam standards, congratulate the user and award a score out of 10 based on the quality, completeness, and accuracy of the answer. Set isCorrect to true.
@@ -86,20 +95,33 @@ Also output the updated chatHistory array, including the user answer (if any) an
     const {
       subsection,
       userAnswer,
+      userImage,
       previousChatHistory = [],
       question,
     } = flowInput;
+
+    // Build the prompt config
+    const promptConfig: any = {
+      model: 'googleai/gemini-2.0-flash-exp',
+    };
+
+    // If user provided an image, add it to the config as media
+    if (userImage) {
+      promptConfig.media = {
+        url: userImage, // Base64 data URL
+        contentType: 'image/png',
+      };
+    }
 
     const {
       output,
     } = await prompt({
       subsection,
       userAnswer,
+      userImage,
       previousChatHistory,
       question,
-    }, {
-      model: 'googleai/gemini-2.5-flash-lite',
-    });
+    }, promptConfig);
 
     if (!output) {
       throw new Error('AI response was empty.');
@@ -107,8 +129,12 @@ Also output the updated chatHistory array, including the user answer (if any) an
 
     // Update the chat history with the user's answer and the assistant's message.
     const updatedChatHistory = [...previousChatHistory];
-    if (userAnswer) {
-      updatedChatHistory.push({role: 'user', content: userAnswer});
+    if (userAnswer || userImage) {
+      updatedChatHistory.push({
+        role: 'user',
+        content: userAnswer || 'Whiteboard drawing',
+        imageUrl: userImage,
+      });
     }
     updatedChatHistory.push({role: 'assistant', content: output.nextAssistantMessage});
 
