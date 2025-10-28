@@ -5,7 +5,6 @@ import { useSession } from 'next-auth/react';
 import type { Subject, Topic, ExamQuestion, PastPaper, PaperType } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { decomposeSyllabus } from '@/ai/flows/decompose-syllabus-into-topics';
-import { extractExamQuestions } from '@/ai/flows/extract-exam-questions';
 import { generateSimilarQuestion } from '@/ai/flows/generate-similar-question';
 import { backgroundQueue } from '@/lib/background-queue';
 
@@ -333,116 +332,54 @@ export function AppProvider({ children }: { children: ReactNode }) {
             }));
           }
 
-          // Extract questions from all papers
-          const topicsInfo = paperTypes.flatMap(pt =>
-            pt.topics.map(t => ({ name: t.name, description: t.description }))
-          );
+          // Use batch API endpoint for parallel processing on server
+          console.log(`[Process B] Calling batch API to extract ${examPapersDataUris.length} papers in parallel`);
 
-          if (topicsInfo.length === 0) {
-            throw new Error('No topics found for question extraction');
+          const batchResponse = await fetch('/api/extract-questions-batch', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              subjectId,
+              examPapersDataUris,
+              paperTypes
+            })
+          });
+
+          if (!batchResponse.ok) {
+            const errorData = await batchResponse.json();
+            throw new Error(`Batch extraction failed: ${errorData.error || 'Unknown error'}`);
           }
 
-          const paperTypesInfo = paperTypes.map(pt => ({ name: pt.name }));
+          const batchResult = await batchResponse.json();
+          console.log(`[Process B] Batch extraction complete: ${batchResult.questionsExtracted} extracted, ${batchResult.questionsSaved} saved`);
 
-          // Process each exam paper individually
-          const allExtractedQuestions: Array<{ paperTypeName: string; questionText: string; summary: string; topicName: string }> = [];
+          // Fetch updated subject from database to get all questions with their IDs
+          const subjectResponse = await fetch(`/api/subjects/${subjectId}`);
+          if (!subjectResponse.ok) {
+            throw new Error('Failed to fetch updated subject');
+          }
 
-          for (let i = 0; i < examPapersDataUris.length; i++) {
-            const questionsResult = await extractExamQuestions({
-              examPaperDataUri: examPapersDataUris[i],
-              paperTypes: paperTypesInfo,
-              topics: topicsInfo,
-            });
+          const updatedSubjectData = await subjectResponse.json();
 
-            // Add paper type info to each question for later categorization
-            questionsResult.questions.forEach(q => {
-              allExtractedQuestions.push({
-                paperTypeName: questionsResult.paperTypeName,
-                questionText: q.questionText,
+          // Convert API format to client format
+          const updatedPaperTypes = updatedSubjectData.paperTypes.map((pt: any) => ({
+            id: pt.id.toString(),
+            name: pt.name,
+            topics: (pt.topics || []).map((t: any) => ({
+              id: t.id.toString(),
+              name: t.name,
+              description: t.description || '',
+              examQuestions: (t.questions || []).map((q: any) => ({
+                id: q.id.toString(),
+                questionText: q.question_text,
                 summary: q.summary,
-                topicName: q.topicName,
-              });
-            });
-          }
-
-          // Log extraction summary
-          console.log(`[Process B] Extracted ${allExtractedQuestions.length} total questions`);
-          console.log(`[Process B] Available paper types:`, paperTypes.map(pt => pt.name));
-
-          // Log sample of what AI returned for debugging
-          if (allExtractedQuestions.length > 0) {
-            const sample = allExtractedQuestions.slice(0, 3);
-            console.log(`[Process B] Sample extracted questions:`);
-            sample.forEach((q, i) => {
-              console.log(`  ${i+1}. Paper: "${q.paperTypeName}" | Topic: "${q.topicName}"`);
-            });
-          }
-
-          // Persist questions to database and update subject with questions
-          const updatedPaperTypes = await Promise.all(paperTypes.map(async (pt) => {
-            const updatedTopics = await Promise.all(pt.topics.map(async (topic) => {
-              // Filter questions that belong to this paper type AND this topic
-              // Use fuzzy matching to handle variations in AI output
-              const topicQuestions = allExtractedQuestions.filter(q => {
-                const matchesPaperType = q.paperTypeName === pt.name ||
-                                       pt.name.includes(q.paperTypeName) ||
-                                       q.paperTypeName.includes(pt.name);
-
-                const matchesTopic = topic.name.toLowerCase().includes(q.topicName.toLowerCase()) ||
-                                    q.topicName.toLowerCase().includes(topic.name.toLowerCase());
-
-                return matchesPaperType && matchesTopic;
-              });
-
-              console.log(`[Process B] Topic "${topic.name}" (${pt.name}): ${topicQuestions.length} questions matched`);
-
-              // Persist each question to the database
-              const createdQuestions = await Promise.all(topicQuestions.map(async (q) => {
-                const response = await fetch(`/api/topics/${topic.id}/questions`, {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    questionText: q.questionText,
-                    summary: q.summary
-                  })
-                });
-
-                if (!response.ok) {
-                  const errorData = await response.json();
-                  console.error(`Failed to save question to topic ${topic.id}:`, errorData);
-                  throw new Error(`Failed to save question: ${errorData.error || 'Unknown error'}`);
-                }
-
-                const dbQuestion = await response.json();
-                console.log(`Saved question ${dbQuestion.id} to topic ${topic.id}`);
-                return {
-                  id: dbQuestion.id.toString(),
-                  questionText: dbQuestion.question_text,
-                  summary: dbQuestion.summary,
-                  score: 0,
-                  attempts: 0,
-                };
-              }));
-
-              return {
-                ...topic,
-                examQuestions: [...topic.examQuestions, ...createdQuestions],
-              };
-            }));
-
-            return {
-              ...pt,
-              topics: updatedTopics
-            };
+                score: q.score || 0,
+                attempts: q.attempts || 0,
+              }))
+            }))
           }));
 
-          // Count total questions saved
-          const totalSaved = updatedPaperTypes.reduce((total, pt) =>
-            total + pt.topics.reduce((ptTotal, topic) => ptTotal + topic.examQuestions.length, 0), 0
-          );
-          console.log(`[Process B] Successfully saved ${totalSaved} questions to database`);
-
-          // Update local state with the created questions
+          // Update local state with the fresh data from database
           setSubjects(prev => prev.map(s => {
             if (s.id !== subjectId) return s;
             return {
@@ -453,7 +390,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
           toast({
             title: "Questions Extracted",
-            description: `Saved ${totalSaved} questions from ${examPapers.length} paper(s) to database.`
+            description: `Saved ${batchResult.questionsSaved} questions from ${examPapers.length} paper(s) to database.`
           });
         }
       });
