@@ -4,10 +4,10 @@ import { requireAuth } from '@/lib/auth-helpers';
 import type { Subject, PastPaper } from '@/lib/db';
 
 // POST /api/subjects/[id]/papers - Add a past paper to a subject
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const user = await requireAuth();
-    const subjectId = params.id;
+    const { id: subjectId } = await params;
     const { name, content } = await req.json();
 
     if (!name || !content) {

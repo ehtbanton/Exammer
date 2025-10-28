@@ -4,10 +4,10 @@ import { requireAuth } from '@/lib/auth-helpers';
 import type { UserProgress } from '@/lib/db';
 
 // GET /api/questions/[id]/progress - Get user progress for a question (workspace members)
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const user = await requireAuth();
-    const questionId = params.id;
+    const { id: questionId } = await params;
 
     // Get subject_id for this question
     const questionInfo = await db.get<{ subject_id: number }>(
@@ -54,10 +54,10 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 }
 
 // POST /api/questions/[id]/progress - Update user progress for a question (workspace members)
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const user = await requireAuth();
-    const questionId = params.id;
+    const { id: questionId } = await params;
     const { score } = await req.json();
 
     if (typeof score !== 'number' || score < 0 || score > 10) {

@@ -4,10 +4,10 @@ import { requireAuth } from '@/lib/auth-helpers';
 import type { Subject, PaperType } from '@/lib/db';
 
 // POST /api/subjects/[id]/paper-types - Add a paper type to a subject (creators only)
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const user = await requireAuth();
-    const subjectId = params.id;
+    const { id: subjectId } = await params;
     const { name } = await req.json();
 
     if (!name) {

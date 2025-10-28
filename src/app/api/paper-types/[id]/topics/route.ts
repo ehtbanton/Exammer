@@ -4,10 +4,10 @@ import { requireAuth } from '@/lib/auth-helpers';
 import type { Topic } from '@/lib/db';
 
 // GET /api/paper-types/[id]/topics - Get all topics for a paper type (workspace members)
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const user = await requireAuth();
-    const paperTypeId = params.id;
+    const { id: paperTypeId } = await params;
 
     // Verify subject is in user's workspace
     const workspace = await db.get<{ subject_id: number }>(
@@ -46,10 +46,10 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 }
 
 // POST /api/paper-types/[id]/topics - Add a topic to a paper type (creators only)
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const user = await requireAuth();
-    const paperTypeId = params.id;
+    const { id: paperTypeId } = await params;
     const { name, description } = await req.json();
 
     if (!name) {

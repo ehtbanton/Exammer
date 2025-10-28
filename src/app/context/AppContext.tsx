@@ -158,11 +158,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
           console.log('Syllabus processing complete.');
 
           // Update subject name in database
-          await fetch(`/api/subjects/${subjectId}`, {
+          const updateNameResponse = await fetch(`/api/subjects/${subjectId}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ name: result.subjectName || 'Untitled Subject' })
           });
+
+          if (!updateNameResponse.ok) {
+            const errorData = await updateNameResponse.json();
+            throw new Error(`Failed to update subject name: ${errorData.error || 'Unknown error'}`);
+          }
 
           // Create paper types in database and get their IDs
           const createdPaperTypes: PaperType[] = [];
@@ -172,6 +177,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ name: pt.name })
             });
+
+            if (!ptResponse.ok) {
+              const errorData = await ptResponse.json();
+              throw new Error(`Failed to create paper type "${pt.name}": ${errorData.error || 'Unknown error'}`);
+            }
+
             const dbPaperType = await ptResponse.json();
 
             // Create topics for this paper type
@@ -182,6 +193,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ name: topic.name, description: topic.description })
               });
+
+              if (!topicResponse.ok) {
+                const errorData = await topicResponse.json();
+                throw new Error(`Failed to create topic "${topic.name}": ${errorData.error || 'Unknown error'}`);
+              }
+
               const dbTopic = await topicResponse.json();
               createdTopics.push({
                 id: dbTopic.id.toString(),

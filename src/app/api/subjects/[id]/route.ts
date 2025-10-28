@@ -4,10 +4,10 @@ import { requireAuth } from '@/lib/auth-helpers';
 import type { Subject, PastPaper, PaperType } from '@/lib/db';
 
 // GET /api/subjects/[id] - Get a specific subject (must be in user's workspace)
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const user = await requireAuth();
-    const subjectId = params.id;
+    const { id: subjectId } = await params;
 
     // Check if subject is in user's workspace
     const workspace = await db.get(
@@ -104,10 +104,10 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 }
 
 // PUT /api/subjects/[id] - Update a subject (creators only)
-export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const user = await requireAuth();
-    const subjectId = params.id;
+    const { id: subjectId } = await params;
     const { name, syllabusContent } = await req.json();
 
     // Verify user is the creator
@@ -144,10 +144,10 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
 }
 
 // DELETE /api/subjects/[id] - Delete a subject (creators only, removes from everyone's workspace)
-export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const user = await requireAuth();
-    const subjectId = params.id;
+    const { id: subjectId } = await params;
 
     // Verify user is the creator
     const workspace = await db.get<{ is_creator: number }>(

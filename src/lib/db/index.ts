@@ -45,6 +45,19 @@ class Database {
 
         console.log('Connected to SQLite database at', DB_PATH);
 
+        // Configure SQLite for better write durability
+        this.db!.run('PRAGMA journal_mode = DELETE', (err) => {
+          if (err) {
+            console.error('Error setting journal mode:', err);
+          }
+        });
+
+        this.db!.run('PRAGMA synchronous = FULL', (err) => {
+          if (err) {
+            console.error('Error setting synchronous mode:', err);
+          }
+        });
+
         const schemaPath = path.join(process.cwd(), 'src', 'lib', 'db', 'schema.sql');
         const schema = fs.readFileSync(schemaPath, 'utf8');
 
@@ -94,6 +107,9 @@ class Database {
             console.error('Error reopening database after migration:', err);
             reject(err);
           } else {
+            // Configure SQLite for better write durability
+            this.db!.run('PRAGMA journal_mode = DELETE', () => {});
+            this.db!.run('PRAGMA synchronous = FULL', () => {});
             console.log('Database reconnected after migration');
             resolve();
           }
