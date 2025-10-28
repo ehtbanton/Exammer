@@ -369,7 +369,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
               id: t.id.toString(),
               name: t.name,
               description: t.description || '',
-              examQuestions: (t.questions || []).map((q: any) => ({
+              examQuestions: (t.examQuestions || []).map((q: any) => ({
                 id: q.id.toString(),
                 questionText: q.question_text,
                 summary: q.summary,

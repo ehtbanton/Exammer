@@ -3,6 +3,8 @@ import { db } from '@/lib/db';
 import { requireAuth } from '@/lib/auth-helpers';
 import type { Subject, PastPaper, PaperType } from '@/lib/db';
 
+export const dynamic = 'force-dynamic'; // Prevent caching to always get fresh data
+
 // GET /api/subjects - Get subjects in user's workspace (includes query param for filtering)
 export async function GET(req: NextRequest) {
   try {
@@ -55,76 +57,106 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    // For each subject, fetch its past papers, paper types, topics, questions, and user progress
-    const subjectsWithDetails = await Promise.all(
-      subjects.map(async (subject) => {
-        const pastPapers = await db.all<PastPaper>(
-          'SELECT * FROM past_papers WHERE subject_id = ?',
-          [subject.id]
-        );
+    // If no subjects, return empty array early
+    if (subjects.length === 0) {
+      return NextResponse.json([]);
+    }
 
-        const paperTypes = await db.all<PaperType>(
-          'SELECT * FROM paper_types WHERE subject_id = ?',
-          [subject.id]
-        );
+    const subjectIds = subjects.map(s => s.id);
+    const placeholders = subjectIds.map(() => '?').join(',');
 
-        // For each paper type, fetch topics with questions and user progress
-        const paperTypesWithTopics = await Promise.all(
-          paperTypes.map(async (pt) => {
-            const topics = await db.all<any>(
-              'SELECT * FROM topics WHERE paper_type_id = ?',
-              [pt.id]
-            );
-
-            const topicsWithQuestions = await Promise.all(
-              topics.map(async (topic) => {
-                const questions = await db.all<any>(
-                  'SELECT * FROM questions WHERE topic_id = ? ORDER BY created_at ASC',
-                  [topic.id]
-                );
-
-                // Fetch user progress for each question
-                const questionsWithProgress = await Promise.all(
-                  questions.map(async (question) => {
-                    const progress = await db.get<any>(
-                      'SELECT score, attempts FROM user_progress WHERE user_id = ? AND question_id = ?',
-                      [user.id, question.id]
-                    );
-
-                    return {
-                      id: question.id,
-                      question_text: question.question_text,
-                      summary: question.summary,
-                      score: progress?.score || 0,
-                      attempts: progress?.attempts || 0,
-                    };
-                  })
-                );
-
-                return {
-                  id: topic.id,
-                  name: topic.name,
-                  description: topic.description,
-                  examQuestions: questionsWithProgress,
-                };
-              })
-            );
-
-            return {
-              id: pt.id,
-              name: pt.name,
-              topics: topicsWithQuestions,
-            };
-          })
-        );
-
-        return {
-          ...subject,
-          pastPapers,
-          paperTypes: paperTypesWithTopics,
-        };
-      })
+    // Fetch all past papers for all subjects in one query
+    const allPastPapers = await db.all<PastPaper>(
+      `SELECT * FROM past_papers WHERE subject_id IN (${placeholders})`,
+      subjectIds
     );
+
+    // Fetch complete question hierarchy with user progress in ONE efficient query
+    const allData = await db.all<any>(
+      `SELECT
+        pt.subject_id,
+        pt.id as paper_type_id,
+        pt.name as paper_type_name,
+        t.id as topic_id,
+        t.name as topic_name,
+        t.description as topic_description,
+        q.id as question_id,
+        q.question_text,
+        q.summary,
+        q.created_at as question_created_at,
+        COALESCE(up.score, 0) as score,
+        COALESCE(up.attempts, 0) as attempts
+      FROM paper_types pt
+      LEFT JOIN topics t ON t.paper_type_id = pt.id
+      LEFT JOIN questions q ON q.topic_id = t.id
+      LEFT JOIN user_progress up ON up.question_id = q.id AND up.user_id = ?
+      WHERE pt.subject_id IN (${placeholders})
+      ORDER BY pt.subject_id, pt.id, t.id, q.created_at ASC`,
+      [user.id, ...subjectIds]
+    );
+
+    // Transform flat result set into nested structure
+    const subjectsWithDetails = subjects.map(subject => {
+      const pastPapers = allPastPapers.filter(pp => pp.subject_id === subject.id);
+
+      // Group data by paper type, then topic, then question
+      const paperTypesMap = new Map<number, any>();
+
+      allData
+        .filter(row => row.subject_id === subject.id)
+        .forEach(row => {
+          // Skip rows without paper types (shouldn't happen, but defensive)
+          if (!row.paper_type_id) return;
+
+          // Get or create paper type
+          if (!paperTypesMap.has(row.paper_type_id)) {
+            paperTypesMap.set(row.paper_type_id, {
+              id: row.paper_type_id,
+              name: row.paper_type_name,
+              topicsMap: new Map<number, any>(),
+            });
+          }
+          const paperType = paperTypesMap.get(row.paper_type_id)!;
+
+          // Skip if no topic (paper type exists but has no topics yet)
+          if (!row.topic_id) return;
+
+          // Get or create topic
+          if (!paperType.topicsMap.has(row.topic_id)) {
+            paperType.topicsMap.set(row.topic_id, {
+              id: row.topic_id,
+              name: row.topic_name,
+              description: row.topic_description,
+              examQuestions: [],
+            });
+          }
+          const topic = paperType.topicsMap.get(row.topic_id)!;
+
+          // Add question if it exists
+          if (row.question_id) {
+            topic.examQuestions.push({
+              id: row.question_id,
+              question_text: row.question_text,
+              summary: row.summary,
+              score: row.score,
+              attempts: row.attempts,
+            });
+          }
+        });
+
+      // Convert maps to arrays
+      const paperTypes = Array.from(paperTypesMap.values()).map(pt => ({
+        id: pt.id,
+        name: pt.name,
+        topics: Array.from(pt.topicsMap.values()),
+      }));
+
+      return {
+        ...subject,
+        pastPapers,
+        paperTypes,
+      };
+    });
 
     return NextResponse.json(subjectsWithDetails);
   } catch (error: any) {
