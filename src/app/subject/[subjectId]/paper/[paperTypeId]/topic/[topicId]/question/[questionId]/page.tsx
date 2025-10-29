@@ -6,19 +6,22 @@ import Link from 'next/link';
 import { useAppContext } from '@/app/context/AppContext';
 import { AuthGuard } from '@/components/AuthGuard';
 import { aiPoweredInterview, generateQuestion } from '@/ai/flows/ai-powered-interview';
+import { executeDevCommand } from '@/ai/flows/dev-commands';
+import { isDevCommand } from '@/lib/dev-commands-helpers';
 import type { ChatHistory } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import LoadingSpinner from '@/components/LoadingSpinner';
-import { Send, User, Bot, ArrowLeft, MessageSquare, PenTool } from 'lucide-react';
+import { Send, User, Bot, ArrowLeft, MessageSquare, PenTool, Terminal } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import PageSpinner from '@/components/PageSpinner';
 import { Whiteboard } from '@/components/whiteboard';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useSession } from 'next-auth/react';
 
 export default function InterviewPage() {
   return (
@@ -33,6 +36,7 @@ function InterviewPageContent() {
   const router = useRouter();
   const { getSubjectById, updateExamQuestionScore, generateQuestionVariant, isLoading: isAppLoading } = useAppContext();
   const { toast } = useToast();
+  const { data: session, status } = useSession();
 
   const subjectId = params.subjectId as string;
   const paperTypeId = decodeURIComponent(params.paperTypeId as string);
@@ -50,10 +54,29 @@ function InterviewPageContent() {
   const [isCompleted, setIsCompleted] = useState(false);
   const [generatedVariant, setGeneratedVariant] = useState<string | null>(null);
   const [inputMode, setInputMode] = useState<'text' | 'whiteboard'>('text');
+  const [accessLevel, setAccessLevel] = useState<number | null>(null);
 
   const scrollAreaViewport = useRef<HTMLDivElement>(null);
   const hasInitialized = useRef<string | false>(false);
   const isInitializing = useRef(false);
+
+  // Fetch user access level
+  useEffect(() => {
+    if (status === 'authenticated') {
+      const fetchAccessLevel = async () => {
+        try {
+          const response = await fetch('/api/auth/access-level');
+          if (response.ok) {
+            const data = await response.json();
+            setAccessLevel(data.accessLevel);
+          }
+        } catch (error) {
+          console.error('Failed to fetch access level:', error);
+        }
+      };
+      fetchAccessLevel();
+    }
+  }, [status]);
 
   useEffect(() => {
     if (scrollAreaViewport.current) {
@@ -123,6 +146,61 @@ function InterviewPageContent() {
     const currentInput = userInput;
     setUserInput('');
 
+    // Check if this is a dev command (level 3 users only)
+    if (accessLevel === 3 && !imageData && isDevCommand(currentInput)) {
+      try {
+        toast({
+          title: "Dev Command Detected",
+          description: `Executing: ${currentInput}`,
+        });
+
+        const devResult = await executeDevCommand({
+          command: currentInput,
+          question: generatedVariant,
+          subsection: examQuestion.summary,
+        });
+
+        // Add the generated answer as a user message
+        const newHistoryWithDevAnswer: ChatHistory = [...chatHistory, {
+          role: 'user',
+          content: devResult.generatedAnswer,
+        }];
+        setChatHistory(newHistoryWithDevAnswer);
+
+        // Now send this generated answer to the interview AI
+        const res = await aiPoweredInterview({
+          subsection: examQuestion.summary,
+          userAnswer: devResult.generatedAnswer,
+          previousChatHistory: chatHistory,
+          question: generatedVariant,
+        });
+
+        setChatHistory(res.chatHistory);
+
+        if (res.isCorrect && res.score) {
+          setIsCompleted(true);
+          if (paperType && topic) {
+            updateExamQuestionScore(subject.id, paperType.name, topic.name, examQuestion.id, res.score);
+          }
+          toast({
+            title: "Question Complete!",
+            description: `You scored ${res.score}/10. Redirecting back to topic...`,
+          });
+          setTimeout(() => {
+            router.push(`/subject/${subjectId}/paper/${encodeURIComponent(paperTypeId)}/topic/${encodeURIComponent(topicId)}`);
+          }, 3000);
+        }
+      } catch (e) {
+        toast({ variant: 'destructive', title: 'Dev Command Error', description: 'Failed to execute dev command.' });
+        console.error(e);
+        setChatHistory(chatHistory);
+      } finally {
+        setIsLoading(false);
+      }
+      return;
+    }
+
+    // Normal message handling
     const newHistory: ChatHistory = [...chatHistory, {
       role: 'user',
       content: currentInput || 'Whiteboard drawing',
@@ -296,17 +374,26 @@ function InterviewPageContent() {
                     </TabsTrigger>
                   </TabsList>
                   <TabsContent value="text" className="mt-0">
-                    <div className="flex items-center gap-2">
-                      <Input
-                        placeholder="Type your answer..."
-                        value={userInput}
-                        onChange={(e) => setUserInput(e.target.value)}
-                        onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
-                        disabled={isLoading || isCompleted}
-                      />
-                      <Button onClick={() => handleSendMessage()} disabled={isLoading || isCompleted || !userInput.trim()}>
-                        {isLoading ? <LoadingSpinner /> : <Send />}
-                      </Button>
+                    <div className="space-y-2">
+                      {accessLevel === 3 && (
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted/50 px-2 py-1 rounded">
+                          <Terminal className="h-3 w-3" />
+                          <span>Dev commands enabled: <code className="bg-background px-1 rounded">fullans</code></span>
+                        </div>
+                      )}
+                      <div className="flex items-center gap-2">
+                        <Input
+                          placeholder={accessLevel === 3 ? "Type your answer or dev command..." : "Type your answer..."}
+                          value={userInput}
+                          onChange={(e) => setUserInput(e.target.value)}
+                          onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
+                          disabled={isLoading || isCompleted}
+                          className={accessLevel === 3 && isDevCommand(userInput) ? "border-yellow-500 bg-yellow-50 dark:bg-yellow-950/20" : ""}
+                        />
+                        <Button onClick={() => handleSendMessage()} disabled={isLoading || isCompleted || !userInput.trim()}>
+                          {isLoading ? <LoadingSpinner /> : <Send />}
+                        </Button>
+                      </div>
                     </div>
                   </TabsContent>
                   <TabsContent value="whiteboard" className="mt-0">
