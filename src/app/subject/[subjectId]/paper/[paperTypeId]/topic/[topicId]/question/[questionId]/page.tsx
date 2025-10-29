@@ -190,9 +190,9 @@ function InterviewPageContent() {
   };
 
   return (
-    <div className="container mx-auto md:h-[calc(100vh-8rem)] flex flex-col">
+    <div className="container mx-auto h-[calc(100vh-6rem)] flex flex-col p-4">
       {/* Header with Back Button and Topic */}
-      <div className="flex items-center justify-between mb-4 pb-3 border-b">
+      <div className="flex items-center justify-between mb-4 pb-3 border-b shrink-0">
         <Button variant="ghost" onClick={() => router.push(`/subject/${subjectId}/paper/${encodeURIComponent(paperTypeId)}/topic/${encodeURIComponent(topicId)}`)}>
           <ArrowLeft className="mr-2 h-4 w-4" />
           Back to Questions
@@ -203,17 +203,17 @@ function InterviewPageContent() {
       </div>
 
       {/* Main Content - Question Left, Chat Right */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:flex-1 md:min-h-0">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 flex-1 min-h-0 overflow-hidden">
         {/* Left Side - Question Display */}
-        <div className="flex flex-col min-h-[40vh] md:min-h-0">
-          <Card className="bg-primary/5 border-primary/20 flex-1 flex flex-col">
-            <CardContent className="flex-1 flex flex-col p-0 min-h-0">
+        <div className="flex flex-col h-full overflow-hidden">
+          <Card className="bg-primary/5 border-primary/20 flex-1 flex flex-col h-full overflow-hidden">
+            <CardContent className="flex-1 flex flex-col p-0 h-full overflow-hidden">
               <div className="p-6 pb-4 border-b">
                 <h2 className="text-sm font-semibold text-muted-foreground uppercase">Question</h2>
               </div>
               {generatedVariant ? (
                 <>
-                  <ScrollArea className="flex-1 p-6 min-h-0">
+                  <ScrollArea className="flex-1 p-6 overflow-auto">
                     <div className="prose prose-base max-w-none dark:prose-invert">
                       <div className="text-base leading-relaxed whitespace-pre-wrap break-words font-normal">
                         {formatQuestionText(generatedVariant)}
@@ -225,7 +225,7 @@ function InterviewPageContent() {
                   </div>
                 </>
               ) : (
-                <div className="flex items-center justify-center gap-3 flex-1">
+                <div className="flex items-center justify-center gap-3 flex-1 overflow-hidden">
                   <LoadingSpinner className="w-5 h-5" />
                   <p className="text-sm text-muted-foreground">Generating similar question...</p>
                 </div>
@@ -235,10 +235,10 @@ function InterviewPageContent() {
         </div>
 
         {/* Right Side - Chat Interface */}
-        <div className="flex flex-col min-h-[50vh] md:min-h-0">
-          <Card className="flex-1 flex flex-col">
-            <CardContent className="flex-1 flex flex-col p-0 min-h-0">
-              <ScrollArea className="flex-1 p-4 min-h-0" viewportRef={scrollAreaViewport}>
+        <div className="flex flex-col h-full overflow-hidden">
+          <Card className="flex-1 flex flex-col h-full overflow-hidden">
+            <CardContent className="flex-1 flex flex-col p-0 h-full overflow-hidden">
+              <ScrollArea className="flex-1 p-4 overflow-auto" viewportRef={scrollAreaViewport}>
                 <div className="space-y-6">
                   {chatHistory.map((message, index) => (
                     <div key={index} className={cn("flex items-start gap-3", message.role === 'user' ? "justify-end" : "")}>
