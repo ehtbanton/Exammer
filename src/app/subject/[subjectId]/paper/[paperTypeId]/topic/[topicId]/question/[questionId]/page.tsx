@@ -387,8 +387,9 @@ function InterviewPageContent() {
                           value={userInput}
                           onChange={(e) => setUserInput(e.target.value)}
                           onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
+                          onPaste={(e) => e.preventDefault()}
                           disabled={isLoading || isCompleted}
-                          className={accessLevel === 3 && isDevCommand(userInput) ? "border-yellow-500 bg-yellow-50 dark:bg-yellow-950/20" : ""}
+                          className={accessLevel === 3 && isDevCommand(userInput) ? "text-blue-600 font-bold dark:text-blue-400" : ""}
                         />
                         <Button onClick={() => handleSendMessage()} disabled={isLoading || isCompleted || !userInput.trim()}>
                           {isLoading ? <LoadingSpinner /> : <Send />}
