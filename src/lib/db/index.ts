@@ -295,5 +295,6 @@ export interface UserProgress {
   question_id: number;
   score: number;
   attempts: number;
+  score_history: string; // JSON array of last 3 scores (out of 10)
   updated_at: number;
 }

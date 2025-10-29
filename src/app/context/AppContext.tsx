@@ -72,7 +72,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
                   id: q.id.toString(),
                   questionText: q.question_text,
                   summary: q.summary,
-                  score: q.score || 0,
+                  score: q.score || (q.attempts === 0 ? 50 : 0), // Default 50% if no attempts
                   attempts: q.attempts || 0,
                 }))
               }))
@@ -373,7 +373,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
                 id: q.id.toString(),
                 questionText: q.question_text,
                 summary: q.summary,
-                score: q.score || 0,
+                score: q.score || (q.attempts === 0 ? 50 : 0), // Default 50% if no attempts
                 attempts: q.attempts || 0,
               }))
             }))
@@ -659,7 +659,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
               id: q.id.toString(),
               questionText: q.question_text,
               summary: q.summary,
-              score: q.score || 0,
+              score: q.score || (q.attempts === 0 ? 50 : 0), // Default 50% if no attempts
               attempts: q.attempts || 0,
             }))
           }))

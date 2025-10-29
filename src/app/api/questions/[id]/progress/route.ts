@@ -40,7 +40,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     );
 
     if (!progress) {
-      return NextResponse.json({ score: 0, attempts: 0 });
+      // No progress yet, return 50% as starting score
+      return NextResponse.json({ score: 50, attempts: 0 });
     }
 
     return NextResponse.json(progress);
@@ -97,28 +98,39 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
     let newScore: number;
     let newAttempts: number;
+    let scoreHistory: number[];
 
     if (!currentProgress) {
-      // First attempt - use the score formula
-      // Formula: new_percentage = (old_percentage * (n + 1) + score * 10) / (n + 2)
-      // For first attempt: (0 * 1 + score * 10) / 2
-      newScore = (score * 10) / 2;
+      // First attempt - start with imaginary 50% score, then average with actual score
+      // Starting score: 50% (5 out of 10)
+      // New score: average of [5, actual_score]
+      scoreHistory = [5, score]; // Store last 3 scores (out of 10)
+      newScore = (scoreHistory.reduce((a, b) => a + b, 0) / scoreHistory.length) * 10; // Convert to percentage
       newAttempts = 1;
 
       await db.run(
-        'INSERT INTO user_progress (user_id, question_id, score, attempts, updated_at) VALUES (?, ?, ?, ?, unixepoch())',
-        [user.id, questionId, newScore, newAttempts]
+        'INSERT INTO user_progress (user_id, question_id, score, attempts, score_history, updated_at) VALUES (?, ?, ?, ?, ?, unixepoch())',
+        [user.id, questionId, newScore, newAttempts, JSON.stringify(scoreHistory)]
       );
     } else {
-      // Subsequent attempts
-      const n = currentProgress.attempts;
-      const oldPercentage = currentProgress.score;
-      newScore = (oldPercentage * (n + 1) + score * 10) / (n + 2);
-      newAttempts = n + 1;
+      // Subsequent attempts - keep only last 3 scores
+      scoreHistory = currentProgress.score_history
+        ? JSON.parse(currentProgress.score_history)
+        : [5]; // Fallback for old records
+
+      // Add new score and keep only last 3
+      scoreHistory.push(score);
+      if (scoreHistory.length > 3) {
+        scoreHistory = scoreHistory.slice(-3); // Keep only last 3
+      }
+
+      // Calculate average of last 3 scores
+      newScore = (scoreHistory.reduce((a, b) => a + b, 0) / scoreHistory.length) * 10; // Convert to percentage
+      newAttempts = currentProgress.attempts + 1;
 
       await db.run(
-        'UPDATE user_progress SET score = ?, attempts = ?, updated_at = unixepoch() WHERE user_id = ? AND question_id = ?',
-        [newScore, newAttempts, user.id, questionId]
+        'UPDATE user_progress SET score = ?, attempts = ?, score_history = ?, updated_at = unixepoch() WHERE user_id = ? AND question_id = ?',
+        [newScore, newAttempts, JSON.stringify(scoreHistory), user.id, questionId]
       );
     }
 

@@ -1,5 +1,5 @@
 {
-  "currentVersion": 1,
+  "currentVersion": 2,
   "versions": {
     "0": {
       "description": "Initial schema - subjects owned by users",
@@ -67,6 +67,25 @@
             "action": "recreate_indexes",
             "description": "Recreate indexes after table recreation",
             "sql": "CREATE INDEX IF NOT EXISTS idx_subjects_name ON subjects(name)"
+          }
+        ]
+      }
+    },
+    "2": {
+      "description": "Add score_history to user_progress for last-3-scores averaging with 50% starting score",
+      "schema": {
+        "user_progress": {
+          "columns": ["id", "user_id", "question_id", "score", "attempts", "score_history", "updated_at"],
+          "note": "score_history stores JSON array of last 3 scores (out of 10). Default starting score is 50%, averaging with last 3 attempts."
+        }
+      },
+      "migration": {
+        "from": 1,
+        "steps": [
+          {
+            "action": "create_table",
+            "description": "Add score_history column to user_progress",
+            "sql": "ALTER TABLE user_progress ADD COLUMN score_history TEXT DEFAULT '[]'"
           }
         ]
       }
