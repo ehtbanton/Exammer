@@ -18,11 +18,37 @@ class Database {
     try {
       console.log('Starting database initialization...');
 
-      // First, ensure schema file is applied (creates tables with IF NOT EXISTS)
-      await this.applyBaseSchema();
+      // Check if database exists
+      const dbExists = fs.existsSync(DB_PATH);
 
-      // Then run versioned migrations
+      if (!dbExists) {
+        // If database doesn't exist, let migrations handle creation
+        console.log('Database does not exist, migrations will create it...');
+      } else {
+        // Database exists, ensure schema is applied (handles any IF NOT EXISTS clauses)
+        await this.applyBaseSchema();
+      }
+
+      // Run versioned migrations (will create database if needed)
       await this.runVersionedMigrations();
+
+      // If database was created by migrations, we need to open a connection
+      if (!dbExists && !this.db) {
+        await new Promise<void>((resolve, reject) => {
+          this.db = new sqlite3.Database(DB_PATH, (err) => {
+            if (err) {
+              console.error('Error opening database:', err);
+              reject(err);
+            } else {
+              console.log('Connected to SQLite database at', DB_PATH);
+              // Configure SQLite for better write durability
+              this.db!.run('PRAGMA journal_mode = DELETE', () => {});
+              this.db!.run('PRAGMA synchronous = FULL', () => {});
+              resolve();
+            }
+          });
+        });
+      }
 
       // Finally, initialize user access sync
       await this.initializeUserAccessSync();

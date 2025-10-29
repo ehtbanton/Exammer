@@ -10,8 +10,10 @@ import sqlite3 from 'sqlite3';
 import path from 'path';
 import fs from 'fs';
 
-const DB_PATH = path.join(process.cwd(), 'db', 'exammer.db');
-const VERSION_FILE = path.join(process.cwd(), 'db', 'db_vers.json');
+const DB_DIR = path.join(process.cwd(), 'db');
+const DB_PATH = path.join(DB_DIR, 'exammer.db');
+const VERSION_FILE = path.join(DB_DIR, 'db_vers.json');
+const USERS_FILE = path.join(DB_DIR, 'users.json');
 
 interface VersionSpec {
   currentVersion: number;
@@ -39,6 +41,18 @@ export class DatabaseMigrator {
   private initPromise: Promise<void>;
 
   constructor(dbPath: string = DB_PATH) {
+    // Ensure db directory exists
+    if (!fs.existsSync(DB_DIR)) {
+      console.log(`Creating database directory: ${DB_DIR}`);
+      fs.mkdirSync(DB_DIR, { recursive: true });
+    }
+
+    // Ensure users.json exists
+    if (!fs.existsSync(USERS_FILE)) {
+      console.log(`Creating users.json file: ${USERS_FILE}`);
+      fs.writeFileSync(USERS_FILE, JSON.stringify([], null, 2), 'utf-8');
+    }
+
     // Load version specification
     if (!fs.existsSync(VERSION_FILE)) {
       throw new Error(`Version file not found: ${VERSION_FILE}`);
@@ -46,21 +60,93 @@ export class DatabaseMigrator {
 
     this.versionSpec = JSON.parse(fs.readFileSync(VERSION_FILE, 'utf8'));
 
-    // Open database connection asynchronously
-    this.initPromise = new Promise((resolve, reject) => {
-      this.db = new sqlite3.Database(dbPath, (err) => {
+    // Check if database exists
+    const dbExists = fs.existsSync(dbPath);
+    const isNewDatabase = !dbExists;
+
+    if (!dbExists) {
+      console.log(`Database does not exist, will create new database at: ${dbPath}`);
+    }
+
+    // Open database connection asynchronously (creates file if it doesn't exist)
+    this.initPromise = new Promise(async (resolve, reject) => {
+      this.db = new sqlite3.Database(dbPath, async (err) => {
         if (err) {
           console.error('Error opening database for migration:', err);
           reject(err);
-        } else {
-          resolve();
+          return;
         }
+
+        // If database was just created, initialize it with base schema
+        if (isNewDatabase) {
+          try {
+            await this.initializeNewDatabase();
+            console.log('✅ New database initialization complete');
+          } catch (initError) {
+            console.error('Error initializing new database:', initError);
+            reject(initError);
+            return;
+          }
+        }
+        resolve();
       });
     });
   }
 
   private async ready(): Promise<void> {
     await this.initPromise;
+  }
+
+  /**
+   * Initialize a new database with base schema
+   * The schema.sql file contains the latest schema, so we set the version to currentVersion
+   * and skip running migrations
+   */
+  private async initializeNewDatabase(): Promise<void> {
+    console.log('\n🆕 Initializing new database with current schema...\n');
+
+    try {
+      // Read and apply the base schema (which is already at the latest version)
+      const schemaPath = path.join(process.cwd(), 'src', 'lib', 'db', 'schema.sql');
+
+      if (!fs.existsSync(schemaPath)) {
+        throw new Error(`Schema file not found: ${schemaPath}`);
+      }
+
+      const schema = fs.readFileSync(schemaPath, 'utf8');
+
+      // Execute schema
+      await new Promise<void>((resolve, reject) => {
+        this.db.exec(schema, (err) => {
+          if (err) {
+            console.error('Error applying base schema:', err);
+            reject(err);
+          } else {
+            console.log('✅ Base schema applied successfully');
+            resolve();
+          }
+        });
+      });
+
+      // The schema.sql already includes db_version table creation, but we need to set the version
+      // Set the version to currentVersion since we applied the latest schema
+      await new Promise<void>((resolve, reject) => {
+        this.db.run(
+          'INSERT INTO db_version (version) VALUES (?)',
+          [this.versionSpec.currentVersion],
+          (err) => {
+            if (err) reject(err);
+            else resolve();
+          }
+        );
+      });
+
+      console.log(`✅ Fresh database initialized at version ${this.versionSpec.currentVersion}`);
+      console.log('   No migrations needed - schema is already current\n');
+    } catch (error) {
+      console.error('Failed to initialize new database:', error);
+      throw error;
+    }
   }
 
   private async all<T = any>(sql: string, params: any[] = []): Promise<T[]> {
