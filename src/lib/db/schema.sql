@@ -113,6 +113,7 @@ CREATE TABLE IF NOT EXISTS user_progress (
   question_id INTEGER NOT NULL,
   score INTEGER DEFAULT 0,
   attempts INTEGER DEFAULT 0,
+  score_history TEXT DEFAULT '[]',
   updated_at INTEGER DEFAULT (unixepoch()),
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
   FOREIGN KEY (question_id) REFERENCES questions(id) ON DELETE CASCADE,
@@ -132,3 +133,10 @@ CREATE INDEX IF NOT EXISTS idx_topics_paper_type_id ON topics(paper_type_id);
 CREATE INDEX IF NOT EXISTS idx_questions_topic_id ON questions(topic_id);
 CREATE INDEX IF NOT EXISTS idx_user_progress_user_id ON user_progress(user_id);
 CREATE INDEX IF NOT EXISTS idx_user_progress_question_id ON user_progress(question_id);
+
+-- Database version tracking table
+CREATE TABLE IF NOT EXISTS db_version (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  version INTEGER NOT NULL,
+  migrated_at INTEGER DEFAULT (unixepoch())
+);
