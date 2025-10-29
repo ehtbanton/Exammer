@@ -100,19 +100,60 @@ Also output the updated chatHistory array, including the user answer (if any) an
       question,
     } = flowInput;
 
-    // Build the prompt config
-    const promptConfig: any = {
-      model: 'googleai/gemini-2.0-flash-exp',
-    };
-
-    // If user provided an image, add it to the config as media
+    // For Genkit with images, we need to use the generate function directly
+    // because definePrompt doesn't handle multimodal input properly
     if (userImage) {
-      promptConfig.media = {
-        url: userImage, // Base64 data URL
-        contentType: 'image/png',
+      // Use direct generate call with multimodal content
+      const response = await ai.generate({
+        model: 'googleai/gemini-2.0-flash-exp',
+        prompt: [
+          {text: `You are an AI assistant designed to help students learn material by conducting interview-style conversations. You are helping the student answer a real exam question.
+
+Topic context: ${subsection}
+
+The exam question the student is working on:
+${question}
+
+Here's the previous chat history:
+${previousChatHistory.map(msg => `${msg.role}: ${msg.content}${msg.imageUrl ? ' [Image provided]' : ''}`).join('\n')}
+
+The user has provided a whiteboard drawing (see image) ${userAnswer ? `and the following text answer: ${userAnswer}` : ''}.
+
+Based on this answer and typical exam marking criteria for this type of question, provide the next step in the interview process:
+- If the answer is correct and complete according to exam standards, congratulate the user and award a score out of 10 based on the quality, completeness, and accuracy of the answer. Start your response with "CORRECT:" followed by the score.
+- If the answer is partially correct or incomplete, provide encouraging feedback and a helpful hint or follow-up question to guide them towards a more complete answer that would earn full marks.
+- If the answer is incorrect, provide constructive feedback and a guiding question to help them think about the problem differently.
+
+Use your knowledge of the subject matter from the topic context to assess the answer fairly.`},
+          {media: {url: userImage, contentType: 'image/png'}}
+        ],
+      });
+
+      const text = response.text;
+      const isCorrect = text.startsWith('CORRECT:');
+      const score = isCorrect ? parseInt(text.match(/CORRECT:\s*(\d+)/)?.[1] || '0') : undefined;
+      const nextMessage = isCorrect ? text.replace(/CORRECT:\s*\d+\s*/, '') : text;
+
+      const updatedChatHistory = [...previousChatHistory];
+      if (userAnswer || userImage) {
+        updatedChatHistory.push({
+          role: 'user',
+          content: userAnswer || 'Whiteboard drawing',
+          imageUrl: userImage,
+        });
+      }
+      updatedChatHistory.push({role: 'assistant', content: nextMessage});
+
+      return {
+        question: question || '',
+        nextAssistantMessage: nextMessage,
+        isCorrect,
+        score,
+        chatHistory: updatedChatHistory,
       };
     }
 
+    // Text-only path - use the original prompt
     const {
       output,
     } = await prompt({
@@ -121,7 +162,9 @@ Also output the updated chatHistory array, including the user answer (if any) an
       userImage,
       previousChatHistory,
       question,
-    }, promptConfig);
+    }, {
+      model: 'googleai/gemini-2.5-flash-lite',
+    });
 
     if (!output) {
       throw new Error('AI response was empty.');
