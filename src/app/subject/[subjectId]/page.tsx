@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import LoadingSpinner from '@/components/LoadingSpinner';
 import PageSpinner from '@/components/PageSpinner';
 import { ArrowLeft, BookCopy, FileText, List, Upload, Crown } from 'lucide-react';
-import { getScoreColorStyle, getDefaultBoxStyle } from '@/lib/utils';
+import { getScoreColorStyle, getDefaultBoxStyle, getUnattemptedBoxStyle } from '@/lib/utils';
 import { PaperType } from '@/lib/types';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
@@ -91,25 +91,26 @@ function SubjectPageContent() {
 
   const isPaperLoading = isLoading(`process-papers-${subject.id}`);
 
-  // Calculate average score for a paper type
+  // Calculate average score for a paper type based only on attempted topics
   const getPaperTypeAverageScore = (paperType: PaperType): number | null => {
     const topicsWithQuestions = paperType.topics.filter(t => t.examQuestions && t.examQuestions.length > 0);
     if (topicsWithQuestions.length === 0) return null;
 
-    let totalScore = 0;
-    let totalQuestions = 0;
+    let topicScoresSum = 0;
+    let attemptedTopicsCount = 0;
 
     for (const topic of topicsWithQuestions) {
-      // Include all questions - unattempted questions have a score of 0
-      const allQuestions = topic.examQuestions || [];
-      for (const question of allQuestions) {
-        totalScore += question.score;
-        totalQuestions++;
+      const attemptedQuestions = topic.examQuestions.filter(q => q.attempts > 0);
+      if (attemptedQuestions.length > 0) {
+        // Calculate topic average from attempted questions only
+        const topicScore = attemptedQuestions.reduce((acc, q) => acc + q.score, 0) / attemptedQuestions.length;
+        topicScoresSum += topicScore;
+        attemptedTopicsCount++;
       }
     }
 
-    if (totalQuestions === 0) return null;
-    return totalScore / totalQuestions;
+    if (attemptedTopicsCount === 0) return null;
+    return topicScoresSum / attemptedTopicsCount;
   };
 
   // Check if a paper type has any questions
@@ -249,12 +250,23 @@ function SubjectPageContent() {
             {filteredPaperTypes.map(paperType => {
               const avgScore = getPaperTypeAverageScore(paperType);
               const hasScore = avgScore !== null;
+              const hasQuestions = paperTypeHasQuestions(paperType);
+
+              // Determine which style to use
+              let boxStyle;
+              if (hasScore) {
+                boxStyle = getScoreColorStyle(avgScore);
+              } else if (hasQuestions) {
+                boxStyle = getUnattemptedBoxStyle(); // Has questions but no attempts
+              } else {
+                boxStyle = getDefaultBoxStyle(); // No questions at all
+              }
 
               return (
                 <Card
                   key={paperType.id}
                   className="hover:shadow-[0_0_0_4px_white] transition-all cursor-pointer h-full border-2"
-                  style={hasScore ? getScoreColorStyle(avgScore) : getDefaultBoxStyle()}
+                  style={boxStyle}
                   onClick={() => handleNavigate(paperType.id)}
                 >
                   <CardHeader>

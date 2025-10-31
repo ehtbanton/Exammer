@@ -10,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import PageSpinner from '@/components/PageSpinner';
 import { ArrowLeft, BookCopy } from 'lucide-react';
 import { Topic } from '@/lib/types';
-import { getScoreColorStyle, getDefaultBoxStyle } from '@/lib/utils';
+import { getScoreColorStyle, getDefaultBoxStyle, getUnattemptedBoxStyle } from '@/lib/utils';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 
@@ -70,13 +70,17 @@ function PaperTypePageContent() {
     );
   }
 
-  // Calculate average score for each topic
+  // Calculate average score for each topic based only on attempted questions
   const getTopicAverageScore = (topic: Topic): number | null => {
     const allQuestions = topic.examQuestions || [];
     if (allQuestions.length === 0) return null;
-    // Include all questions - unattempted questions have a score of 0
-    const sum = allQuestions.reduce((acc, q) => acc + q.score, 0);
-    return sum / allQuestions.length;
+
+    // Only include questions with at least 1 attempt
+    const attemptedQuestions = allQuestions.filter(q => q.attempts > 0);
+    if (attemptedQuestions.length === 0) return null;
+
+    const sum = attemptedQuestions.reduce((acc, q) => acc + q.score, 0);
+    return sum / attemptedQuestions.length;
   };
 
   // Filter topics based on toggle
@@ -110,12 +114,23 @@ function PaperTypePageContent() {
             {filteredTopics.map((topic: Topic) => {
               const avgScore = getTopicAverageScore(topic);
               const hasScore = avgScore !== null;
+              const hasQuestions = topic.examQuestions && topic.examQuestions.length > 0;
+
+              // Determine which style to use
+              let boxStyle;
+              if (hasScore) {
+                boxStyle = getScoreColorStyle(avgScore);
+              } else if (hasQuestions) {
+                boxStyle = getUnattemptedBoxStyle(); // Has questions but no attempts
+              } else {
+                boxStyle = getDefaultBoxStyle(); // No questions at all
+              }
 
               return (
                 <Link key={topic.id} href={`/subject/${subjectId}/paper/${encodeURIComponent(paperTypeId)}/topic/${encodeURIComponent(topic.id)}`} onClick={() => handleNavigate(topic.id)} className="block hover:no-underline">
                   <Card
                     className="hover:shadow-[0_0_0_4px_white] transition-all h-full border-2"
-                    style={hasScore ? getScoreColorStyle(avgScore) : getDefaultBoxStyle()}
+                    style={boxStyle}
                   >
                     <CardHeader>
                       <CardTitle className="text-lg text-black">{topic.name}</CardTitle>

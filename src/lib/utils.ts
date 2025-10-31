@@ -29,10 +29,17 @@ export function getScoreColorClass(score: number): string {
 }
 
 /**
- * Gets default light grey class for boxes without scores
+ * Gets default darker grey class for boxes without any questions
  */
 export function getDefaultBoxClass(): string {
-  return 'bg-gray-200 border-gray-400 text-black';
+  return 'bg-gray-400 border-gray-500 text-black';
+}
+
+/**
+ * Gets inviting light grey class for unattempted questions/topics/papers
+ */
+export function getUnattemptedBoxClass(): string {
+  return 'bg-gray-100 border-gray-300 text-black';
 }
 
 /**
@@ -69,8 +76,15 @@ export function getScoreColorStyle(score: number): React.CSSProperties {
 }
 
 /**
- * Gets default light grey style for boxes without scores
+ * Gets default darker grey style for boxes without any questions
  */
 export function getDefaultBoxStyle(): React.CSSProperties {
-  return { backgroundColor: 'rgb(229, 231, 235)', borderColor: 'rgb(156, 163, 175)', color: 'rgb(0, 0, 0)' }; // gray-200, gray-400
+  return { backgroundColor: 'rgb(156, 163, 175)', borderColor: 'rgb(107, 114, 128)', color: 'rgb(0, 0, 0)' }; // gray-400, gray-500
+}
+
+/**
+ * Gets inviting light grey style for unattempted questions/topics/papers
+ */
+export function getUnattemptedBoxStyle(): React.CSSProperties {
+  return { backgroundColor: 'rgb(243, 244, 246)', borderColor: 'rgb(209, 213, 219)', color: 'rgb(0, 0, 0)' }; // gray-100, gray-300
 }

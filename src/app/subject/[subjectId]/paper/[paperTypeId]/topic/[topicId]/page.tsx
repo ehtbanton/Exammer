@@ -12,7 +12,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { ArrowLeft, AlertCircle } from 'lucide-react';
 import PageSpinner from '@/components/PageSpinner';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { getScoreColorStyle } from '@/lib/utils';
+import { getScoreColorStyle, getUnattemptedBoxStyle } from '@/lib/utils';
 
 export default function TopicPage() {
   return (
@@ -93,11 +93,15 @@ function TopicPageContent() {
 
       {topic.examQuestions.length > 0 ? (
         <div className="space-y-3">
-          {topic.examQuestions.map(question => (
+          {topic.examQuestions.map(question => {
+            const hasAttempts = question.attempts > 0;
+            const boxStyle = hasAttempts ? getScoreColorStyle(question.score) : getUnattemptedBoxStyle();
+
+            return (
               <Card
                 key={question.id}
                 className="hover:shadow-[0_0_0_4px_white] transition-all cursor-pointer border-2"
-                style={getScoreColorStyle(question.score)}
+                style={boxStyle}
                 onClick={() => handleNavigate(question.id)}
               >
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -105,17 +109,22 @@ function TopicPageContent() {
                     <CardTitle className="text-md font-medium text-black">{question.summary}</CardTitle>
                   </div>
                   <div className="text-right ml-4">
-                    <div className="text-sm font-bold text-black">{question.score.toFixed(1)}%</div>
-                    {question.attempts > 0 && (
-                      <div className="text-xs text-black">{question.attempts} attempt{question.attempts !== 1 ? 's' : ''}</div>
+                    {hasAttempts ? (
+                      <>
+                        <div className="text-sm font-bold text-black">{question.score.toFixed(1)}%</div>
+                        <div className="text-xs text-black">{question.attempts} attempt{question.attempts !== 1 ? 's' : ''}</div>
+                      </>
+                    ) : (
+                      <div className="text-sm text-gray-600">Not attempted</div>
                     )}
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <Progress value={question.score} className="h-2" />
+                  <Progress value={hasAttempts ? question.score : 0} className="h-2" />
                 </CardContent>
               </Card>
-          ))}
+            );
+          })}
         </div>
       ) : (
          <Card className="text-center py-12 border-2 border-dashed">
