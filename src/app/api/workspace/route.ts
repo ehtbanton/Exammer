@@ -65,15 +65,8 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ error: 'Subject not in workspace' }, { status: 404 });
     }
 
-    // Cannot remove if creator (would leave subject orphaned in workspace context)
-    // Creator should use DELETE /api/subjects/[id] to delete the subject entirely
-    if (workspace.is_creator === 1) {
-      return NextResponse.json(
-        { error: 'Cannot remove created subjects from workspace. Use delete subject instead.' },
-        { status: 400 }
-      );
-    }
-
+    // Allow creators to remove from workspace - they can still delete the entire subject
+    // or add it back to their workspace later if needed
     // Remove from workspace
     await db.run(
       'DELETE FROM user_workspaces WHERE user_id = ? AND subject_id = ?',

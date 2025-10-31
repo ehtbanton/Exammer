@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { requireAuth } from '@/lib/auth-helpers';
+import { requireAuth, getUserWithAccessLevel } from '@/lib/auth-helpers';
 import type { Subject, PastPaper, PaperType } from '@/lib/db';
 
 export const dynamic = 'force-dynamic'; // Prevent caching to always get fresh data
@@ -164,20 +164,32 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
   }
 }
 
-// DELETE /api/subjects/[id] - Delete a subject (creators only, removes from everyone's workspace)
+// DELETE /api/subjects/[id] - Delete a subject (creators and level 3 users, removes from everyone's workspace)
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const user = await requireAuth();
     const { id: subjectId } = await params;
 
-    // Verify user is the creator
-    const workspace = await db.get<{ is_creator: number }>(
-      'SELECT is_creator FROM user_workspaces WHERE user_id = ? AND subject_id = ?',
-      [user.id, subjectId]
-    );
+    // Get user's full data including access level
+    const fullUser = await getUserWithAccessLevel(user.id);
 
-    if (!workspace || workspace.is_creator !== 1) {
-      return NextResponse.json({ error: 'Only creators can delete subjects' }, { status: 403 });
+    if (!fullUser) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    }
+
+    // Check if user is level 3 (can delete any subject)
+    const isLevel3 = fullUser.access_level >= 3;
+
+    if (!isLevel3) {
+      // If not level 3, verify user is the creator
+      const workspace = await db.get<{ is_creator: number }>(
+        'SELECT is_creator FROM user_workspaces WHERE user_id = ? AND subject_id = ?',
+        [user.id, subjectId]
+      );
+
+      if (!workspace || workspace.is_creator !== 1) {
+        return NextResponse.json({ error: 'Only creators or level 3 users can delete subjects' }, { status: 403 });
+      }
     }
 
     // Delete the subject (CASCADE will remove from all workspaces and delete related data)

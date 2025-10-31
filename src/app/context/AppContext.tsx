@@ -11,6 +11,7 @@ import { backgroundQueue } from '@/lib/background-queue';
 interface AppContextType {
   subjects: Subject[];
   otherSubjects: Subject[];
+  isLevel3User: boolean;
   createSubjectFromSyllabus: (syllabusFile: File) => Promise<void>;
   processExamPapers: (subjectId: string, examPapers: File[]) => Promise<void>;
   deleteSubject: (subjectId: string) => Promise<void>;
@@ -30,6 +31,7 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 export function AppProvider({ children }: { children: ReactNode }) {
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [otherSubjects, setOtherSubjects] = useState<Subject[]>([]);
+  const [isLevel3User, setIsLevel3User] = useState<boolean>(false);
   const [loadingStates, setLoadingStates] = useState<Record<string, boolean>>({});
   const { toast } = useToast();
   const { data: session, status} = useSession();
@@ -41,12 +43,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
       if (!session?.user) {
         setSubjects([]);
         setOtherSubjects([]);
+        setIsLevel3User(false);
         setLoadingStates(prev => ({ ...prev, 'fetch-subjects': false }));
         return;
       }
 
       setLoadingStates(prev => ({ ...prev, 'fetch-subjects': true }));
       try {
+        // Fetch user's access level
+        const accessLevelResponse = await fetch('/api/auth/access-level');
+        if (accessLevelResponse.ok) {
+          const { accessLevel } = await accessLevelResponse.json();
+          setIsLevel3User(accessLevel >= 3);
+        }
+
         // Fetch workspace subjects only
         const workspaceResponse = await fetch('/api/subjects');
         if (workspaceResponse.ok) {
@@ -131,13 +141,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const dbSubject = await response.json();
       const subjectId = dbSubject.id.toString();
 
-      // Create placeholder subject in local state
+      // Create placeholder subject in local state with isCreator set to true
       const placeholderSubject: Subject = {
         id: subjectId,
         name: 'Processing...',
         syllabusContent: syllabusText,
         pastPapers: [],
         paperTypes: [],
+        isCreator: true,
       };
 
       setSubjects(prev => [...prev, placeholderSubject]);
@@ -675,7 +686,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [toast, setLoading]);
 
   return (
-    <AppContext.Provider value={{ subjects, otherSubjects, createSubjectFromSyllabus, processExamPapers, deleteSubject, addSubjectToWorkspace, removeSubjectFromWorkspace, searchSubjects, getSubjectById, addPastPaperToSubject, updateExamQuestionScore, generateQuestionVariant, isLoading, setLoading }}>
+    <AppContext.Provider value={{ subjects, otherSubjects, isLevel3User, createSubjectFromSyllabus, processExamPapers, deleteSubject, addSubjectToWorkspace, removeSubjectFromWorkspace, searchSubjects, getSubjectById, addPastPaperToSubject, updateExamQuestionScore, generateQuestionVariant, isLoading, setLoading }}>
       {children}
     </AppContext.Provider>
   );

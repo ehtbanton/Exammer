@@ -22,7 +22,7 @@ export default function HomePage() {
 }
 
 function HomePageContent() {
-  const { subjects, otherSubjects, createSubjectFromSyllabus, processExamPapers, deleteSubject, addSubjectToWorkspace, removeSubjectFromWorkspace, searchSubjects, isLoading, setLoading } = useAppContext();
+  const { subjects, otherSubjects, isLevel3User, createSubjectFromSyllabus, processExamPapers, deleteSubject, addSubjectToWorkspace, removeSubjectFromWorkspace, searchSubjects, isLoading, setLoading } = useAppContext();
   const [navigatingTo, setNavigatingTo] = useState<string | null>(null);
   const [syllabusFile, setSyllabusFile] = useState<File | null>(null);
   const [uploadStage, setUploadStage] = useState<'initial' | 'syllabus' | 'papers'>('initial');
@@ -245,28 +245,29 @@ function HomePageContent() {
                   <Button asChild variant="default" size="sm" onClick={() => handleNavigate(subject.id)}>
                     <Link href={`/subject/${subject.id}`}>Study</Link>
                   </Button>
-                  {subject.isCreator ? (
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button variant="destructive" size="icon">
-                          <Trash2 />
-                          <span className="sr-only">Delete Subject</span>
-                        </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            This will permanently delete the "{subject.name}" subject and all its data. This action cannot be undone.
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>Cancel</AlertDialogCancel>
-                          <AlertDialogAction onClick={() => deleteSubject(subject.id)}>Delete</AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
-                  ) : (
+                  <div className="flex gap-2">
+                    {(subject.isCreator || isLevel3User) && (
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button variant="destructive" size="icon">
+                            <Trash2 />
+                            <span className="sr-only">Delete Subject</span>
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              This will permanently delete the "{subject.name}" subject and all its data. This action cannot be undone.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction onClick={() => deleteSubject(subject.id)}>Delete</AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    )}
                     <Button
                       variant="outline"
                       size="icon"
@@ -276,7 +277,7 @@ function HomePageContent() {
                       {isLoading(`remove-workspace-${subject.id}`) ? <LoadingSpinner /> : <UserMinus />}
                       <span className="sr-only">Remove from Workspace</span>
                     </Button>
-                  )}
+                  </div>
                 </CardFooter>
               </Card>
             ))}
