@@ -28,6 +28,7 @@ const AIPoweredInterviewOutputSchema = z.object({
   nextAssistantMessage: z.string().describe('The next message from the AI assistant in the interview.'),
   isCorrect: z.boolean().optional().describe('Whether the user has answered the question correctly.'),
   score: z.number().optional().describe('The score awarded for answering the question, out of 10.'),
+  currentScore: z.number().describe('The current score the user would receive if they stopped now, out of 10.'),
   chatHistory: z.array(z.object({
     role: z.enum(['user', 'assistant']),
     content: z.string(),
@@ -88,6 +89,7 @@ Here's the previous chat history:
 
 Output the nextAssistantMessage which contains your next message to the user.
 If the question is fully and correctly answered, set the isCorrect boolean to true and award the final score in the score field (out of 10).
+ALWAYS output currentScore (0-10) representing what the user would score if they stopped right now based on their current progress.
 Also output the updated chatHistory array, including the user answer (if any) and your assistant message.
 `,
     });
@@ -120,9 +122,9 @@ ${previousChatHistory.map(msg => `${msg.role}: ${msg.content}${msg.imageUrl ? ' 
 The user has provided a whiteboard drawing (see image) ${userAnswer ? `and the following text answer: ${userAnswer}` : ''}.
 
 Based on this answer and typical exam marking criteria for this type of question, provide the next step in the interview process:
-- If the answer is correct and complete according to exam standards, congratulate the user and award a score out of 10 based on the quality, completeness, and accuracy of the answer. Start your response with "CORRECT:" followed by the score.
-- If the answer is partially correct or incomplete, provide encouraging feedback and a helpful hint or follow-up question to guide them towards a more complete answer that would earn full marks.
-- If the answer is incorrect, provide constructive feedback and a guiding question to help them think about the problem differently.
+- If the answer is correct and complete according to exam standards, congratulate the user and award a score out of 10 based on the quality, completeness, and accuracy of the answer. Start your response with "CORRECT:" followed by the score, then "CURRENT:" followed by the current score.
+- If the answer is partially correct or incomplete, provide encouraging feedback and a helpful hint or follow-up question to guide them towards a more complete answer that would earn full marks. Start your response with "CURRENT:" followed by what they would score if they stopped now (0-10).
+- If the answer is incorrect, provide constructive feedback and a guiding question to help them think about the problem differently. Start your response with "CURRENT:" followed by what they would score if they stopped now (0-10).
 
 Use your knowledge of the subject matter from the topic context to assess the answer fairly.`},
           {media: {url: userImage, contentType: 'image/png'}}
@@ -132,7 +134,12 @@ Use your knowledge of the subject matter from the topic context to assess the an
       const text = response.text;
       const isCorrect = text.startsWith('CORRECT:');
       const score = isCorrect ? parseInt(text.match(/CORRECT:\s*(\d+)/)?.[1] || '0') : undefined;
-      const nextMessage = isCorrect ? text.replace(/CORRECT:\s*\d+\s*/, '') : text;
+      const currentScore = parseInt(text.match(/CURRENT:\s*(\d+)/)?.[1] || '0');
+      let nextMessage = text;
+      if (isCorrect) {
+        nextMessage = nextMessage.replace(/CORRECT:\s*\d+\s*/, '');
+      }
+      nextMessage = nextMessage.replace(/CURRENT:\s*\d+\s*/, '');
 
       const updatedChatHistory = [...previousChatHistory];
       if (userAnswer || userImage) {
@@ -149,6 +156,7 @@ Use your knowledge of the subject matter from the topic context to assess the an
         nextAssistantMessage: nextMessage,
         isCorrect,
         score,
+        currentScore,
         chatHistory: updatedChatHistory,
       };
     }
@@ -186,6 +194,7 @@ Use your knowledge of the subject matter from the topic context to assess the an
       nextAssistantMessage: output.nextAssistantMessage,
       isCorrect: output.isCorrect,
       score: output.score,
+      currentScore: output.currentScore,
       chatHistory: updatedChatHistory,
     };
   }, input);

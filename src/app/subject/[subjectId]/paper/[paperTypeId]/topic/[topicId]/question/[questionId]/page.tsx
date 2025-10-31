@@ -16,6 +16,8 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import { Send, User, Bot, ArrowLeft, MessageSquare, PenTool, Terminal } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
+import { Progress } from '@/components/ui/progress';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import PageSpinner from '@/components/PageSpinner';
@@ -55,6 +57,9 @@ function InterviewPageContent() {
   const [generatedVariant, setGeneratedVariant] = useState<string | null>(null);
   const [inputMode, setInputMode] = useState<'text' | 'whiteboard'>('text');
   const [accessLevel, setAccessLevel] = useState<number | null>(null);
+  const [currentScore, setCurrentScore] = useState<number>(0);
+  const [finalScore, setFinalScore] = useState<number | null>(null);
+  const [showExitDialog, setShowExitDialog] = useState(false);
 
   const scrollAreaViewport = useRef<HTMLDivElement>(null);
   const hasInitialized = useRef<string | false>(false);
@@ -176,19 +181,15 @@ function InterviewPageContent() {
         });
 
         setChatHistory(res.chatHistory);
+        setCurrentScore(res.currentScore || 0);
 
         if (res.isCorrect && res.score) {
           setIsCompleted(true);
-          if (paperType && topic) {
-            updateExamQuestionScore(subject.id, paperType.name, topic.name, examQuestion.id, res.score);
-          }
+          setFinalScore(res.score);
           toast({
             title: "Question Complete!",
-            description: `You scored ${res.score}/10. Redirecting back to topic...`,
+            description: `You scored ${res.score}/10. You can now exit to save your score.`,
           });
-          setTimeout(() => {
-            router.push(`/subject/${subjectId}/paper/${encodeURIComponent(paperTypeId)}/topic/${encodeURIComponent(topicId)}`);
-          }, 3000);
         }
       } catch (e) {
         toast({ variant: 'destructive', title: 'Dev Command Error', description: 'Failed to execute dev command.' });
@@ -218,19 +219,15 @@ function InterviewPageContent() {
       });
 
       setChatHistory(res.chatHistory);
+      setCurrentScore(res.currentScore || 0);
 
       if (res.isCorrect && res.score) {
         setIsCompleted(true);
-        if (paperType && topic) {
-            updateExamQuestionScore(subject.id, paperType.name, topic.name, examQuestion.id, res.score);
-        }
+        setFinalScore(res.score);
         toast({
           title: "Question Complete!",
-          description: `You scored ${res.score}/10. Redirecting back to topic...`,
+          description: `You scored ${res.score}/10. You can now exit to save your score.`,
         });
-        setTimeout(() => {
-          router.push(`/subject/${subjectId}/paper/${encodeURIComponent(paperTypeId)}/topic/${encodeURIComponent(topicId)}`);
-        }, 3000);
       }
     } catch (e) {
       toast({ variant: 'destructive', title: 'AI Error', description: 'Could not get AI response.' });
@@ -267,11 +264,35 @@ function InterviewPageContent() {
     return formatted.trim();
   };
 
+  const handleBackClick = () => {
+    if (chatHistory.length > 1) { // Has started answering
+      setShowExitDialog(true);
+    } else {
+      router.push(`/subject/${subjectId}/paper/${encodeURIComponent(paperTypeId)}/topic/${encodeURIComponent(topicId)}`);
+    }
+  };
+
+  const handleAcceptScore = () => {
+    const scoreToSave = finalScore !== null ? finalScore : currentScore;
+    if (paperType && topic && scoreToSave > 0) {
+      updateExamQuestionScore(subject.id, paperType.name, topic.name, examQuestion.id, scoreToSave);
+      toast({
+        title: "Score Saved",
+        description: `Your score of ${scoreToSave}/10 has been saved.`,
+      });
+    }
+    router.push(`/subject/${subjectId}/paper/${encodeURIComponent(paperTypeId)}/topic/${encodeURIComponent(topicId)}`);
+  };
+
+  const handleDiscardScore = () => {
+    router.push(`/subject/${subjectId}/paper/${encodeURIComponent(paperTypeId)}/topic/${encodeURIComponent(topicId)}`);
+  };
+
   return (
     <div className="container mx-auto h-[calc(100vh-6rem)] flex flex-col p-4">
       {/* Header with Back Button and Topic */}
       <div className="flex items-center justify-between mb-4 pb-3 border-b shrink-0">
-        <Button variant="ghost" onClick={() => router.push(`/subject/${subjectId}/paper/${encodeURIComponent(paperTypeId)}/topic/${encodeURIComponent(topicId)}`)}>
+        <Button variant="ghost" onClick={handleBackClick}>
           <ArrowLeft className="mr-2 h-4 w-4" />
           Back to Questions
         </Button>
@@ -280,14 +301,34 @@ function InterviewPageContent() {
         </div>
       </div>
 
+      {/* Exit Confirmation Dialog */}
+      <AlertDialog open={showExitDialog} onOpenChange={setShowExitDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Save Your Progress?</AlertDialogTitle>
+            <AlertDialogDescription>
+              You've made progress on this question. Would you like to save your current score of {finalScore !== null ? finalScore : currentScore}/10?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={handleDiscardScore}>Discard</AlertDialogCancel>
+            <AlertDialogAction onClick={handleAcceptScore}>Accept Score</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {/* Main Content - Question Left, Chat Right */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 flex-1 min-h-0 overflow-hidden">
         {/* Left Side - Question Display */}
         <div className="flex flex-col h-full overflow-hidden">
           <Card className="bg-primary/5 border-primary/20 flex-1 flex flex-col h-full overflow-hidden">
             <CardContent className="flex-1 flex flex-col p-0 h-full overflow-hidden">
-              <div className="p-6 pb-4 border-b">
-                <h2 className="text-sm font-semibold text-muted-foreground uppercase">Question</h2>
+              <div className="p-6 pb-4 border-b space-y-2">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-sm font-semibold text-muted-foreground uppercase">Question</h2>
+                  <span className="text-sm font-bold">{currentScore}/10</span>
+                </div>
+                <Progress value={currentScore * 10} className="h-2" />
               </div>
               {generatedVariant ? (
                 <>
