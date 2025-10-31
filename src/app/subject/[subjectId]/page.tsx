@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Progress } from '@/components/ui/progress';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import PageSpinner from '@/components/PageSpinner';
 import { ArrowLeft, BookCopy, FileText, List, Upload, Crown } from 'lucide-react';
@@ -252,6 +253,12 @@ function SubjectPageContent() {
               const hasScore = avgScore !== null;
               const hasQuestions = paperTypeHasQuestions(paperType);
 
+              // Calculate progress
+              const allQuestions = paperType.topics.flatMap(t => t.examQuestions || []);
+              const totalQuestions = allQuestions.length;
+              const attemptedQuestions = allQuestions.filter(q => q.attempts > 0).length;
+              const progressPercentage = totalQuestions > 0 ? (attemptedQuestions / totalQuestions) * 100 : 0;
+
               // Determine which style to use
               let boxStyle;
               if (hasScore) {
@@ -272,13 +279,16 @@ function SubjectPageContent() {
                   <CardHeader>
                     <CardTitle className="text-lg text-black">{paperType.name}</CardTitle>
                   </CardHeader>
-                  <CardContent>
+                  <CardContent className="space-y-2">
                     <div className="flex items-center justify-between">
-                      <p className="text-sm text-black">{paperType.topics.length} topics</p>
+                      <p className="text-sm text-black">{totalQuestions > 0 ? `${attemptedQuestions}/${totalQuestions} attempted` : `${paperType.topics.length} topics`}</p>
                       {hasScore && (
                         <p className="text-sm font-bold text-black">{avgScore.toFixed(1)}%</p>
                       )}
                     </div>
+                    {totalQuestions > 0 && (
+                      <Progress value={progressPercentage} className="h-2" />
+                    )}
                   </CardContent>
                 </Card>
               );

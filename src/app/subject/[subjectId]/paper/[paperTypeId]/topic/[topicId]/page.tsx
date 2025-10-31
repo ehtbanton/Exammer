@@ -6,7 +6,6 @@ import Link from 'next/link';
 import { useAppContext } from '@/app/context/AppContext';
 import { AuthGuard } from '@/components/AuthGuard';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ArrowLeft, AlertCircle } from 'lucide-react';
@@ -92,7 +91,7 @@ function TopicPageContent() {
       <p className="text-muted-foreground mb-8">Select a question to start practicing.</p>
 
       {topic.examQuestions.length > 0 ? (
-        <div className="space-y-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {topic.examQuestions.map(question => {
             const hasAttempts = question.attempts > 0;
             const boxStyle = hasAttempts ? getScoreColorStyle(question.score) : getUnattemptedBoxStyle();
@@ -100,27 +99,24 @@ function TopicPageContent() {
             return (
               <Card
                 key={question.id}
-                className="hover:shadow-[0_0_0_4px_white] transition-all cursor-pointer border-2"
+                className="hover:shadow-[0_0_0_4px_white] transition-all cursor-pointer h-full border-2"
                 style={boxStyle}
                 onClick={() => handleNavigate(question.id)}
               >
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <div className="flex-1">
-                    <CardTitle className="text-md font-medium text-black">{question.summary}</CardTitle>
-                  </div>
-                  <div className="text-right ml-4">
-                    {hasAttempts ? (
-                      <>
-                        <div className="text-sm font-bold text-black">{question.score.toFixed(1)}%</div>
-                        <div className="text-xs text-black">{question.attempts} attempt{question.attempts !== 1 ? 's' : ''}</div>
-                      </>
-                    ) : (
-                      <div className="text-sm text-gray-600">Not attempted</div>
-                    )}
-                  </div>
+                <CardHeader>
+                  <CardTitle className="text-lg text-black">{question.summary}</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <Progress value={hasAttempts ? question.score : 0} className="h-2" />
+                  <div className="flex items-center justify-between">
+                    {hasAttempts ? (
+                      <>
+                        <p className="text-sm text-black">{question.attempts} attempt{question.attempts !== 1 ? 's' : ''}</p>
+                        <p className="text-sm font-bold text-black">{question.score.toFixed(1)}%</p>
+                      </>
+                    ) : (
+                      <p className="text-sm text-gray-600">Not attempted</p>
+                    )}
+                  </div>
                 </CardContent>
               </Card>
             );

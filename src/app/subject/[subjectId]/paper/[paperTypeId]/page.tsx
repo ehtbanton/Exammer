@@ -7,6 +7,7 @@ import { useAppContext } from '@/app/context/AppContext';
 import { AuthGuard } from '@/components/AuthGuard';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Progress } from '@/components/ui/progress';
 import PageSpinner from '@/components/PageSpinner';
 import { ArrowLeft, BookCopy } from 'lucide-react';
 import { Topic } from '@/lib/types';
@@ -116,6 +117,11 @@ function PaperTypePageContent() {
               const hasScore = avgScore !== null;
               const hasQuestions = topic.examQuestions && topic.examQuestions.length > 0;
 
+              // Calculate progress
+              const totalQuestions = topic.examQuestions?.length || 0;
+              const attemptedQuestions = topic.examQuestions?.filter(q => q.attempts > 0).length || 0;
+              const progressPercentage = totalQuestions > 0 ? (attemptedQuestions / totalQuestions) * 100 : 0;
+
               // Determine which style to use
               let boxStyle;
               if (hasScore) {
@@ -135,13 +141,16 @@ function PaperTypePageContent() {
                     <CardHeader>
                       <CardTitle className="text-lg text-black">{topic.name}</CardTitle>
                     </CardHeader>
-                    <CardContent>
+                    <CardContent className="space-y-2">
                       <div className="flex items-center justify-between">
-                        <p className="text-sm text-black">{topic.examQuestions?.length > 0 ? `${topic.examQuestions.length} questions` : 'No questions yet'}</p>
+                        <p className="text-sm text-black">{totalQuestions > 0 ? `${attemptedQuestions}/${totalQuestions} attempted` : 'No questions yet'}</p>
                         {hasScore && (
                           <p className="text-sm font-bold text-black">{avgScore.toFixed(1)}%</p>
                         )}
                       </div>
+                      {totalQuestions > 0 && (
+                        <Progress value={progressPercentage} className="h-2" />
+                      )}
                     </CardContent>
                   </Card>
                 </Link>
