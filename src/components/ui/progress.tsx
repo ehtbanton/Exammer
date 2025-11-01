@@ -12,14 +12,18 @@ const Progress = React.forwardRef<
   <ProgressPrimitive.Root
     ref={ref}
     className={cn(
-      "relative h-4 w-full overflow-hidden rounded-full bg-secondary",
+      "relative h-4 w-full overflow-hidden rounded-full",
       className
     )}
+    style={{ backgroundColor: 'rgb(64, 64, 64)' }}
     {...props}
   >
     <ProgressPrimitive.Indicator
-      className="h-full w-full flex-1 bg-primary transition-all"
-      style={{ transform: `translateX(-${100 - (value || 0)}%)` }}
+      className="h-full w-full flex-1 transition-all"
+      style={{
+        transform: `translateX(-${100 - (value || 0)}%)`,
+        backgroundColor: 'rgb(249, 249, 249)'
+      }}
     />
   </ProgressPrimitive.Root>
 ))

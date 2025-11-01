@@ -99,7 +99,7 @@ function TopicPageContent() {
             return (
               <Card
                 key={question.id}
-                className="hover:shadow-[0_0_0_4px_white] transition-all cursor-pointer h-full border-2"
+                className="hover:shadow-[0_0_0_4px_rgb(55,65,81)] dark:hover:shadow-[0_0_0_4px_white] transition-all cursor-pointer h-full border-2"
                 style={boxStyle}
                 onClick={() => handleNavigate(question.id)}
               >
