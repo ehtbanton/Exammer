@@ -16,6 +16,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { LogOut, User, Terminal, ArrowLeft } from 'lucide-react';
+import { ThemeToggle } from './theme-toggle';
 
 export default function Header() {
   const { data: session, status } = useSession();
@@ -68,6 +69,7 @@ export default function Header() {
           </Link>
 
           <div className="flex items-center gap-4">
+            <ThemeToggle />
             {status === 'loading' ? (
               <div className="h-8 w-8 rounded-full bg-gray-200 animate-pulse" />
             ) : session ? (
