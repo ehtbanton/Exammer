@@ -233,6 +233,7 @@ export class DatabaseMigrator {
         case 'create_index':
         case 'migrate_data':
         case 'recreate_indexes':
+        case 'add_column':
           if (step.sql) {
             await this.run(step.sql);
             console.log(`    ✓ Executed SQL`);
@@ -302,6 +303,102 @@ export class DatabaseMigrator {
   }
 
   /**
+   * Verify that the schema actually matches the expected version
+   * Returns true if schema is correct, false if it needs repair
+   */
+  private async verifySchemaForVersion(version: number): Promise<boolean> {
+    if (version === 3) {
+      // Check if version 3 columns actually exist
+      try {
+        const columns = await this.all<{ name: string }>(
+          "PRAGMA table_info(questions)"
+        );
+        const columnNames = columns.map(c => c.name);
+
+        const hasSolutionObjectives = columnNames.includes('solution_objectives');
+        const hasMarkschemeId = columnNames.includes('markscheme_id');
+
+        if (!hasSolutionObjectives || !hasMarkschemeId) {
+          console.log('⚠ Version 3 schema verification failed: missing columns in questions table');
+          return false;
+        }
+
+        const userProgressColumns = await this.all<{ name: string }>(
+          "PRAGMA table_info(user_progress)"
+        );
+        const upColumnNames = userProgressColumns.map(c => c.name);
+
+        const hasCompletedObjectives = upColumnNames.includes('completed_objectives');
+
+        if (!hasCompletedObjectives) {
+          console.log('⚠ Version 3 schema verification failed: missing columns in user_progress table');
+          return false;
+        }
+
+        // Check if markschemes table exists
+        const tables = await this.all<{ name: string }>(
+          "SELECT name FROM sqlite_master WHERE type='table' AND name='markschemes'"
+        );
+
+        if (tables.length === 0) {
+          console.log('⚠ Version 3 schema verification failed: markschemes table missing');
+          return false;
+        }
+
+        return true;
+      } catch (error) {
+        console.error('Error verifying schema:', error);
+        return false;
+      }
+    }
+
+    return true; // For other versions, assume they're correct
+  }
+
+  /**
+   * Re-apply migration steps for the current version (used when schema verification fails)
+   */
+  private async repairVersion(version: number): Promise<void> {
+    const versionInfo = this.versionSpec.versions[version.toString()];
+
+    if (!versionInfo || !versionInfo.migration) {
+      console.log(`No migration steps to repair version ${version}`);
+      return;
+    }
+
+    console.log(`\n🔧 Repairing version ${version}: ${versionInfo.description}`);
+
+    // Begin transaction
+    await this.run('BEGIN TRANSACTION');
+
+    try {
+      // Apply each migration step
+      for (let i = 0; i < versionInfo.migration.steps.length; i++) {
+        const step = versionInfo.migration.steps[i];
+        try {
+          await this.applyMigrationStep(step, i);
+        } catch (error: any) {
+          // If column already exists, that's ok - continue
+          if (error.message && error.message.includes('duplicate column')) {
+            console.log(`    ℹ Column already exists, skipping`);
+          } else {
+            throw error;
+          }
+        }
+      }
+
+      // Commit transaction
+      await this.run('COMMIT');
+
+      console.log(`✅ Successfully repaired version ${version}\n`);
+    } catch (error) {
+      // Rollback on error
+      await this.run('ROLLBACK');
+      throw error;
+    }
+  }
+
+  /**
    * Check and perform migrations if needed
    */
   async checkAndMigrate(): Promise<void> {
@@ -316,7 +413,17 @@ export class DatabaseMigrator {
     console.log(`Target version: ${targetVersion}`);
 
     if (currentVersion === targetVersion) {
-      console.log('✓ Database is up to date!\n');
+      // Verify the schema actually matches
+      const schemaIsValid = await this.verifySchemaForVersion(currentVersion);
+
+      if (!schemaIsValid) {
+        console.log('⚠ Database version is correct but schema is incomplete');
+        console.log('🔧 Repairing schema...\n');
+        await this.repairVersion(currentVersion);
+        console.log('✓ Schema repair complete!\n');
+      } else {
+        console.log('✓ Database is up to date!\n');
+      }
       return;
     }
 
