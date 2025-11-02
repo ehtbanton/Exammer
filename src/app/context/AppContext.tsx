@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
-import type { Subject, Topic, ExamQuestion, PastPaper, PaperType } from '@/lib/types';
+import type { Subject, Topic, ExamQuestion, PastPaper, PaperType, Markscheme } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { decomposeSyllabus } from '@/ai/flows/decompose-syllabus-into-topics';
 import { generateSimilarQuestion } from '@/ai/flows/generate-similar-question';
@@ -13,7 +13,7 @@ interface AppContextType {
   otherSubjects: Subject[];
   isLevel3User: boolean;
   createSubjectFromSyllabus: (syllabusFile: File) => Promise<void>;
-  processExamPapers: (subjectId: string, examPapers: File[]) => Promise<void>;
+  processExamPapers: (subjectId: string, examPapers: File[], markschemes?: File[]) => Promise<void>;
   deleteSubject: (subjectId: string) => Promise<void>;
   addSubjectToWorkspace: (subjectId: string) => Promise<void>;
   removeSubjectFromWorkspace: (subjectId: string) => Promise<void>;
@@ -21,7 +21,7 @@ interface AppContextType {
   getSubjectById: (subjectId: string) => Subject | undefined;
   addPastPaperToSubject: (subjectId: string, paperFile: File) => Promise<void>;
   updateExamQuestionScore: (subjectId: string, paperTypeName: string, topicName: string, questionId: string, score: number) => void;
-  generateQuestionVariant: (subjectId: string, paperTypeId: string, topicId: string, questionId: string) => Promise<string>;
+  generateQuestionVariant: (subjectId: string, paperTypeId: string, topicId: string, questionId: string) => Promise<{ questionText: string; solutionObjectives: string[] }>;
   isLoading: (key: string) => boolean;
   setLoading: (key: string, value: boolean) => void;
 }
@@ -253,7 +253,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, [toast, setLoading]);
 
-  const processExamPapers = useCallback(async (subjectId: string, examPapers: File[]) => {
+  const processExamPapers = useCallback(async (subjectId: string, examPapers: File[], markschemes: File[] = []) => {
     const loadingKey = `process-papers-${subjectId}`;
     setLoading(loadingKey, true);
 
@@ -266,6 +266,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
       // Pre-process exam papers for storage
       const examPapersDataUris = await Promise.all(examPapers.map(file => fileToDataURI(file)));
+
+      // Pre-process markschemes for storage
+      const markschemesDataUris = await Promise.all(markschemes.map(file => fileToDataURI(file)));
 
       // Persist past papers to database
       const pastPapers: PastPaper[] = [];
@@ -294,9 +297,40 @@ export function AppProvider({ children }: { children: ReactNode }) {
         });
       }
 
-      // Update local state with persisted papers
+      // Persist markschemes to database
+      const dbMarkschemes: Markscheme[] = [];
+      for (const markschemeFile of markschemes) {
+        const markschemeContent = await fileToString(markschemeFile);
+
+        // Save to database via API
+        const response = await fetch(`/api/subjects/${subjectId}/markschemes`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: markschemeFile.name,
+            content: markschemeContent
+          })
+        });
+
+        if (!response.ok) {
+          throw new Error(`Failed to save markscheme: ${markschemeFile.name}`);
+        }
+
+        const dbMarkscheme = await response.json();
+        dbMarkschemes.push({
+          id: dbMarkscheme.id.toString(),
+          name: dbMarkscheme.name,
+          content: dbMarkscheme.content,
+        });
+      }
+
+      // Update local state with persisted papers and markschemes
       setSubjects(prev => prev.map(s =>
-        s.id === subjectId ? { ...s, pastPapers: [...s.pastPapers, ...pastPapers] } : s
+        s.id === subjectId ? {
+          ...s,
+          pastPapers: [...s.pastPapers, ...pastPapers],
+          markschemes: [...(s.markschemes || []), ...dbMarkschemes]
+        } : s
       ));
 
       // Check if Process A exists and is not yet complete
@@ -344,7 +378,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           }
 
           // Use batch API endpoint for parallel processing on server
-          console.log(`[Process B] Calling batch API to extract ${examPapersDataUris.length} papers in parallel`);
+          console.log(`[Process B] Calling batch API to extract ${examPapersDataUris.length} papers with ${markschemesDataUris.length} markschemes in parallel`);
 
           const batchResponse = await fetch('/api/extract-questions-batch', {
             method: 'POST',
@@ -352,6 +386,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
             body: JSON.stringify({
               subjectId,
               examPapersDataUris,
+              markschemesDataUris,
               paperTypes
             })
           });
@@ -554,7 +589,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, [toast]);
 
-  const generateQuestionVariant = useCallback(async (subjectId: string, paperTypeId: string, topicId: string, questionId: string): Promise<string> => {
+  const generateQuestionVariant = useCallback(async (subjectId: string, paperTypeId: string, topicId: string, questionId: string): Promise<{ questionText: string; solutionObjectives: string[] }> => {
     // Find the question to generate a variant for
     const subject = subjects.find(s => s.id === subjectId);
     if (!subject) throw new Error('Subject not found');
@@ -568,18 +603,26 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const question = topic.examQuestions.find(q => q.id === questionId);
     if (!question) throw new Error('Question not found');
 
-    console.log('[Process C] Generating similar question variant...');
+    if (!question.solutionObjectives || question.solutionObjectives.length === 0) {
+      throw new Error('Question has no solution objectives - cannot generate variant');
+    }
+
+    console.log('[Process C] Generating similar question variant with adapted objectives...');
 
     // Generate the variant directly (synchronously from the caller's perspective)
     const result = await generateSimilarQuestion({
       originalQuestionText: question.questionText,
       topicName: topic.name,
       topicDescription: topic.description,
+      originalObjectives: question.solutionObjectives,
     });
 
-    console.log('[Process C] Question variant generated successfully');
+    console.log('[Process C] Question variant generated successfully with', result.solutionObjectives.length, 'adapted objectives');
 
-    return result.questionText;
+    return {
+      questionText: result.questionText,
+      solutionObjectives: result.solutionObjectives,
+    };
   }, [subjects]);
 
   const addSubjectToWorkspace = useCallback(async (subjectId: string) => {

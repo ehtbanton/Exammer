@@ -53,13 +53,12 @@ function InterviewPageContent() {
   const [chatHistory, setChatHistory] = useState<ChatHistory>([]);
   const [userInput, setUserInput] = useState('');
   const [isLoading, setIsLoading] = useState(true);
-  const [isCompleted, setIsCompleted] = useState(false);
-  const [generatedVariant, setGeneratedVariant] = useState<string | null>(null);
+  const [generatedVariant, setGeneratedVariant] = useState<{questionText: string; solutionObjectives: string[]} | null>(null);
   const [inputMode, setInputMode] = useState<'text' | 'whiteboard'>('text');
   const [accessLevel, setAccessLevel] = useState<number | null>(null);
-  const [currentScore, setCurrentScore] = useState<number>(0);
-  const [finalScore, setFinalScore] = useState<number | null>(null);
+  const [completedObjectives, setCompletedObjectives] = useState<number[]>([]);
   const [showExitDialog, setShowExitDialog] = useState(false);
+  const [noMarkscheme, setNoMarkscheme] = useState(false);
 
   const scrollAreaViewport = useRef<HTMLDivElement>(null);
   const hasInitialized = useRef<string | false>(false);
@@ -118,21 +117,29 @@ function InterviewPageContent() {
       setIsLoading(true);
       try {
         // Generate a fresh variant EVERY time
-        console.log('Generating question variant...');
-        const variant = await generateQuestionVariant(subject.id, paperType.id, topic.id, examQuestion.id);
-        setGeneratedVariant(variant);
-        console.log('Question variant generated successfully');
+        console.log('Generating question variant with adapted objectives...');
+        const variantData = await generateQuestionVariant(subject.id, paperType.id, topic.id, examQuestion.id);
+        setGeneratedVariant(variantData);
+        console.log('Question variant generated successfully with', variantData.solutionObjectives.length, 'objectives');
 
-        // Start the interview with the generated variant
-        console.log('Calling aiPoweredInterview with generated variant...');
+        // Start the interview with the generated variant and objectives
+        console.log('Calling aiPoweredInterview with generated variant and objectives...');
         const res = await aiPoweredInterview({
-          subsection: examQuestion.summary, // Using summary as context
-          question: variant, // Use the generated variant
+          subsection: examQuestion.summary,
+          question: variantData.questionText,
+          solutionObjectives: variantData.solutionObjectives,
+          previouslyCompletedObjectives: [],
         });
         console.log('Interview started, chat history:', res.chatHistory);
         setChatHistory(res.chatHistory);
-      } catch (e) {
-        toast({ variant: 'destructive', title: 'AI Error', description: 'Could not start the interview.' });
+        setCompletedObjectives(res.completedObjectives || []);
+      } catch (e: any) {
+        if (e.message?.includes('no solution objectives')) {
+          setNoMarkscheme(true);
+          toast({ variant: 'destructive', title: 'No Markscheme', description: 'This question has no markscheme objectives.' });
+        } else {
+          toast({ variant: 'destructive', title: 'AI Error', description: 'Could not start the interview.' });
+        }
         console.error(e);
         hasInitialized.current = false; // Reset on error so user can retry
       } finally {
@@ -161,7 +168,7 @@ function InterviewPageContent() {
 
         const devResult = await executeDevCommand({
           command: currentInput,
-          question: generatedVariant,
+          question: generatedVariant.questionText,
           subsection: examQuestion.summary,
         });
 
@@ -177,20 +184,13 @@ function InterviewPageContent() {
           subsection: examQuestion.summary,
           userAnswer: devResult.generatedAnswer,
           previousChatHistory: chatHistory,
-          question: generatedVariant,
+          question: generatedVariant.questionText,
+          solutionObjectives: generatedVariant.solutionObjectives,
+          previouslyCompletedObjectives: completedObjectives,
         });
 
         setChatHistory(res.chatHistory);
-        setCurrentScore(res.currentScore || 0);
-
-        if (res.isCorrect && res.score) {
-          setIsCompleted(true);
-          setFinalScore(res.score);
-          toast({
-            title: "Question Complete!",
-            description: `You scored ${res.score}/10. You can now exit to save your score.`,
-          });
-        }
+        setCompletedObjectives(res.completedObjectives || []);
       } catch (e) {
         toast({ variant: 'destructive', title: 'Dev Command Error', description: 'Failed to execute dev command.' });
         console.error(e);
@@ -215,20 +215,17 @@ function InterviewPageContent() {
         userAnswer: currentInput || undefined,
         userImage: imageData,
         previousChatHistory: chatHistory,
-        question: generatedVariant, // Always use the generated variant
+        question: generatedVariant.questionText,
+        solutionObjectives: generatedVariant.solutionObjectives,
+        previouslyCompletedObjectives: completedObjectives,
       });
 
       setChatHistory(res.chatHistory);
-      setCurrentScore(res.currentScore || 0);
-
-      if (res.isCorrect && res.score) {
-        setIsCompleted(true);
-        setFinalScore(res.score);
-        toast({
-          title: "Question Complete!",
-          description: `You scored ${res.score}/10. You can now exit to save your score.`,
-        });
-      }
+      // Ensure immutability - merge new objectives with existing ones
+      setCompletedObjectives(prevCompleted => {
+        const newSet = new Set([...prevCompleted, ...res.completedObjectives]);
+        return Array.from(newSet).sort((a, b) => a - b);
+      });
     } catch (e) {
       toast({ variant: 'destructive', title: 'AI Error', description: 'Could not get AI response.' });
       console.error(e);
@@ -273,18 +270,20 @@ function InterviewPageContent() {
   };
 
   const handleAcceptScore = () => {
-    const scoreToSave = finalScore !== null ? finalScore : currentScore;
-    if (paperType && topic && scoreToSave > 0) {
-      updateExamQuestionScore(subject.id, paperType.name, topic.name, examQuestion.id, scoreToSave);
+    if (paperType && topic && completedObjectives.length > 0 && generatedVariant) {
+      // Calculate score as percentage of objectives completed
+      const totalObjectives = generatedVariant.solutionObjectives.length;
+      const percentageScore = (completedObjectives.length / totalObjectives) * 100;
+      updateExamQuestionScore(subject.id, paperType.name, topic.name, examQuestion.id, percentageScore);
       toast({
-        title: "Score Saved",
-        description: `Your score of ${scoreToSave}/10 has been saved.`,
+        title: "Progress Saved",
+        description: `Completed ${completedObjectives.length}/${totalObjectives} objectives.`,
       });
     }
     router.push(`/subject/${subjectId}/paper/${encodeURIComponent(paperTypeId)}/topic/${encodeURIComponent(topicId)}`);
   };
 
-  const handleDiscardScore = () => {
+  const handleDiscardProgress = () => {
     router.push(`/subject/${subjectId}/paper/${encodeURIComponent(paperTypeId)}/topic/${encodeURIComponent(topicId)}`);
   };
 
@@ -307,12 +306,16 @@ function InterviewPageContent() {
           <AlertDialogHeader>
             <AlertDialogTitle>Save Your Progress?</AlertDialogTitle>
             <AlertDialogDescription>
-              You've made progress on this question. Would you like to save your current score of {finalScore !== null ? finalScore : currentScore}/10?
+              {generatedVariant ? (
+                `You've completed ${completedObjectives.length}/${generatedVariant.solutionObjectives.length} objectives. Would you like to save your progress?`
+              ) : (
+                'Would you like to save your progress on this question?'
+              )}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={handleDiscardScore}>Discard</AlertDialogCancel>
-            <AlertDialogAction onClick={handleAcceptScore}>Accept Score</AlertDialogAction>
+            <AlertDialogCancel onClick={handleDiscardProgress}>Discard</AlertDialogCancel>
+            <AlertDialogAction onClick={handleAcceptScore}>Save Progress</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -323,31 +326,59 @@ function InterviewPageContent() {
         <div className="flex flex-col h-full overflow-hidden">
           <Card className="bg-primary/5 border-primary/20 flex-1 flex flex-col h-full overflow-hidden">
             <CardContent className="flex-1 flex flex-col p-0 h-full overflow-hidden">
-              <div className="p-6 pb-4 border-b space-y-2">
-                <div className="flex items-center justify-between">
-                  <h2 className="text-sm font-semibold text-muted-foreground uppercase">Question</h2>
-                  <span className="text-sm font-bold">{currentScore}/10</span>
-                </div>
-                <Progress value={currentScore * 10} className="h-2" />
-              </div>
-              {generatedVariant ? (
-                <>
-                  <ScrollArea className="flex-1 p-6 overflow-auto">
-                    <div className="prose prose-base max-w-none dark:prose-invert">
-                      <div className="text-base leading-relaxed whitespace-pre-wrap break-words font-normal">
-                        {formatQuestionText(generatedVariant)}
-                      </div>
-                    </div>
-                  </ScrollArea>
-                  <div className="p-4 border-t shrink-0">
-                    <p className="text-xs text-muted-foreground italic">✨ Similar question generated for practice</p>
+              {noMarkscheme ? (
+                <div className="flex items-center justify-center flex-1 p-6">
+                  <div className="text-center space-y-2">
+                    <p className="text-lg font-bold text-destructive">NO MARKSCHEME FOUND</p>
+                    <p className="text-sm text-muted-foreground">This question cannot be attempted without marking objectives.</p>
                   </div>
-                </>
-              ) : (
-                <div className="flex items-center justify-center gap-3 flex-1 overflow-hidden">
-                  <LoadingSpinner className="w-5 h-5" />
-                  <p className="text-sm text-muted-foreground">Generating similar question...</p>
                 </div>
+              ) : (
+                <>
+                  <div className="p-6 pb-4 border-b space-y-2">
+                    <div className="flex items-center justify-between">
+                      <h2 className="text-sm font-semibold text-muted-foreground uppercase">Question</h2>
+                      {generatedVariant && (
+                        <span className="text-sm font-bold">{completedObjectives.length}/{generatedVariant.solutionObjectives.length} objectives</span>
+                      )}
+                    </div>
+                    {generatedVariant && (
+                      <Progress value={(completedObjectives.length / generatedVariant.solutionObjectives.length) * 100} className="h-2" />
+                    )}
+                  </div>
+                  {generatedVariant ? (
+                    <>
+                      <ScrollArea className="flex-1 p-6 overflow-auto">
+                        <div className="prose prose-base max-w-none dark:prose-invert">
+                          <div className="text-base leading-relaxed whitespace-pre-wrap break-words font-normal">
+                            {formatQuestionText(generatedVariant.questionText)}
+                          </div>
+                        </div>
+                        {completedObjectives.length > 0 && (
+                          <div className="mt-6 p-4 bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-lg">
+                            <h3 className="text-sm font-semibold mb-2 text-green-800 dark:text-green-200">✓ Objectives Achieved:</h3>
+                            <ul className="space-y-1">
+                              {completedObjectives.map(idx => (
+                                <li key={idx} className="text-sm text-green-700 dark:text-green-300 flex items-start gap-2">
+                                  <span className="font-mono text-xs mt-0.5">[{idx}]</span>
+                                  <span>{generatedVariant.solutionObjectives[idx]}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                      </ScrollArea>
+                      <div className="p-4 border-t shrink-0">
+                        <p className="text-xs text-muted-foreground italic">✨ Similar question generated for practice</p>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="flex items-center justify-center gap-3 flex-1 overflow-hidden">
+                      <LoadingSpinner className="w-5 h-5" />
+                      <p className="text-sm text-muted-foreground">Generating similar question...</p>
+                    </div>
+                  )}
+                </>
               )}
             </CardContent>
           </Card>

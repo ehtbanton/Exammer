@@ -77,6 +77,16 @@ CREATE TABLE IF NOT EXISTS past_papers (
   FOREIGN KEY (subject_id) REFERENCES subjects(id) ON DELETE CASCADE
 );
 
+-- Markschemes table
+CREATE TABLE IF NOT EXISTS markschemes (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  subject_id INTEGER NOT NULL,
+  name TEXT NOT NULL,
+  content TEXT NOT NULL,
+  created_at INTEGER DEFAULT (unixepoch()),
+  FOREIGN KEY (subject_id) REFERENCES subjects(id) ON DELETE CASCADE
+);
+
 -- Paper types table
 CREATE TABLE IF NOT EXISTS paper_types (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -102,8 +112,11 @@ CREATE TABLE IF NOT EXISTS questions (
   topic_id INTEGER NOT NULL,
   question_text TEXT NOT NULL,
   summary TEXT NOT NULL,
+  solution_objectives TEXT,
+  markscheme_id INTEGER,
   created_at INTEGER DEFAULT (unixepoch()),
-  FOREIGN KEY (topic_id) REFERENCES topics(id) ON DELETE CASCADE
+  FOREIGN KEY (topic_id) REFERENCES topics(id) ON DELETE CASCADE,
+  FOREIGN KEY (markscheme_id) REFERENCES markschemes(id) ON DELETE SET NULL
 );
 
 -- User progress table (tracks scores and attempts for each question)
@@ -114,6 +127,7 @@ CREATE TABLE IF NOT EXISTS user_progress (
   score INTEGER DEFAULT 0,
   attempts INTEGER DEFAULT 0,
   score_history TEXT DEFAULT '[]',
+  completed_objectives TEXT DEFAULT '[]',
   updated_at INTEGER DEFAULT (unixepoch()),
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
   FOREIGN KEY (question_id) REFERENCES questions(id) ON DELETE CASCADE,
@@ -128,6 +142,7 @@ CREATE INDEX IF NOT EXISTS idx_subjects_name ON subjects(name);
 CREATE INDEX IF NOT EXISTS idx_user_workspaces_user_id ON user_workspaces(user_id);
 CREATE INDEX IF NOT EXISTS idx_user_workspaces_subject_id ON user_workspaces(subject_id);
 CREATE INDEX IF NOT EXISTS idx_past_papers_subject_id ON past_papers(subject_id);
+CREATE INDEX IF NOT EXISTS idx_markschemes_subject_id ON markschemes(subject_id);
 CREATE INDEX IF NOT EXISTS idx_paper_types_subject_id ON paper_types(subject_id);
 CREATE INDEX IF NOT EXISTS idx_topics_paper_type_id ON topics(paper_type_id);
 CREATE INDEX IF NOT EXISTS idx_questions_topic_id ON questions(topic_id);

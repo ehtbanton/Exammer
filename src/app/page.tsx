@@ -25,12 +25,14 @@ function HomePageContent() {
   const { subjects, otherSubjects, isLevel3User, createSubjectFromSyllabus, processExamPapers, deleteSubject, addSubjectToWorkspace, removeSubjectFromWorkspace, searchSubjects, isLoading, setLoading } = useAppContext();
   const [navigatingTo, setNavigatingTo] = useState<string | null>(null);
   const [syllabusFile, setSyllabusFile] = useState<File | null>(null);
-  const [uploadStage, setUploadStage] = useState<'initial' | 'syllabus' | 'papers'>('initial');
+  const [uploadStage, setUploadStage] = useState<'initial' | 'syllabus' | 'papers' | 'markschemes'>('initial');
   const [examPapers, setExamPapers] = useState<File[]>([]);
+  const [markschemes, setMarkschemes] = useState<File[]>([]);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [hasSearched, setHasSearched] = useState<boolean>(false);
   const syllabusInputRef = useRef<HTMLInputElement>(null);
   const examPapersInputRef = useRef<HTMLInputElement>(null);
+  const markschemesInputRef = useRef<HTMLInputElement>(null);
 
   const handleSyllabusSelect = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -52,20 +54,35 @@ function HomePageContent() {
     setExamPapers(prev => prev.filter((_, i) => i !== index));
   };
 
+  const handleMarkschemesSelect = (e: ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    setMarkschemes(prev => [...prev, ...files]);
+  };
+
+  const removeMarkscheme = (index: number) => {
+    setMarkschemes(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleContinueToMarkschemes = () => {
+    setUploadStage('markschemes');
+  };
+
   const handleFinishUpload = async () => {
     if (subjects.length > 0 && examPapers.length > 0) {
       const latestSubject = subjects[subjects.length - 1];
-      await processExamPapers(latestSubject.id, examPapers);
+      await processExamPapers(latestSubject.id, examPapers, markschemes);
     }
     // Reset and close
     setSyllabusFile(null);
     setExamPapers([]);
+    setMarkschemes([]);
     setUploadStage('initial');
   };
 
   const handleSkipPapers = () => {
     setSyllabusFile(null);
     setExamPapers([]);
+    setMarkschemes([]);
     setUploadStage('initial');
   };
 
@@ -121,9 +138,17 @@ function HomePageContent() {
         onChange={handleExamPapersSelect}
         multiple
       />
+      <Input
+        type="file"
+        accept=".pdf,.txt,.md"
+        ref={markschemesInputRef}
+        className="hidden"
+        onChange={handleMarkschemesSelect}
+        multiple
+      />
 
       {/* Upload Dialog */}
-      <AlertDialog open={uploadStage === 'syllabus' || uploadStage === 'papers'} onOpenChange={(open) => !open && handleSkipPapers()}>
+      <AlertDialog open={uploadStage === 'syllabus' || uploadStage === 'papers' || uploadStage === 'markschemes'} onOpenChange={(open) => !open && handleSkipPapers()}>
         <AlertDialogContent className="max-w-2xl">
           {uploadStage === 'syllabus' && (
             <>
@@ -207,8 +232,68 @@ function HomePageContent() {
                   Skip for Now
                 </AlertDialogCancel>
                 <AlertDialogAction
+                  onClick={handleContinueToMarkschemes}
+                  disabled={examPapers.length === 0}
+                >
+                  Continue
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </>
+          )}
+
+          {uploadStage === 'markschemes' && (
+            <>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Upload Markschemes</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Upload the markschemes for your past papers. We'll use these to extract solution objectives and track your progress accurately.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+
+              <div className="space-y-4">
+                <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                  <p className="text-sm text-blue-800 dark:text-blue-200">
+                    <strong>Note:</strong> Upload all markschemes. We'll automatically match them to the corresponding papers.
+                  </p>
+                </div>
+
+                <div>
+                  <Button
+                    variant="outline"
+                    onClick={() => markschemesInputRef.current?.click()}
+                    type="button"
+                    className="w-full"
+                  >
+                    <FileText className="mr-2 h-4 w-4" />
+                    Add Markschemes
+                  </Button>
+
+                  {markschemes.length > 0 && (
+                    <div className="mt-3 max-h-64 overflow-y-auto border rounded-md p-2 space-y-2">
+                      {markschemes.map((markscheme, index) => (
+                        <div key={index} className="flex items-center justify-between p-2 bg-muted rounded">
+                          <span className="text-sm truncate flex-1 mr-2">{markscheme.name}</span>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => removeMarkscheme(index)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <AlertDialogFooter>
+                <AlertDialogCancel onClick={handleSkipPapers}>
+                  Skip for Now
+                </AlertDialogCancel>
+                <AlertDialogAction
                   onClick={handleFinishUpload}
-                  disabled={examPapers.length === 0 || isLoading(`process-papers-${subjects[subjects.length - 1]?.id}`)}
+                  disabled={markschemes.length === 0 || isLoading(`process-papers-${subjects[subjects.length - 1]?.id}`)}
                 >
                   {isLoading(`process-papers-${subjects[subjects.length - 1]?.id}`) ? <LoadingSpinner /> : 'Finish'}
                 </AlertDialogAction>

@@ -21,14 +21,15 @@ const AIPoweredInterviewInputSchema = z.object({
     imageUrl: z.string().optional(),
   })).optional().describe('The previous chat history between the user and the assistant.'),
   question: z.string().describe('The exam question being asked to the student.'),
+  solutionObjectives: z.array(z.string()).describe('List of specific marking objectives/criteria that the student must achieve to gain full marks.'),
+  previouslyCompletedObjectives: z.array(z.number()).optional().describe('Array of objective indices (0-based) that the user has already completed. These cannot be undone.'),
 });
 export type AIPoweredInterviewInput = z.infer<typeof AIPoweredInterviewInputSchema>;
 
 const AIPoweredInterviewOutputSchema = z.object({
   nextAssistantMessage: z.string().describe('The next message from the AI assistant in the interview.'),
-  isCorrect: z.boolean().optional().describe('Whether the user has answered the question correctly.'),
-  score: z.number().optional().describe('The score awarded for answering the question, out of 10.'),
-  currentScore: z.number().describe('The current score the user would receive if they stopped now, out of 10.'),
+  completedObjectives: z.array(z.number()).describe('Array of objective indices (0-based) that the user has now achieved.'),
+  hints: z.array(z.string()).describe('Helpful hints for objectives that have not yet been achieved.'),
   chatHistory: z.array(z.object({
     role: z.enum(['user', 'assistant']),
     content: z.string(),
@@ -55,12 +56,26 @@ export async function aiPoweredInterview(input: AIPoweredInterviewInput): Promis
       name: 'aiPoweredInterviewPrompt',
       input: {schema: AIPoweredInterviewInputSchema},
       output: {schema: AIPoweredInterviewOutputSchema},
-      prompt: `You are an AI assistant designed to help students learn material by conducting interview-style conversations. You are helping the student answer a real exam question.
+      prompt: `You are an AI assistant designed to help students learn material by conducting interview-style conversations. You are helping the student answer a real exam question using a markscheme-based approach.
 
 Topic context: {{{subsection}}}
 
 The exam question the student is working on:
 {{{question}}}
+
+Marking Objectives (from official markscheme):
+{{#each solutionObjectives}}
+  [{{@index}}] {{{this}}}
+{{/each}}
+
+Previously Completed Objectives (IMMUTABLE - cannot be removed):
+{{#if previouslyCompletedObjectives}}
+  {{#each previouslyCompletedObjectives}}
+    [{{this}}]
+  {{/each}}
+{{else}}
+  None yet
+{{/if}}
 
 Here's the previous chat history:
 {{#each previousChatHistory}}
@@ -77,20 +92,28 @@ Here's the previous chat history:
 
 {{#if userAnswer}}
 
-  Based on this answer and typical exam marking criteria for this type of question, provide the next step in the interview process:
-  - If the answer is correct and complete according to exam standards, congratulate the user and award a score out of 10 based on the quality, completeness, and accuracy of the answer. Set isCorrect to true.
-  - If the answer is partially correct or incomplete, provide encouraging feedback and a helpful hint or follow-up question to guide them towards a more complete answer that would earn full marks.
-  - If the answer is incorrect, provide constructive feedback and a guiding question to help them think about the problem differently.
+  Your task is to:
+  1. Evaluate which marking objectives the user has now achieved based on their answer
+  2. Return the complete list of completed objectives (including previously completed ones - they are immutable)
+  3. For any objectives not yet achieved, provide helpful hints in the hints array
+  4. Provide encouraging feedback in nextAssistantMessage
 
-  Use your knowledge of the subject matter from the topic context to assess the answer fairly.
+  IMPORTANT:
+  - Only mark an objective as complete if the user has clearly demonstrated that specific criterion
+  - Previously completed objectives CANNOT be removed - always include them in completedObjectives
+  - Be specific and fair in your evaluation
+  - Focus your message on what they've achieved and what to work on next
+  - Do NOT reveal the exact wording of incomplete objectives - give hints instead
+
 {{else}}
-  This is the start of the interview. Provide a brief encouraging message to help the student begin answering the exam question. Do NOT repeat the question - it will be shown separately.
+  This is the start of the interview. Provide a brief encouraging message to help the student begin answering the exam question. Do NOT repeat the question or reveal the marking objectives - they will discover them through their work.
 {{/if}}
 
-Output the nextAssistantMessage which contains your next message to the user.
-If the question is fully and correctly answered, set the isCorrect boolean to true and award the final score in the score field (out of 10).
-ALWAYS output currentScore (0-10) representing what the user would score if they stopped right now based on their current progress.
-Also output the updated chatHistory array, including the user answer (if any) and your assistant message.
+Output:
+- nextAssistantMessage: Your encouraging feedback to the student
+- completedObjectives: Array of objective indices (0-based) that are now complete (MUST include all previously completed)
+- hints: Array of helpful hints for objectives not yet achieved (do not reveal exact objective wording)
+- chatHistory: Updated conversation history
 `,
     });
 
@@ -100,46 +123,75 @@ Also output the updated chatHistory array, including the user answer (if any) an
       userImage,
       previousChatHistory = [],
       question,
+      solutionObjectives,
+      previouslyCompletedObjectives = [],
     } = flowInput;
 
     // For Genkit with images, we need to use the generate function directly
     // because definePrompt doesn't handle multimodal input properly
     if (userImage) {
       // Use direct generate call with multimodal content
+      const objectivesList = solutionObjectives.map((obj, idx) => `[${idx}] ${obj}`).join('\n  ');
+      const completedList = previouslyCompletedObjectives.length > 0
+        ? previouslyCompletedObjectives.map(idx => `[${idx}]`).join(', ')
+        : 'None yet';
+
       const response = await ai.generate({
         model: 'googleai/gemini-2.0-flash-exp',
         prompt: [
-          {text: `You are an AI assistant designed to help students learn material by conducting interview-style conversations. You are helping the student answer a real exam question.
+          {text: `You are an AI assistant designed to help students learn material by conducting interview-style conversations. You are helping the student answer a real exam question using a markscheme-based approach.
 
 Topic context: ${subsection}
 
 The exam question the student is working on:
 ${question}
 
+Marking Objectives (from official markscheme):
+  ${objectivesList}
+
+Previously Completed Objectives (IMMUTABLE - cannot be removed):
+  ${completedList}
+
 Here's the previous chat history:
 ${previousChatHistory.map(msg => `${msg.role}: ${msg.content}${msg.imageUrl ? ' [Image provided]' : ''}`).join('\n')}
 
 The user has provided a whiteboard drawing (see image) ${userAnswer ? `and the following text answer: ${userAnswer}` : ''}.
 
-Based on this answer and typical exam marking criteria for this type of question, provide the next step in the interview process:
-- If the answer is correct and complete according to exam standards, congratulate the user and award a score out of 10 based on the quality, completeness, and accuracy of the answer. Start your response with "CORRECT:" followed by the score, then "CURRENT:" followed by the current score.
-- If the answer is partially correct or incomplete, provide encouraging feedback and a helpful hint or follow-up question to guide them towards a more complete answer that would earn full marks. Start your response with "CURRENT:" followed by what they would score if they stopped now (0-10).
-- If the answer is incorrect, provide constructive feedback and a guiding question to help them think about the problem differently. Start your response with "CURRENT:" followed by what they would score if they stopped now (0-10).
+Your task is to:
+1. Evaluate which marking objectives the user has now achieved based on their answer
+2. Return the complete list of completed objectives as comma-separated indices (including previously completed ones - they are immutable)
+3. Provide helpful hints for objectives not yet achieved
+4. Provide encouraging feedback
 
-Use your knowledge of the subject matter from the topic context to assess the answer fairly.`},
+IMPORTANT:
+- Only mark an objective as complete if the user has clearly demonstrated that specific criterion
+- Previously completed objectives CANNOT be removed - always include them
+- Be specific and fair in your evaluation
+
+Format your response as:
+COMPLETED: [comma-separated objective indices, e.g., "0,1,3"]
+HINTS: [hint 1] | [hint 2] | [hint 3]
+MESSAGE: [your encouraging feedback to the student]
+
+Use your knowledge of the subject matter to assess the answer fairly.`},
           {media: {url: userImage, contentType: 'image/png'}}
         ],
       });
 
       const text = response.text;
-      const isCorrect = text.startsWith('CORRECT:');
-      const score = isCorrect ? parseInt(text.match(/CORRECT:\s*(\d+)/)?.[1] || '0') : undefined;
-      const currentScore = parseInt(text.match(/CURRENT:\s*(\d+)/)?.[1] || '0');
-      let nextMessage = text;
-      if (isCorrect) {
-        nextMessage = nextMessage.replace(/CORRECT:\s*\d+\s*/, '');
-      }
-      nextMessage = nextMessage.replace(/CURRENT:\s*\d+\s*/, '');
+      const completedMatch = text.match(/COMPLETED:\s*\[(.*?)\]/);
+      const hintsMatch = text.match(/HINTS:\s*(.*?)(?=MESSAGE:|$)/s);
+      const messageMatch = text.match(/MESSAGE:\s*(.*)/s);
+
+      const completedObjectives = completedMatch
+        ? completedMatch[1].split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n))
+        : [...previouslyCompletedObjectives];
+
+      const hints = hintsMatch
+        ? hintsMatch[1].split('|').map(s => s.trim()).filter(s => s.length > 0)
+        : [];
+
+      const nextMessage = messageMatch ? messageMatch[1].trim() : text;
 
       const updatedChatHistory = [...previousChatHistory];
       if (userAnswer || userImage) {
@@ -152,11 +204,9 @@ Use your knowledge of the subject matter from the topic context to assess the an
       updatedChatHistory.push({role: 'assistant', content: nextMessage});
 
       return {
-        question: question || '',
         nextAssistantMessage: nextMessage,
-        isCorrect,
-        score,
-        currentScore,
+        completedObjectives,
+        hints,
         chatHistory: updatedChatHistory,
       };
     }
@@ -170,6 +220,8 @@ Use your knowledge of the subject matter from the topic context to assess the an
       userImage,
       previousChatHistory,
       question,
+      solutionObjectives,
+      previouslyCompletedObjectives,
     }, {
       model: 'googleai/gemini-2.5-flash-lite',
     });
@@ -190,11 +242,9 @@ Use your knowledge of the subject matter from the topic context to assess the an
     updatedChatHistory.push({role: 'assistant', content: output.nextAssistantMessage});
 
     return {
-      question: question || '',
       nextAssistantMessage: output.nextAssistantMessage,
-      isCorrect: output.isCorrect,
-      score: output.score,
-      currentScore: output.currentScore,
+      completedObjectives: output.completedObjectives,
+      hints: output.hints,
       chatHistory: updatedChatHistory,
     };
   }, input);

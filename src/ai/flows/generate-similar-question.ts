@@ -15,12 +15,14 @@ const GenerateSimilarQuestionInputSchema = z.object({
   originalQuestionText: z.string().describe('The original exam question to base the variant on.'),
   topicName: z.string().describe('The name of the topic this question covers.'),
   topicDescription: z.string().describe('The description of what this topic covers.'),
+  originalObjectives: z.array(z.string()).describe('The marking objectives from the original question markscheme.'),
 });
 export type GenerateSimilarQuestionInput = z.infer<typeof GenerateSimilarQuestionInputSchema>;
 
 const GenerateSimilarQuestionOutputSchema = z.object({
   questionText: z.string().describe('The generated question variant that is similar but not identical to the original.'),
   summary: z.string().describe('A brief one-sentence summary of what this question variant is about.'),
+  solutionObjectives: z.array(z.string()).describe('The marking objectives for this specific variant question, adapted from the original objectives to match the new question details.'),
 });
 export type GenerateSimilarQuestionOutput = z.infer<typeof GenerateSimilarQuestionOutputSchema>;
 
@@ -39,13 +41,18 @@ export async function generateSimilarQuestion(
       output: {schema: GenerateSimilarQuestionOutputSchema},
       prompt: `You are an expert educator creating practice exam questions for students.
 
-Your task is to generate a NEW question that is SIMILAR to the original question provided, but NOT IDENTICAL.
+Your task is to generate a NEW question that is SIMILAR to the original question provided, but NOT IDENTICAL. You must also adapt the marking objectives to match your new variant.
 
 Topic: {{topicName}}
 Topic Description: {{topicDescription}}
 
 Original Question:
 {{originalQuestionText}}
+
+Original Marking Objectives (from markscheme):
+{{#each originalObjectives}}
+  {{@index}}. {{this}}
+{{/each}}
 
 Guidelines for generating the similar question:
 1. MAINTAIN the same structure and format as the original (e.g., if it has parts a, b, c, keep that structure)
@@ -63,7 +70,16 @@ For example:
 - If the original describes a specific experimental setup, describe a similar but different setup
 - If the original asks to "calculate X", the variant should also ask to "calculate X" but with different values
 
-Generate a similar question that follows these guidelines.`,
+After generating the question, adapt the marking objectives:
+- Keep the SAME NUMBER of objectives as the original
+- Maintain the SAME LEVEL of specificity and difficulty
+- Update any numbers, examples, or specific details to match your variant question
+- The objectives should still test the exact same concepts, just with your new details
+
+For example, if the original objective was "Calculate the wavelength using λ = 50 cm",
+your adapted objective might be "Calculate the wavelength using λ = 75 cm"
+
+Generate both the similar question AND the adapted marking objectives.`,
     });
 
     const response = await prompt(flowInput, {
@@ -78,6 +94,7 @@ Generate a similar question that follows these guidelines.`,
     return {
       questionText: output.questionText,
       summary: output.summary,
+      solutionObjectives: output.solutionObjectives,
     };
   }, input);
 
