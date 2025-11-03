@@ -60,6 +60,11 @@ function InterviewPageContent() {
   const [showExitDialog, setShowExitDialog] = useState(false);
   const [noMarkscheme, setNoMarkscheme] = useState(false);
 
+  // Compute if all objectives are completed
+  const isCompleted = generatedVariant
+    ? completedObjectives.length === generatedVariant.solutionObjectives.length
+    : false;
+
   const scrollAreaViewport = useRef<HTMLDivElement>(null);
   const hasInitialized = useRef<string | false>(false);
   const isInitializing = useRef(false);
