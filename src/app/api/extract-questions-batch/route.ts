@@ -146,7 +146,15 @@ export async function POST(req: NextRequest) {
       console.log(`[Batch Extraction] Sample extracted questions:`);
       sample.forEach((q, i) => {
         console.log(`  ${i+1}. Paper: "${q.paperTypeName}" | Topic: "${q.topicName}" | Objectives: ${q.solutionObjectives?.length || 0}`);
+        if (q.solutionObjectives && q.solutionObjectives.length > 0) {
+          console.log(`      First objective: "${q.solutionObjectives[0]}"`);
+        }
       });
+
+      // Count how many questions have objectives
+      const withObjectives = allExtractedQuestions.filter(q => q.solutionObjectives && q.solutionObjectives.length > 0).length;
+      const withoutObjectives = allExtractedQuestions.length - withObjectives;
+      console.log(`[Batch Extraction] Questions with objectives: ${withObjectives}, without: ${withoutObjectives}`);
     }
 
     // Persist questions to database
@@ -167,11 +175,16 @@ export async function POST(req: NextRequest) {
         });
 
         if (topicQuestions.length > 0) {
-          console.log(`[Batch Extraction] Saving ${topicQuestions.length} questions for "${topic.name}"`);
+          const questionsWithObjectivesCount = topicQuestions.filter(q => q.solutionObjectives && q.solutionObjectives.length > 0).length;
+          console.log(`[Batch Extraction] Saving ${topicQuestions.length} questions for "${topic.name}" (${questionsWithObjectivesCount} with objectives)`);
         }
 
         for (const q of topicQuestions) {
           const solutionObjectivesJson = q.solutionObjectives ? JSON.stringify(q.solutionObjectives) : null;
+
+          if (savedCount < 3 && solutionObjectivesJson) {
+            console.log(`[Batch Extraction]   Saving question with ${q.solutionObjectives?.length} objectives: ${solutionObjectivesJson.substring(0, 100)}...`);
+          }
 
           await db.run(
             'INSERT INTO questions (topic_id, question_text, summary, solution_objectives) VALUES (?, ?, ?, ?)',

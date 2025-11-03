@@ -88,6 +88,30 @@ IMPORTANT: Output exactly one match entry for each paper, in the same order as t
         throw new Error('Failed to match papers to markschemes - no output received');
       }
 
+      // Validate that we got exactly one match per paper
+      if (output.matches.length !== flowInput.papers.length) {
+        console.error(`[Paper-Markscheme Matching] ERROR: AI returned ${output.matches.length} matches for ${flowInput.papers.length} papers`);
+        console.error(`[Paper-Markscheme Matching] Expected exactly one match per paper. Truncating/padding to match.`);
+
+        // Truncate or pad to match paper count
+        const validatedMatches = [];
+        for (let i = 0; i < flowInput.papers.length; i++) {
+          if (i < output.matches.length) {
+            validatedMatches.push(output.matches[i]);
+          } else {
+            // Pad with null matches if AI returned too few
+            validatedMatches.push({
+              paperName: flowInput.papers[i].name,
+              markschemeName: null,
+            });
+          }
+        }
+
+        return {
+          matches: validatedMatches,
+        };
+      }
+
       return {
         matches: output.matches,
       };

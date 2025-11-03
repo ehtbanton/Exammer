@@ -90,9 +90,15 @@ function TopicPageContent() {
 
       <p className="text-muted-foreground mb-8">Select a question to start practicing.</p>
 
-      {topic.examQuestions.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {topic.examQuestions.map(question => {
+      {(() => {
+        // Filter to only show questions with objectives
+        const questionsWithObjectives = topic.examQuestions.filter(q =>
+          q.solutionObjectives && q.solutionObjectives.length > 0
+        );
+
+        return questionsWithObjectives.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {questionsWithObjectives.map(question => {
             const hasAttempts = question.attempts > 0;
             const boxStyle = hasAttempts ? getScoreColorStyle(question.score) : getUnattemptedBoxStyle();
 
@@ -126,18 +132,19 @@ function TopicPageContent() {
          <Card className="text-center py-12 border-2 border-dashed">
             <CardContent>
               <AlertCircle className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-              <h3 className="text-lg font-semibold mb-2">No Exam Questions Available</h3>
+              <h3 className="text-lg font-semibold mb-2">No Questions with Markschemes Available</h3>
               <p className="text-muted-foreground mb-4">
-                Questions are extracted from real past exam papers. To practice questions for this topic, please upload at least one exam paper.
+                Questions can only be practiced if they have been extracted with a markscheme. To practice questions for this topic, please upload exam papers along with their corresponding markschemes.
               </p>
               <div className="bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-lg p-4 max-w-md mx-auto">
                 <p className="text-sm text-amber-800 dark:text-amber-200">
-                  <strong>Tip:</strong> Upload exam papers via the "Manage Past Papers" button on the paper type page, then questions will be automatically extracted and categorized.
+                  <strong>Tip:</strong> Upload both exam papers and markschemes via the "Manage Past Papers" button on the paper type page. Questions without markschemes cannot be practiced.
                 </p>
               </div>
             </CardContent>
           </Card>
-      )}
+      );
+      })()}
     </div>
   );
 }
