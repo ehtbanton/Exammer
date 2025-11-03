@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth-helpers';
 import { extractExamQuestions } from '@/ai/flows/extract-exam-questions';
-import { matchPapersToMarkschemes } from '@/ai/flows/match-papers-to-markschemes';
 import { db } from '@/lib/db';
 
 export const maxDuration = 300; // 5 minutes max for batch processing
@@ -52,40 +51,65 @@ export async function POST(req: NextRequest) {
       [subjectId]
     );
 
-    // Step 1: Match all papers to markschemes in ONE prompt
+    // Step 1: Match papers to markschemes using filename similarity
     let paperMarkschemeMap: Map<number, string | null> = new Map();
 
     if (markschemesDataUris.length > 0) {
-      console.log(`[Batch Extraction] Step 1: Matching ${examPapersDataUris.length} papers to ${markschemesDataUris.length} markschemes in single prompt...`);
+      console.log(`[Batch Extraction] Step 1: Matching ${examPapersDataUris.length} papers to ${markschemesDataUris.length} markschemes using filename similarity...`);
 
-      const papersForMatching = examPapersDataUris.map((dataUri, index) => ({
-        name: dbPapers[index]?.name || `paper-${index + 1}`,
-        dataUri,
-      }));
+      // Helper function to normalize filenames for matching
+      const normalizeFilename = (filename: string): string => {
+        return filename
+          .toLowerCase()
+          .replace(/[_\s-]+/g, '') // Remove separators
+          .replace(/\.(pdf|docx?|png|jpe?g)$/i, '') // Remove extensions
+          .replace(/markscheme|ms|solutions?|answers?/gi, '') // Remove common markscheme indicators
+          .trim();
+      };
 
-      const markschemesForMatching = markschemesDataUris.map((dataUri, index) => ({
-        name: dbMarkschemes[index]?.name || `markscheme-${index + 1}`,
-        dataUri,
-      }));
+      // Helper function to calculate similarity between two strings
+      const similarity = (s1: string, s2: string): number => {
+        const longer = s1.length > s2.length ? s1 : s2;
+        const shorter = s1.length > s2.length ? s2 : s1;
 
-      const matchingResult = await matchPapersToMarkschemes({
-        papers: papersForMatching,
-        markschemes: markschemesForMatching,
-      });
+        if (longer.length === 0) return 1.0;
 
-      // Build map of paper index -> markscheme dataUri (or null)
-      matchingResult.matches.forEach((match, paperIndex) => {
-        if (match.markschemeName) {
-          const markschemeIndex = markschemesForMatching.findIndex(m => m.name === match.markschemeName);
-          if (markschemeIndex >= 0) {
-            paperMarkschemeMap.set(paperIndex, markschemesDataUris[markschemeIndex]);
-          } else {
-            paperMarkschemeMap.set(paperIndex, null);
+        // Count matching characters
+        let matches = 0;
+        for (let i = 0; i < shorter.length; i++) {
+          if (longer.includes(shorter[i])) matches++;
+        }
+
+        return matches / longer.length;
+      };
+
+      // Match each paper to the most similar markscheme
+      for (let paperIndex = 0; paperIndex < examPapersDataUris.length; paperIndex++) {
+        const paperName = dbPapers[paperIndex]?.name || `paper-${paperIndex + 1}`;
+        const normalizedPaperName = normalizeFilename(paperName);
+
+        let bestMatch: { index: number; score: number } | null = null;
+
+        for (let msIndex = 0; msIndex < markschemesDataUris.length; msIndex++) {
+          const msName = dbMarkschemes[msIndex]?.name || `markscheme-${msIndex + 1}`;
+          const normalizedMsName = normalizeFilename(msName);
+
+          const score = similarity(normalizedPaperName, normalizedMsName);
+
+          // Consider it a match if similarity is above 60%
+          if (score > 0.6 && (!bestMatch || score > bestMatch.score)) {
+            bestMatch = { index: msIndex, score };
           }
+        }
+
+        if (bestMatch && bestMatch.score > 0.6) {
+          paperMarkschemeMap.set(paperIndex, markschemesDataUris[bestMatch.index]);
+          console.log(`[Batch Extraction]   Matched "${paperName}" → "${dbMarkschemes[bestMatch.index]?.name}" (${(bestMatch.score * 100).toFixed(0)}% similar)`);
         } else {
           paperMarkschemeMap.set(paperIndex, null);
+          console.log(`[Batch Extraction]   No match for "${paperName}"`);
         }
-      });
+      }
 
       const matchedCount = Array.from(paperMarkschemeMap.values()).filter(v => v !== null).length;
       console.log(`[Batch Extraction] Matched ${matchedCount}/${examPapersDataUris.length} papers to markschemes`);
