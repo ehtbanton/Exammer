@@ -84,6 +84,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
                   summary: q.summary,
                   score: q.score || (q.attempts === 0 ? 50 : 0), // Default 50% if no attempts
                   attempts: q.attempts || 0,
+                  solutionObjectives: q.solutionObjectives || undefined,
+                  completedObjectives: q.completedObjectives || [],
                 }))
               }))
             }))
@@ -421,6 +423,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
                 summary: q.summary,
                 score: q.score || (q.attempts === 0 ? 50 : 0), // Default 50% if no attempts
                 attempts: q.attempts || 0,
+                solutionObjectives: q.solutionObjectives || undefined,
+                completedObjectives: q.completedObjectives || [],
               }))
             }))
           }));
@@ -715,6 +719,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
               summary: q.summary,
               score: q.score || (q.attempts === 0 ? 50 : 0), // Default 50% if no attempts
               attempts: q.attempts || 0,
+              solutionObjectives: q.solutionObjectives || undefined,
+              completedObjectives: q.completedObjectives || [],
             }))
           }))
         }))

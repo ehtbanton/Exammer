@@ -83,9 +83,11 @@ export async function GET(req: NextRequest) {
         q.id as question_id,
         q.question_text,
         q.summary,
+        q.solution_objectives,
         q.created_at as question_created_at,
         COALESCE(up.score, 0) as score,
-        COALESCE(up.attempts, 0) as attempts
+        COALESCE(up.attempts, 0) as attempts,
+        up.completed_objectives
       FROM paper_types pt
       LEFT JOIN topics t ON t.paper_type_id = pt.id
       LEFT JOIN questions q ON q.topic_id = t.id
@@ -134,10 +136,32 @@ export async function GET(req: NextRequest) {
 
           // Add question if it exists
           if (row.question_id) {
+            // Parse solution_objectives from JSON string to array
+            let solutionObjectives: string[] | undefined = undefined;
+            if (row.solution_objectives) {
+              try {
+                solutionObjectives = JSON.parse(row.solution_objectives);
+              } catch (e) {
+                console.error(`Failed to parse solution_objectives for question ${row.question_id}:`, e);
+              }
+            }
+
+            // Parse completed_objectives from JSON string to array
+            let completedObjectives: number[] = [];
+            if (row.completed_objectives) {
+              try {
+                completedObjectives = JSON.parse(row.completed_objectives);
+              } catch (e) {
+                console.error(`Failed to parse completed_objectives for question ${row.question_id}:`, e);
+              }
+            }
+
             topic.examQuestions.push({
               id: row.question_id,
               question_text: row.question_text,
               summary: row.summary,
+              solutionObjectives,
+              completedObjectives,
               score: row.score,
               attempts: row.attempts,
             });

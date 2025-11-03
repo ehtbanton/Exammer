@@ -38,7 +38,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       [topicId]
     );
 
-    // For each question, fetch user progress
+    // For each question, fetch user progress and parse JSON fields
     const questionsWithProgress = await Promise.all(
       questions.map(async (question) => {
         const progress = await db.get<UserProgress>(
@@ -46,10 +46,32 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
           [user.id, question.id]
         );
 
+        // Parse solution_objectives from JSON string to array
+        let solutionObjectives: string[] | undefined = undefined;
+        if (question.solution_objectives) {
+          try {
+            solutionObjectives = JSON.parse(question.solution_objectives);
+          } catch (e) {
+            console.error(`Failed to parse solution_objectives for question ${question.id}:`, e);
+          }
+        }
+
+        // Parse completed_objectives from JSON string to array
+        let completedObjectives: number[] = [];
+        if (progress?.completed_objectives) {
+          try {
+            completedObjectives = JSON.parse(progress.completed_objectives);
+          } catch (e) {
+            console.error(`Failed to parse completed_objectives for question ${question.id}:`, e);
+          }
+        }
+
         return {
           ...question,
+          solutionObjectives,
           score: progress?.score || 0,
           attempts: progress?.attempts || 0,
+          completedObjectives,
         };
       })
     );
