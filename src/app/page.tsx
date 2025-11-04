@@ -2,13 +2,14 @@
 
 import { ChangeEvent, useRef, useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useAppContext } from '@/app/context/AppContext';
 import { AuthGuard } from '@/components/AuthGuard';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogHeader, AlertDialogTitle, AlertDialogFooter, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Upload, Trash2, BookOpen, FileText, Plus, UserPlus, UserMinus, Crown } from 'lucide-react';
+import { Upload, Trash2, BookOpen, UserPlus, UserMinus, Crown } from 'lucide-react';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import PageSpinner from '@/components/PageSpinner';
 import WorkspaceLoading from '@/components/WorkspaceLoading';
@@ -22,68 +23,28 @@ export default function HomePage() {
 }
 
 function HomePageContent() {
-  const { subjects, otherSubjects, isLevel3User, createSubjectFromSyllabus, processExamPapers, deleteSubject, addSubjectToWorkspace, removeSubjectFromWorkspace, searchSubjects, isLoading, setLoading } = useAppContext();
+  const router = useRouter();
+  const { subjects, otherSubjects, isLevel3User, createSubjectFromSyllabus, deleteSubject, addSubjectToWorkspace, removeSubjectFromWorkspace, searchSubjects, isLoading, setLoading } = useAppContext();
   const [navigatingTo, setNavigatingTo] = useState<string | null>(null);
   const [syllabusFile, setSyllabusFile] = useState<File | null>(null);
-  const [uploadStage, setUploadStage] = useState<'initial' | 'syllabus' | 'papers' | 'markschemes'>('initial');
-  const [examPapers, setExamPapers] = useState<File[]>([]);
-  const [markschemes, setMarkschemes] = useState<File[]>([]);
+  const [uploadStage, setUploadStage] = useState<'initial' | 'syllabus'>('initial');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [hasSearched, setHasSearched] = useState<boolean>(false);
   const syllabusInputRef = useRef<HTMLInputElement>(null);
-  const examPapersInputRef = useRef<HTMLInputElement>(null);
-  const markschemesInputRef = useRef<HTMLInputElement>(null);
 
   const handleSyllabusSelect = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       setSyllabusFile(file);
       // Start processing syllabus in background
-      await createSubjectFromSyllabus(file);
-      // Immediately transition to papers stage (processing happens in background)
-      setUploadStage('papers');
+      const subjectId = await createSubjectFromSyllabus(file);
+      // Close the dialog and redirect to the new subject page
+      setUploadStage('initial');
+      setSyllabusFile(null);
+      if (subjectId) {
+        router.push(`/subject/${subjectId}`);
+      }
     }
-  };
-
-  const handleExamPapersSelect = (e: ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || []);
-    setExamPapers(prev => [...prev, ...files]);
-  };
-
-  const removeExamPaper = (index: number) => {
-    setExamPapers(prev => prev.filter((_, i) => i !== index));
-  };
-
-  const handleMarkschemesSelect = (e: ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || []);
-    setMarkschemes(prev => [...prev, ...files]);
-  };
-
-  const removeMarkscheme = (index: number) => {
-    setMarkschemes(prev => prev.filter((_, i) => i !== index));
-  };
-
-  const handleContinueToMarkschemes = () => {
-    setUploadStage('markschemes');
-  };
-
-  const handleFinishUpload = async () => {
-    if (subjects.length > 0 && examPapers.length > 0) {
-      const latestSubject = subjects[subjects.length - 1];
-      await processExamPapers(latestSubject.id, examPapers, markschemes);
-    }
-    // Reset and close
-    setSyllabusFile(null);
-    setExamPapers([]);
-    setMarkschemes([]);
-    setUploadStage('initial');
-  };
-
-  const handleSkipPapers = () => {
-    setSyllabusFile(null);
-    setExamPapers([]);
-    setMarkschemes([]);
-    setUploadStage('initial');
   };
 
   const handleNavigate = (subjectId: string) => {
@@ -130,32 +91,16 @@ function HomePageContent() {
         className="hidden"
         onChange={handleSyllabusSelect}
       />
-      <Input
-        type="file"
-        accept=".pdf,.txt,.md"
-        ref={examPapersInputRef}
-        className="hidden"
-        onChange={handleExamPapersSelect}
-        multiple
-      />
-      <Input
-        type="file"
-        accept=".pdf,.txt,.md"
-        ref={markschemesInputRef}
-        className="hidden"
-        onChange={handleMarkschemesSelect}
-        multiple
-      />
 
       {/* Upload Dialog */}
-      <AlertDialog open={uploadStage === 'syllabus' || uploadStage === 'papers' || uploadStage === 'markschemes'} onOpenChange={(open) => !open && handleSkipPapers()}>
+      <AlertDialog open={uploadStage === 'syllabus'} onOpenChange={(open) => !open && setUploadStage('initial')}>
         <AlertDialogContent className="max-w-2xl">
           {uploadStage === 'syllabus' && (
             <>
               <AlertDialogHeader>
                 <AlertDialogTitle>Upload Your Syllabus</AlertDialogTitle>
                 <AlertDialogDescription>
-                  Upload your exam syllabus to begin. We'll analyze it to identify paper types and topics.
+                  Upload your exam syllabus to begin. We'll analyze it to identify paper types and topics, then you can upload past papers.
                 </AlertDialogDescription>
               </AlertDialogHeader>
 
@@ -174,129 +119,9 @@ function HomePageContent() {
               </div>
 
               <AlertDialogFooter>
-                <AlertDialogCancel onClick={handleSkipPapers}>
+                <AlertDialogCancel onClick={() => setUploadStage('initial')}>
                   Cancel
                 </AlertDialogCancel>
-              </AlertDialogFooter>
-            </>
-          )}
-
-          {uploadStage === 'papers' && (
-            <>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Upload Past Exam Papers</AlertDialogTitle>
-                <AlertDialogDescription>
-                  Your syllabus is being processed in the background. Upload past exam papers to extract real exam questions.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-
-              <div className="space-y-4">
-                <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-                  <p className="text-sm text-blue-800 dark:text-blue-200">
-                    <strong>Recommended:</strong> Upload at least 1 paper for each paper type.
-                  </p>
-                </div>
-
-                <div>
-                  <Button
-                    variant="outline"
-                    onClick={() => examPapersInputRef.current?.click()}
-                    type="button"
-                    className="w-full"
-                  >
-                    <FileText className="mr-2 h-4 w-4" />
-                    Add Exam Papers
-                  </Button>
-
-                  {examPapers.length > 0 && (
-                    <div className="mt-3 max-h-64 overflow-y-auto border rounded-md p-2 space-y-2">
-                      {examPapers.map((paper, index) => (
-                        <div key={index} className="flex items-center justify-between p-2 bg-muted rounded">
-                          <span className="text-sm truncate flex-1 mr-2">{paper.name}</span>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => removeExamPaper(index)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <AlertDialogFooter>
-                <AlertDialogCancel onClick={handleSkipPapers}>
-                  Skip for Now
-                </AlertDialogCancel>
-                <AlertDialogAction
-                  onClick={handleContinueToMarkschemes}
-                  disabled={examPapers.length === 0}
-                >
-                  Continue
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </>
-          )}
-
-          {uploadStage === 'markschemes' && (
-            <>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Upload Markschemes</AlertDialogTitle>
-                <AlertDialogDescription>
-                  Upload the markschemes for your past papers. We'll use these to extract solution objectives and track your progress accurately.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-
-              <div className="space-y-4">
-                <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-                  <p className="text-sm text-blue-800 dark:text-blue-200">
-                    <strong>Note:</strong> Upload all markschemes. We'll automatically match them to the corresponding papers.
-                  </p>
-                </div>
-
-                <div>
-                  <Button
-                    variant="outline"
-                    onClick={() => markschemesInputRef.current?.click()}
-                    type="button"
-                    className="w-full"
-                  >
-                    <FileText className="mr-2 h-4 w-4" />
-                    Add Markschemes
-                  </Button>
-
-                  {markschemes.length > 0 && (
-                    <div className="mt-3 max-h-64 overflow-y-auto border rounded-md p-2 space-y-2">
-                      {markschemes.map((markscheme, index) => (
-                        <div key={index} className="flex items-center justify-between p-2 bg-muted rounded">
-                          <span className="text-sm truncate flex-1 mr-2">{markscheme.name}</span>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => removeMarkscheme(index)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <AlertDialogFooter>
-                <AlertDialogCancel onClick={handleSkipPapers}>
-                  Skip for Now
-                </AlertDialogCancel>
-                <AlertDialogAction
-                  onClick={handleFinishUpload}
-                  disabled={markschemes.length === 0 || isLoading(`process-papers-${subjects[subjects.length - 1]?.id}`)}
-                >
-                  {isLoading(`process-papers-${subjects[subjects.length - 1]?.id}`) ? <LoadingSpinner /> : 'Finish'}
-                </AlertDialogAction>
               </AlertDialogFooter>
             </>
           )}

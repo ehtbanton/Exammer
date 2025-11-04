@@ -118,7 +118,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const isLoading = useCallback((key: string) => !!loadingStates[key], [loadingStates]);
 
-  const createSubjectFromSyllabus = useCallback(async (syllabusFile: File) => {
+  const createSubjectFromSyllabus = useCallback(async (syllabusFile: File): Promise<string | null> => {
     const loadingKey = `create-subject`;
     setLoading(loadingKey, true);
 
@@ -247,9 +247,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
         }
       });
 
+      return subjectId;
     } catch (error) {
       console.error(error);
       toast({ variant: "destructive", title: "Error", description: "Failed to start syllabus processing." });
+      return null;
     } finally {
       setLoading(loadingKey, false);
     }
