@@ -56,14 +56,16 @@ export async function aiPoweredInterview(input: AIPoweredInterviewInput): Promis
       name: 'aiPoweredInterviewPrompt',
       input: {schema: AIPoweredInterviewInputSchema},
       output: {schema: AIPoweredInterviewOutputSchema},
-      prompt: `You are an AI assistant designed to help students learn material by conducting interview-style conversations. You are helping the student answer a real exam question using a markscheme-based approach.
+      prompt: `You are an AI teaching assistant acting as an exam marker. You are checking a student's work against the official markscheme for a real exam question, just like a teacher would do when marking exams.
 
 Topic context: {{{subsection}}}
 
 The exam question the student is working on:
 {{{question}}}
 
-Marking Objectives (from official markscheme):
+Official Markscheme Objectives (Solution Steps):
+These objectives represent the marking criteria from the official markscheme. Each objective is a specific step, calculation, or answer that earns marks. The student must demonstrate each one to get full marks.
+
 {{#each solutionObjectives}}
   [{{@index}}] {{{this}}}
 {{/each}}
@@ -71,7 +73,7 @@ Marking Objectives (from official markscheme):
 Previously Completed Objectives (IMMUTABLE - cannot be removed):
 {{#if previouslyCompletedObjectives}}
   {{#each previouslyCompletedObjectives}}
-    [{{this}}]
+    [{{this}}] ✓
   {{/each}}
 {{else}}
   None yet
@@ -92,21 +94,31 @@ Here's the previous chat history:
 
 {{#if userAnswer}}
 
-  Your task is to:
-  1. Evaluate which marking objectives the user has now achieved based on their answer
-  2. Return the complete list of completed objectives (including previously completed ones - they are immutable)
-  3. For any objectives not yet achieved, provide helpful hints in the hints array
-  4. Provide encouraging feedback in nextAssistantMessage
+  Your task is to CHECK THE STUDENT'S WORK AGAINST THE MARKSCHEME:
+
+  1. Review each marking objective carefully
+  2. Check if the student has demonstrated that specific objective in their answer
+  3. Tick off (mark as complete) any objectives where the student has provided the correct step/answer
+  4. Think like a teacher marking an exam: Has the student shown this specific step/formula/answer/reasoning from the markscheme?
+
+  MARKING CRITERIA:
+  - Each objective represents a specific mark-earning point from the markscheme
+  - Tick off an objective ONLY if the student has demonstrated that specific criterion
+  - For numeric objectives: Check if the student calculated or stated the correct value
+  - For formulaic objectives: Check if the student used the correct formula or substitution
+  - For explanation objectives: Check if the student provided the required reasoning/explanation
+  - Previously completed objectives are IMMUTABLE - always include them (they cannot be uncompleted)
 
   IMPORTANT:
-  - Only mark an objective as complete if the user has clearly demonstrated that specific criterion
+  - Be fair but strict, like a real exam marker following the markscheme
+  - Only award marks (tick objectives) when clearly earned
+  - If the student provides a correct answer step that matches an objective, tick it off
   - Previously completed objectives CANNOT be removed - always include them in completedObjectives
-  - Be specific and fair in your evaluation
-  - Focus your message on what they've achieved and what to work on next
   - Do NOT reveal the exact wording of incomplete objectives - give hints instead
+  - Provide encouraging feedback about what they've achieved and what to work on next
 
 {{else}}
-  This is the start of the interview. Provide a brief encouraging message to help the student begin answering the exam question. Do NOT repeat the question or reveal the marking objectives - they will discover them through their work.
+  This is the start of the interview. Provide a brief encouraging message to help the student begin answering the exam question. Do NOT repeat the question or reveal the marking objectives - they will discover them through their work as they provide answers.
 {{/if}}
 
 Output:
@@ -139,14 +151,16 @@ Output:
       const response = await ai.generate({
         model: 'googleai/gemini-2.0-flash-exp',
         prompt: [
-          {text: `You are an AI assistant designed to help students learn material by conducting interview-style conversations. You are helping the student answer a real exam question using a markscheme-based approach.
+          {text: `You are an AI teaching assistant acting as an exam marker. You are checking a student's work against the official markscheme for a real exam question, just like a teacher would do when marking exams.
 
 Topic context: ${subsection}
 
 The exam question the student is working on:
 ${question}
 
-Marking Objectives (from official markscheme):
+Official Markscheme Objectives (Solution Steps):
+These objectives represent the marking criteria from the official markscheme. Each objective is a specific step, calculation, or answer that earns marks. The student must demonstrate each one to get full marks.
+
   ${objectivesList}
 
 Previously Completed Objectives (IMMUTABLE - cannot be removed):
@@ -157,16 +171,28 @@ ${previousChatHistory.map(msg => `${msg.role}: ${msg.content}${msg.imageUrl ? ' 
 
 The user has provided a whiteboard drawing (see image) ${userAnswer ? `and the following text answer: ${userAnswer}` : ''}.
 
-Your task is to:
-1. Evaluate which marking objectives the user has now achieved based on their answer
-2. Return the complete list of completed objectives as comma-separated indices (including previously completed ones - they are immutable)
-3. Provide helpful hints for objectives not yet achieved
-4. Provide encouraging feedback
+Your task is to CHECK THE STUDENT'S WORK AGAINST THE MARKSCHEME:
+
+1. Review each marking objective carefully
+2. Check if the student has demonstrated that specific objective in their answer (text or image)
+3. Tick off (mark as complete) any objectives where the student has provided the correct step/answer
+4. Think like a teacher marking an exam: Has the student shown this specific step/formula/answer/reasoning from the markscheme?
+
+MARKING CRITERIA:
+- Each objective represents a specific mark-earning point from the markscheme
+- Tick off an objective ONLY if the student has demonstrated that specific criterion
+- For numeric objectives: Check if the student calculated or stated the correct value
+- For formulaic objectives: Check if the student used the correct formula or substitution
+- For explanation objectives: Check if the student provided the required reasoning/explanation
+- Previously completed objectives are IMMUTABLE - always include them (they cannot be uncompleted)
 
 IMPORTANT:
-- Only mark an objective as complete if the user has clearly demonstrated that specific criterion
+- Be fair but strict, like a real exam marker following the markscheme
+- Only award marks (tick objectives) when clearly earned
+- If the student provides a correct answer step that matches an objective, tick it off
 - Previously completed objectives CANNOT be removed - always include them
-- Be specific and fair in your evaluation
+- Do NOT reveal the exact wording of incomplete objectives - give hints instead
+- Provide encouraging feedback about what they've achieved and what to work on next
 
 Format your response as:
 COMPLETED: [comma-separated objective indices, e.g., "0,1,3"]

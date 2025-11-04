@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth-helpers';
-import { extractExamQuestions } from '@/ai/flows/extract-exam-questions';
+import { extractPaperQuestions } from '@/ai/flows/extract-paper-questions';
+import { extractMarkschemesSolutions } from '@/ai/flows/extract-markscheme-solutions';
 import { db } from '@/lib/db';
 
 export const maxDuration = 300; // 5 minutes max for batch processing
@@ -16,9 +17,10 @@ interface ExtractQuestionsRequest {
 /**
  * POST /api/extract-questions-batch
  *
- * Processes multiple exam papers in parallel using the API key manager.
- * This endpoint runs on the server side where the singleton is truly shared,
- * enabling parallel processing with different API keys.
+ * Processes multiple exam papers in parallel using the redesigned workflow:
+ * 1. Papers and markschemes are processed separately in parallel
+ * 2. Results are matched mechanically based on structured data
+ * 3. Only matched questions (with solutions) are saved to the database
  */
 export async function POST(req: NextRequest) {
   try {
@@ -41,7 +43,7 @@ export async function POST(req: NextRequest) {
 
     console.log(`[Batch Extraction] Processing ${examPapersDataUris.length} papers with ${markschemesDataUris.length} markschemes for subject ${subjectId}`);
 
-    // Get paper and markscheme names from database
+    // Get paper and markscheme names from database for logging
     const dbPapers = await db.all<{ name: string }>(
       'SELECT name FROM past_papers WHERE subject_id = ? ORDER BY id',
       [subjectId]
@@ -51,285 +53,318 @@ export async function POST(req: NextRequest) {
       [subjectId]
     );
 
-    // Step 1: Match papers to markschemes using filename similarity
-    let paperMarkschemeMap: Map<number, string | null> = new Map();
-
-    if (markschemesDataUris.length > 0) {
-      console.log(`[Batch Extraction] Step 1: Matching ${examPapersDataUris.length} papers to ${markschemesDataUris.length} markschemes using filename similarity...`);
-
-      // Helper function to normalize filenames for matching
-      const normalizeFilename = (filename: string): string => {
-        return filename
-          .toLowerCase()
-          .replace(/[_\s-]+/g, '') // Remove separators
-          .replace(/\.(pdf|docx?|png|jpe?g)$/i, '') // Remove extensions
-          .replace(/markscheme|ms|solutions?|answers?/gi, '') // Remove common markscheme indicators
-          .trim();
-      };
-
-      // Helper function to calculate similarity between two strings
-      const similarity = (s1: string, s2: string): number => {
-        const longer = s1.length > s2.length ? s1 : s2;
-        const shorter = s1.length > s2.length ? s2 : s1;
-
-        if (longer.length === 0) return 1.0;
-
-        // Count matching characters
-        let matches = 0;
-        for (let i = 0; i < shorter.length; i++) {
-          if (longer.includes(shorter[i])) matches++;
-        }
-
-        return matches / longer.length;
-      };
-
-      // Match each paper to the most similar markscheme
-      for (let paperIndex = 0; paperIndex < examPapersDataUris.length; paperIndex++) {
-        const paperName = dbPapers[paperIndex]?.name || `paper-${paperIndex + 1}`;
-        const normalizedPaperName = normalizeFilename(paperName);
-
-        let bestMatch: { index: number; score: number } | null = null;
-
-        for (let msIndex = 0; msIndex < markschemesDataUris.length; msIndex++) {
-          const msName = dbMarkschemes[msIndex]?.name || `markscheme-${msIndex + 1}`;
-          const normalizedMsName = normalizeFilename(msName);
-
-          const score = similarity(normalizedPaperName, normalizedMsName);
-
-          // Consider it a match if similarity is above 60%
-          if (score > 0.6 && (!bestMatch || score > bestMatch.score)) {
-            bestMatch = { index: msIndex, score };
-          }
-        }
-
-        if (bestMatch && bestMatch.score > 0.6) {
-          paperMarkschemeMap.set(paperIndex, markschemesDataUris[bestMatch.index]);
-          console.log(`[Batch Extraction]   Matched "${paperName}" → "${dbMarkschemes[bestMatch.index]?.name}" (${(bestMatch.score * 100).toFixed(0)}% similar)`);
-        } else {
-          paperMarkschemeMap.set(paperIndex, null);
-          console.log(`[Batch Extraction]   No match for "${paperName}"`);
-        }
-      }
-
-      const matchedCount = Array.from(paperMarkschemeMap.values()).filter(v => v !== null).length;
-      console.log(`[Batch Extraction] Matched ${matchedCount}/${examPapersDataUris.length} papers to markschemes`);
-
-      // Filter out papers without markschemes
-      const papersToDiscard: string[] = [];
-      Array.from(paperMarkschemeMap.entries()).forEach(([paperIndex, markschemeDataUri]) => {
-        if (markschemeDataUri === null) {
-          const paperName = dbPapers[paperIndex]?.name || `paper-${paperIndex + 1}`;
-          papersToDiscard.push(paperName);
-        }
-      });
-
-      if (papersToDiscard.length > 0) {
-        console.log(`[Batch Extraction] Discarding ${papersToDiscard.length} paper(s) without matching markschemes:`);
-        papersToDiscard.forEach(name => console.log(`  - ${name}`));
-      }
-
-      // Identify unused markschemes
-      const usedMarkschemeIndices = new Set<number>();
-      Array.from(paperMarkschemeMap.entries()).forEach(([paperIndex, markschemeDataUri]) => {
-        if (markschemeDataUri !== null) {
-          const msIndex = markschemesDataUris.indexOf(markschemeDataUri);
-          if (msIndex !== -1) {
-            usedMarkschemeIndices.add(msIndex);
-          }
-        }
-      });
-
-      const unusedMarkschemes: string[] = [];
-      markschemesDataUris.forEach((_, msIndex) => {
-        if (!usedMarkschemeIndices.has(msIndex)) {
-          const msName = dbMarkschemes[msIndex]?.name || `markscheme-${msIndex + 1}`;
-          unusedMarkschemes.push(msName);
-        }
-      });
-
-      if (unusedMarkschemes.length > 0) {
-        console.log(`[Batch Extraction] Found ${unusedMarkschemes.length} unused markscheme(s) without matching papers:`);
-        unusedMarkschemes.forEach(name => console.log(`  - ${name}`));
-      }
-    } else {
-      console.log(`[Batch Extraction] No markschemes provided, discarding all papers as per configuration`);
-      // Discard all papers if no markschemes provided
-      examPapersDataUris.forEach((_, index) => paperMarkschemeMap.set(index, null));
-    }
-
-    // Filter to only keep papers with matching markschemes
-    const filteredPaperData: Array<{ index: number; dataUri: string; markschemeDataUri: string; name: string }> = [];
-    Array.from(paperMarkschemeMap.entries()).forEach(([paperIndex, markschemeDataUri]) => {
-      if (markschemeDataUri !== null) {
-        filteredPaperData.push({
-          index: paperIndex,
-          dataUri: examPapersDataUris[paperIndex],
-          markschemeDataUri,
-          name: dbPapers[paperIndex]?.name || `paper-${paperIndex + 1}`
-        });
-      }
-    });
-
-    if (filteredPaperData.length === 0) {
-      console.log(`[Batch Extraction] No papers with matching markschemes to process. Exiting.`);
-      return NextResponse.json({
-        success: true,
-        papersProcessed: 0,
-        papersFailed: 0,
-        failedPapers: [],
-        questionsExtracted: 0,
-        questionsSaved: 0,
-        message: 'No papers with matching markschemes to process'
-      });
-    }
-
-    // Step 2: Extract questions from each paper IN PARALLEL with its matched markscheme
-    // Use Promise.allSettled to handle individual failures gracefully
-    console.log(`[Batch Extraction] Step 2: Extracting questions from ${filteredPaperData.length} papers (with markschemes) in parallel...`);
-
+    // Prepare data for AI flows
     const topicsInfo = paperTypes.flatMap(pt =>
       pt.topics.map(t => ({ name: t.name, description: t.description }))
     );
     const paperTypesInfo = paperTypes.map(pt => ({ name: pt.name }));
 
-    // Helper function to save questions for a single paper immediately
-    const saveQuestionsForPaper = async (result: any, paperIndex: number) => {
-      let paperSavedCount = 0;
+    // Step 1: Process papers and markschemes in parallel
+    console.log(`[Batch Extraction] Step 1: Starting parallel extraction...`);
+    console.log(`[Batch Extraction]   - Papers stream: ${examPapersDataUris.length} papers`);
+    console.log(`[Batch Extraction]   - Markschemes stream: ${markschemesDataUris.length} markschemes`);
 
-      // paperTypeName is at the result level, not per-question
-      const paperTypeName = result.paperTypeName;
-
-      if (!paperTypeName) {
-        console.warn(`[Batch Extraction] Paper ${paperIndex + 1} has no paperTypeName, skipping all questions`);
-        return 0;
-      }
-
-      for (const question of result.questions) {
-        // Validate question has required fields
-        if (!question.topicName) {
-          console.warn(`[Batch Extraction] Skipping question with missing topicName:`, {
-            summary: question.summary
-          });
-          continue;
-        }
-
-        // Find matching topic
-        let questionSaved = false;
-        for (const pt of paperTypes) {
-          for (const topic of pt.topics) {
-            // Use paperTypeName from result level
-            const matchesPaperType = paperTypeName === pt.name ||
-                                     pt.name.includes(paperTypeName) ||
-                                     paperTypeName.includes(pt.name);
-
-            const matchesTopic = topic.name.toLowerCase().includes(question.topicName.toLowerCase()) ||
-                                question.topicName.toLowerCase().includes(topic.name.toLowerCase());
-
-            if (matchesPaperType && matchesTopic) {
-              const solutionObjectivesJson = question.solutionObjectives ? JSON.stringify(question.solutionObjectives) : null;
-
-              await db.run(
-                'INSERT INTO questions (topic_id, question_text, summary, solution_objectives) VALUES (?, ?, ?, ?)',
-                [topic.id, question.questionText, question.summary, solutionObjectivesJson]
-              );
-              paperSavedCount++;
-              questionSaved = true;
-              break; // Question saved, move to next question
-            }
-          }
-          if (questionSaved) break;
-        }
-      }
-
-      return paperSavedCount;
-    };
-
-    // Process papers in parallel, handling failures gracefully
-    const extractionPromises = filteredPaperData.map(async (paperData, arrayIndex) => {
-      const { index: originalIndex, dataUri: examPaperDataUri, markschemeDataUri, name: paperName } = paperData;
-
-      console.log(`[Batch Extraction] Extracting paper ${arrayIndex + 1}/${filteredPaperData.length}: "${paperName}" (with markscheme)`);
+    // 1.1: Extract questions from papers (parallel)
+    const paperExtractionPromises = examPapersDataUris.map(async (examPaperDataUri, index) => {
+      const paperName = dbPapers[index]?.name || `paper-${index + 1}`;
+      console.log(`[Paper Stream] Processing paper ${index + 1}/${examPapersDataUris.length}: "${paperName}"`);
 
       try {
-        const result = await extractExamQuestions({
+        const result = await extractPaperQuestions({
           examPaperDataUri,
-          markschemeDataUri,
           paperTypes: paperTypesInfo,
           topics: topicsInfo,
         });
 
-        console.log(`[Batch Extraction] ✓ Paper ${arrayIndex + 1} extracted: ${result.questions.length} questions`);
-
-        // Save questions immediately to database
-        const savedCount = await saveQuestionsForPaper(result, originalIndex);
-        console.log(`[Batch Extraction] ✓ Paper ${arrayIndex + 1} saved: ${savedCount} questions persisted to database`);
+        console.log(`[Paper Stream] ✓ Paper ${index + 1} extracted: "${paperName}" → Paper: ${result.paperIdentifier}, Type: ${result.paperTypeIndex}, Questions: ${result.questions.length}`);
 
         return {
           status: 'success' as const,
-          paperIndex: originalIndex,
+          index,
           paperName,
-          questionsExtracted: result.questions.length,
-          questionsSaved: savedCount
+          data: result
         };
       } catch (error: any) {
-        console.error(`[Batch Extraction] ✗ Paper ${arrayIndex + 1} failed: ${error.message}`);
-        if (error.message?.includes('Generation blocked')) {
-          console.error(`[Batch Extraction]   Reason: Gemini safety filter blocked content in "${paperName}"`);
-        }
+        console.error(`[Paper Stream] ✗ Paper ${index + 1} failed: ${error.message}`);
         return {
           status: 'failed' as const,
-          paperIndex: originalIndex,
+          index,
           paperName,
           error: error.message
         };
       }
     });
 
-    const results = await Promise.allSettled(extractionPromises);
+    // 1.2: Extract solutions from markschemes (parallel)
+    const markschemeExtractionPromises = markschemesDataUris.map(async (markschemeDataUri, index) => {
+      const msName = dbMarkschemes[index]?.name || `markscheme-${index + 1}`;
+      console.log(`[Markscheme Stream] Processing markscheme ${index + 1}/${markschemesDataUris.length}: "${msName}"`);
 
-    // Summarize results
-    let totalSuccessful = 0;
-    let totalFailed = 0;
-    let totalQuestionsExtracted = 0;
-    let totalQuestionsSaved = 0;
-    const failedPapers: string[] = [];
+      try {
+        const result = await extractMarkschemesSolutions({
+          markschemeDataUri,
+          paperTypes: paperTypesInfo,
+        });
 
-    results.forEach((result) => {
-      if (result.status === 'fulfilled') {
-        const paperResult = result.value;
-        if (paperResult.status === 'success') {
-          totalSuccessful++;
-          totalQuestionsExtracted += paperResult.questionsExtracted;
-          totalQuestionsSaved += paperResult.questionsSaved;
-        } else {
-          totalFailed++;
-          failedPapers.push(`${paperResult.paperName}: ${paperResult.error}`);
-        }
-      } else {
-        totalFailed++;
-        failedPapers.push(`Unknown paper: ${result.reason}`);
+        console.log(`[Markscheme Stream] ✓ Markscheme ${index + 1} extracted: "${msName}" → Paper: ${result.paperIdentifier}, Type: ${result.paperTypeIndex}, Solutions: ${result.solutions.length}`);
+
+        return {
+          status: 'success' as const,
+          index,
+          msName,
+          data: result
+        };
+      } catch (error: any) {
+        console.error(`[Markscheme Stream] ✗ Markscheme ${index + 1} failed: ${error.message}`);
+        return {
+          status: 'failed' as const,
+          index,
+          msName,
+          error: error.message
+        };
       }
     });
 
+    // Wait for both streams to complete
+    const [paperResults, markschemeResults] = await Promise.all([
+      Promise.allSettled(paperExtractionPromises),
+      Promise.allSettled(markschemeExtractionPromises)
+    ]);
+
+    console.log(`[Batch Extraction] Step 1 completed: ${paperResults.length} papers processed, ${markschemeResults.length} markschemes processed`);
+
+    // Extract successful results
+    const successfulPapers = paperResults
+      .filter((r): r is PromiseFulfilledResult<any> => r.status === 'fulfilled' && r.value.status === 'success')
+      .map(r => r.value);
+
+    const successfulMarkschemes = markschemeResults
+      .filter((r): r is PromiseFulfilledResult<any> => r.status === 'fulfilled' && r.value.status === 'success')
+      .map(r => r.value);
+
+    console.log(`[Batch Extraction] Successful extractions: ${successfulPapers.length} papers, ${successfulMarkschemes.length} markschemes`);
+
+    // Step 2: Mechanical matching of questions to solutions
+    console.log(`[Batch Extraction] Step 2: Matching questions to solutions...`);
+
+    // Helper function to normalize paper identifiers for fuzzy matching
+    const normalizePaperIdentifier = (identifier: string): string => {
+      return identifier
+        .toLowerCase()
+        .replace(/[_\s-]+/g, '')
+        .replace(/variant|var|v/gi, '')
+        .trim();
+    };
+
+    // Helper function to check if two identifiers match (fuzzy)
+    const identifiersMatch = (id1: string, id2: string): boolean => {
+      const norm1 = normalizePaperIdentifier(id1);
+      const norm2 = normalizePaperIdentifier(id2);
+
+      // Exact match after normalization
+      if (norm1 === norm2) return true;
+
+      // Contains match (for cases like "2022 June" vs "June 2022")
+      if (norm1.includes(norm2) || norm2.includes(norm1)) return true;
+
+      return false;
+    };
+
+    interface MatchedQuestion {
+      paperIndex: number;
+      paperName: string;
+      paperTypeIndex: number;
+      paperIdentifier: string;
+      questionNumber: number;
+      topicName: string;
+      questionText: string;
+      summary: string;
+      solutionObjectives: string[];
+    }
+
+    const matchedQuestions: MatchedQuestion[] = [];
+    const unmatchedQuestions: any[] = [];
+    const unmatchedSolutions: any[] = [];
+
+    // Match each question to its solution
+    for (const paperResult of successfulPapers) {
+      const { index: paperIndex, paperName, data: paperData } = paperResult;
+
+      for (const question of paperData.questions) {
+        let matched = false;
+
+        // Try to find a matching solution
+        for (const msResult of successfulMarkschemes) {
+          const { data: msData } = msResult;
+
+          // Check if paper types match
+          if (paperData.paperTypeIndex !== msData.paperTypeIndex) continue;
+
+          // Check if paper identifiers match (fuzzy)
+          if (!identifiersMatch(paperData.paperIdentifier, msData.paperIdentifier)) continue;
+
+          // Find solution with matching question number
+          const matchingSolution = msData.solutions.find(
+            (sol: any) => sol.questionNumber === question.questionNumber
+          );
+
+          if (matchingSolution) {
+            // We found a match!
+            matchedQuestions.push({
+              paperIndex,
+              paperName,
+              paperTypeIndex: paperData.paperTypeIndex,
+              paperIdentifier: paperData.paperIdentifier,
+              questionNumber: question.questionNumber,
+              topicName: question.topicName,
+              questionText: question.questionText,
+              summary: question.summary,
+              solutionObjectives: matchingSolution.solutionObjectives
+            });
+            matched = true;
+            console.log(`[Matching] ✓ Matched question: Paper "${paperData.paperIdentifier}" Type ${paperData.paperTypeIndex} Q${question.questionNumber} → Topic: ${question.topicName}`);
+            break;
+          }
+        }
+
+        if (!matched) {
+          unmatchedQuestions.push({
+            paperName,
+            paperIdentifier: paperData.paperIdentifier,
+            paperTypeIndex: paperData.paperTypeIndex,
+            questionNumber: question.questionNumber,
+            topicName: question.topicName
+          });
+          console.log(`[Matching] ✗ Unmatched question: Paper "${paperData.paperIdentifier}" Type ${paperData.paperTypeIndex} Q${question.questionNumber}`);
+        }
+      }
+    }
+
+    // Find unmatched solutions (solutions without corresponding questions)
+    for (const msResult of successfulMarkschemes) {
+      const { msName, data: msData } = msResult;
+
+      for (const solution of msData.solutions) {
+        const isMatched = matchedQuestions.some(
+          mq => mq.paperTypeIndex === msData.paperTypeIndex &&
+                identifiersMatch(mq.paperIdentifier, msData.paperIdentifier) &&
+                mq.questionNumber === solution.questionNumber
+        );
+
+        if (!isMatched) {
+          unmatchedSolutions.push({
+            msName,
+            paperIdentifier: msData.paperIdentifier,
+            paperTypeIndex: msData.paperTypeIndex,
+            questionNumber: solution.questionNumber
+          });
+          console.log(`[Matching] ✗ Unmatched solution: Markscheme "${msData.paperIdentifier}" Type ${msData.paperTypeIndex} Q${solution.questionNumber}`);
+        }
+      }
+    }
+
+    console.log(`[Batch Extraction] Matching complete: ${matchedQuestions.length} matched, ${unmatchedQuestions.length} unmatched questions, ${unmatchedSolutions.length} unmatched solutions`);
+
+    // Step 3: Save matched questions to database
+    console.log(`[Batch Extraction] Step 3: Saving ${matchedQuestions.length} matched questions to database...`);
+
+    let totalQuestionsSaved = 0;
+
+    for (const matchedQuestion of matchedQuestions) {
+      try {
+        // Find matching topic in database
+        let topicId: string | null = null;
+
+        for (const pt of paperTypes) {
+          // Match paper type by index
+          const paperTypeName = paperTypesInfo[matchedQuestion.paperTypeIndex]?.name;
+          const matchesPaperType = paperTypeName === pt.name ||
+                                   pt.name.includes(paperTypeName) ||
+                                   paperTypeName.includes(pt.name);
+
+          if (!matchesPaperType) continue;
+
+          // Match topic by name
+          for (const topic of pt.topics) {
+            const matchesTopic = topic.name.toLowerCase().includes(matchedQuestion.topicName.toLowerCase()) ||
+                                matchedQuestion.topicName.toLowerCase().includes(topic.name.toLowerCase());
+
+            if (matchesTopic) {
+              topicId = topic.id;
+              break;
+            }
+          }
+
+          if (topicId) break;
+        }
+
+        if (!topicId) {
+          console.warn(`[Database] Skipping question: Could not find matching topic for "${matchedQuestion.topicName}"`);
+          continue;
+        }
+
+        const solutionObjectivesJson = JSON.stringify(matchedQuestion.solutionObjectives);
+
+        await db.run(
+          'INSERT INTO questions (topic_id, question_text, summary, solution_objectives) VALUES (?, ?, ?, ?)',
+          [topicId, matchedQuestion.questionText, matchedQuestion.summary, solutionObjectivesJson]
+        );
+
+        totalQuestionsSaved++;
+      } catch (error: any) {
+        console.error(`[Database] Error saving question Q${matchedQuestion.questionNumber} from "${matchedQuestion.paperName}":`, error.message);
+      }
+    }
+
+    console.log(`[Batch Extraction] Database save complete: ${totalQuestionsSaved} questions saved`);
+
+    // Summary
+    const failedPapers = paperResults
+      .filter((r): r is PromiseFulfilledResult<any> => r.status === 'fulfilled' && r.value.status === 'failed')
+      .map(r => `${r.value.paperName}: ${r.value.error}`);
+
+    const failedMarkschemes = markschemeResults
+      .filter((r): r is PromiseFulfilledResult<any> => r.status === 'fulfilled' && r.value.status === 'failed')
+      .map(r => `${r.value.msName}: ${r.value.error}`);
+
     console.log(`\n[Batch Extraction] ========== SUMMARY ==========`);
-    console.log(`[Batch Extraction] Successful: ${totalSuccessful}/${filteredPaperData.length} papers`);
-    console.log(`[Batch Extraction] Failed: ${totalFailed}/${filteredPaperData.length} papers`);
-    console.log(`[Batch Extraction] Total questions extracted: ${totalQuestionsExtracted}`);
-    console.log(`[Batch Extraction] Total questions saved: ${totalQuestionsSaved}`);
+    console.log(`[Batch Extraction] Papers: ${successfulPapers.length} successful, ${failedPapers.length} failed`);
+    console.log(`[Batch Extraction] Markschemes: ${successfulMarkschemes.length} successful, ${failedMarkschemes.length} failed`);
+    console.log(`[Batch Extraction] Questions matched: ${matchedQuestions.length}`);
+    console.log(`[Batch Extraction] Questions saved: ${totalQuestionsSaved}`);
+    console.log(`[Batch Extraction] Unmatched questions: ${unmatchedQuestions.length}`);
+    console.log(`[Batch Extraction] Unmatched solutions: ${unmatchedSolutions.length}`);
 
     if (failedPapers.length > 0) {
       console.log(`[Batch Extraction] Failed papers:`);
       failedPapers.forEach(fp => console.log(`  - ${fp}`));
     }
+    if (failedMarkschemes.length > 0) {
+      console.log(`[Batch Extraction] Failed markschemes:`);
+      failedMarkschemes.forEach(fm => console.log(`  - ${fm}`));
+    }
+    if (unmatchedQuestions.length > 0) {
+      console.log(`[Batch Extraction] Unmatched questions (no corresponding solutions):`);
+      unmatchedQuestions.forEach(uq => console.log(`  - ${uq.paperName} (${uq.paperIdentifier}) Type ${uq.paperTypeIndex} Q${uq.questionNumber}: ${uq.topicName}`));
+    }
+    if (unmatchedSolutions.length > 0) {
+      console.log(`[Batch Extraction] Unmatched solutions (no corresponding questions):`);
+      unmatchedSolutions.forEach(us => console.log(`  - ${us.msName} (${us.paperIdentifier}) Type ${us.paperTypeIndex} Q${us.questionNumber}`));
+    }
     console.log(`[Batch Extraction] ================================\n`);
 
     return NextResponse.json({
-      success: totalFailed === 0,
-      papersProcessed: totalSuccessful,
-      papersFailed: totalFailed,
-      failedPapers: failedPapers,
-      questionsExtracted: totalQuestionsExtracted,
-      questionsSaved: totalQuestionsSaved
+      success: failedPapers.length === 0 && failedMarkschemes.length === 0,
+      papersProcessed: successfulPapers.length,
+      papersFailed: failedPapers.length,
+      markschemesProcessed: successfulMarkschemes.length,
+      markschemesFailed: failedMarkschemes.length,
+      questionsMatched: matchedQuestions.length,
+      questionsSaved: totalQuestionsSaved,
+      unmatchedQuestions: unmatchedQuestions.length,
+      unmatchedSolutions: unmatchedSolutions.length,
+      failedPapers,
+      failedMarkschemes
     });
 
   } catch (error: any) {

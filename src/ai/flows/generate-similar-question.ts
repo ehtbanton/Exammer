@@ -23,6 +23,7 @@ const GenerateSimilarQuestionOutputSchema = z.object({
   questionText: z.string().describe('The generated question variant that is similar but not identical to the original.'),
   summary: z.string().describe('A brief one-sentence summary of what this question variant is about.'),
   solutionObjectives: z.array(z.string()).describe('The marking objectives for this specific variant question, adapted from the original objectives to match the new question details.'),
+  validationError: z.string().optional().describe('If the generated solution objectives do not logically correspond to the variant question, describe the mismatch here. Otherwise, omit this field.'),
 });
 export type GenerateSimilarQuestionOutput = z.infer<typeof GenerateSimilarQuestionOutputSchema>;
 
@@ -54,32 +55,50 @@ Original Marking Objectives (from markscheme):
   {{@index}}. {{this}}
 {{/each}}
 
+CRITICAL REQUIREMENT: The variant question MUST be similar but NOT the same as the original. You MUST change specific details, numbers, scenarios, or contexts.
+
 Guidelines for generating the similar question:
 1. MAINTAIN the same structure and format as the original (e.g., if it has parts a, b, c, keep that structure)
 2. MAINTAIN the same difficulty level and assessment objectives
 3. TEST the same concepts and skills from the topic
 4. CHANGE the specific details, numbers, scenarios, or context to make it a unique variant
+   - This is MANDATORY - do not create an identical copy
+   - If the original has numbers, use DIFFERENT numbers
+   - If the original has a specific scenario/context, use a DIFFERENT scenario/context
+   - If the original has specific examples, use DIFFERENT examples
 5. Ensure the question is realistic and could plausibly appear on an actual exam
 6. Keep the same approximate length and complexity
-7. If the original uses specific examples or scenarios, use DIFFERENT but equivalent examples
-8. The question should feel like it's from the same exam paper but testing the same knowledge in a slightly different way
+7. The question should feel like it's from the same exam paper but testing the same knowledge in a slightly different way
 
-For example:
-- If the original asks about photosynthesis in plants, the variant might ask about photosynthesis in algae
-- If the original uses specific numbers (e.g., 50 cm), use different numbers (e.g., 75 cm)
-- If the original describes a specific experimental setup, describe a similar but different setup
-- If the original asks to "calculate X", the variant should also ask to "calculate X" but with different values
+Examples of proper variations:
+- If the original asks about photosynthesis in plants → variant asks about photosynthesis in algae
+- If the original uses 50 cm → variant uses 75 cm or 120 cm (different number)
+- If the original describes a pendulum experiment → variant describes a similar but different pendulum setup
+- If the original asks to "calculate velocity at 5 seconds" → variant asks to "calculate velocity at 8 seconds"
 
 After generating the question, adapt the marking objectives:
 - Keep the SAME NUMBER of objectives as the original
 - Maintain the SAME LEVEL of specificity and difficulty
-- Update any numbers, examples, or specific details to match your variant question
-- The objectives should still test the exact same concepts, just with your new details
+- For ANY changes you made to the question, make corresponding changes to the objectives
+- Update all numbers, formulas, and specific answers to match your variant question
+- If the original objective mentions specific values/formulas, your objectives MUST reflect the new values/formulas from your variant
+- The objectives should describe how to solve YOUR variant question, not the original
 
-For example, if the original objective was "Calculate the wavelength using λ = 50 cm",
-your adapted objective might be "Calculate the wavelength using λ = 75 cm"
+Examples of proper objective adaptation:
+- Original: "Calculate wavelength using λ = 50 cm" → Variant: "Calculate wavelength using λ = 75 cm"
+- Original: "Substitute velocity v = 10 m/s into equation" → Variant: "Substitute velocity v = 15 m/s into equation"
+- Original: "Final answer: 25 Joules" → Variant: "Final answer: 40 Joules" (recalculated for new values)
+- Original: "Explain photosynthesis in leaf cells" → Variant: "Explain photosynthesis in algae cells"
 
-Generate both the similar question AND the adapted marking objectives.`,
+VALIDATION STEP (MANDATORY):
+After generating both the question and objectives:
+1. Check if your solution objectives logically correspond to your variant question
+2. Verify that any numeric answers in objectives match the numbers/context in your question
+3. Verify that any formulas or calculations in objectives use the correct values from your question
+4. If you detect ANY mismatch or inconsistency, populate the validationError field with a description
+5. If the objectives perfectly correspond to the question, leave validationError empty/omitted
+
+Generate the similar question, adapted marking objectives, and perform validation.`,
     });
 
     const response = await prompt(flowInput, {
@@ -89,6 +108,15 @@ Generate both the similar question AND the adapted marking objectives.`,
 
     if (!output) {
       throw new Error('Failed to generate similar question - no output received');
+    }
+
+    // Check for validation errors
+    if (output.validationError) {
+      throw new Error(
+        `Generated question validation failed: ${output.validationError}\n\n` +
+        `This means the solution objectives do not match the generated question variant. ` +
+        `Please try generating the question again or check the original question data.`
+      );
     }
 
     return {
