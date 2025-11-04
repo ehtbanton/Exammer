@@ -189,7 +189,7 @@ function SubjectPageContent() {
                 <DialogTrigger asChild>
                   <Button variant="secondary">Add All Past Papers</Button>
                 </DialogTrigger>
-                <DialogContent className="max-w-2xl">
+                <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
                   {uploadStage === 'papers' && (
                     <>
                       <DialogHeader>
@@ -223,9 +223,9 @@ function SubjectPageContent() {
                           {selectedPapers.length > 0 && (
                             <div className="mt-3 max-h-64 overflow-y-auto border rounded-md p-2 space-y-2">
                               {selectedPapers.map((paper, index) => (
-                                <div key={index} className="flex items-center justify-between p-2 bg-muted rounded">
-                                  <span className="text-sm truncate flex-1 mr-2">{paper.name}</span>
-                                  <Button variant="ghost" size="sm" onClick={() => removePaper(index)}>
+                                <div key={index} className="flex items-center justify-between gap-2 p-2 bg-muted rounded min-w-0">
+                                  <span className="text-sm truncate flex-1 min-w-0">{paper.name}</span>
+                                  <Button variant="ghost" size="sm" onClick={() => removePaper(index)} className="shrink-0">
                                     <span className="text-xs">Remove</span>
                                   </Button>
                                 </div>
@@ -287,9 +287,9 @@ function SubjectPageContent() {
                           {selectedMarkschemes.length > 0 && (
                             <div className="mt-3 max-h-64 overflow-y-auto border rounded-md p-2 space-y-2">
                               {selectedMarkschemes.map((markscheme, index) => (
-                                <div key={index} className="flex items-center justify-between p-2 bg-muted rounded">
-                                  <span className="text-sm truncate flex-1 mr-2">{markscheme.name}</span>
-                                  <Button variant="ghost" size="sm" onClick={() => removeMarkscheme(index)}>
+                                <div key={index} className="flex items-center justify-between gap-2 p-2 bg-muted rounded min-w-0">
+                                  <span className="text-sm truncate flex-1 min-w-0">{markscheme.name}</span>
+                                  <Button variant="ghost" size="sm" onClick={() => removeMarkscheme(index)} className="shrink-0">
                                     <span className="text-xs">Remove</span>
                                   </Button>
                                 </div>

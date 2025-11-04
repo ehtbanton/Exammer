@@ -4,13 +4,13 @@ import { Moon, Sun } from 'lucide-react'
 import { useEffect, useState } from 'react'
 
 export function ThemeToggle() {
-  const [isDark, setIsDark] = useState(false)
-
-  useEffect(() => {
-    // Check if dark mode is enabled on mount
-    const isDarkMode = document.documentElement.classList.contains('dark')
-    setIsDark(isDarkMode)
-  }, [])
+  // Initialize state by checking DOM immediately to avoid first-click delay
+  const [isDark, setIsDark] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return document.documentElement.classList.contains('dark')
+    }
+    return false
+  })
 
   const toggleTheme = () => {
     const newIsDark = !isDark
