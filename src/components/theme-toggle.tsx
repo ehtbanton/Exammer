@@ -4,12 +4,14 @@ import { Moon, Sun } from 'lucide-react'
 import { useEffect, useState } from 'react'
 
 export function ThemeToggle() {
-  // Initialize state by checking DOM immediately to avoid first-click delay
+  // Initialize state by checking localStorage to match ThemeProvider logic
+  // Default is dark mode when no theme is saved
   const [isDark, setIsDark] = useState(() => {
     if (typeof window !== 'undefined') {
-      return document.documentElement.classList.contains('dark')
+      const savedTheme = localStorage.getItem('theme')
+      return savedTheme === 'dark' || savedTheme === null
     }
-    return false
+    return true // SSR default is also dark mode
   })
 
   const toggleTheme = () => {

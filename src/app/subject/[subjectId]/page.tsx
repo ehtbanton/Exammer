@@ -42,6 +42,12 @@ function SubjectPageContent() {
   const [selectedMarkschemes, setSelectedMarkschemes] = useState<File[]>([]);
   const [hideEmptyPapers, setHideEmptyPapers] = useState(true);
 
+  // Truncate filename if longer than 43 characters: first 20 + "..." + last 20
+  const truncateFilename = (filename: string) => {
+    if (filename.length <= 43) return filename;
+    return filename.slice(0, 20) + '...' + filename.slice(-20);
+  };
+
   useEffect(() => {
     // Reset loading state on mount in case user navigated back
     if (subject) {
@@ -221,11 +227,11 @@ function SubjectPageContent() {
                           />
 
                           {selectedPapers.length > 0 && (
-                            <div className="mt-3 max-h-64 overflow-y-auto border rounded-md p-2 space-y-2">
+                            <div className="mt-3 max-h-64 overflow-y-auto overflow-x-hidden border rounded-md p-2 space-y-2">
                               {selectedPapers.map((paper, index) => (
-                                <div key={index} className="flex items-center justify-between gap-2 p-2 bg-muted rounded min-w-0">
-                                  <span className="text-sm truncate flex-1 min-w-0">{paper.name}</span>
-                                  <Button variant="ghost" size="sm" onClick={() => removePaper(index)} className="shrink-0">
+                                <div key={index} className="flex items-center justify-between gap-2 p-2 bg-muted rounded">
+                                  <span className="text-sm flex-1">{truncateFilename(paper.name)}</span>
+                                  <Button variant="ghost" size="sm" onClick={() => removePaper(index)} className="shrink-0 whitespace-nowrap">
                                     <span className="text-xs">Remove</span>
                                   </Button>
                                 </div>
@@ -285,11 +291,11 @@ function SubjectPageContent() {
                           />
 
                           {selectedMarkschemes.length > 0 && (
-                            <div className="mt-3 max-h-64 overflow-y-auto border rounded-md p-2 space-y-2">
+                            <div className="mt-3 max-h-64 overflow-y-auto overflow-x-hidden border rounded-md p-2 space-y-2">
                               {selectedMarkschemes.map((markscheme, index) => (
-                                <div key={index} className="flex items-center justify-between gap-2 p-2 bg-muted rounded min-w-0">
-                                  <span className="text-sm truncate flex-1 min-w-0">{markscheme.name}</span>
-                                  <Button variant="ghost" size="sm" onClick={() => removeMarkscheme(index)} className="shrink-0">
+                                <div key={index} className="flex items-center justify-between gap-2 p-2 bg-muted rounded">
+                                  <span className="text-sm flex-1">{truncateFilename(markscheme.name)}</span>
+                                  <Button variant="ghost" size="sm" onClick={() => removeMarkscheme(index)} className="shrink-0 whitespace-nowrap">
                                     <span className="text-xs">Remove</span>
                                   </Button>
                                 </div>
