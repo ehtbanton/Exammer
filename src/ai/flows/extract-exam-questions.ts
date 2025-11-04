@@ -110,7 +110,8 @@ Important guidelines:
 - Identify the paper type from the exam paper title (e.g., "Paper 1", "Paper 2", "Advanced Paper")
 - Each question should be complete and standalone
 - If a question has multiple parts (a, b, c), include all parts in the questionText
-- The summary should be concise but informative (one sentence)
+- CRITICAL: Every single question MUST have all three required fields: questionText, summary, and topicName
+- The summary field is REQUIRED and should be concise but informative (one sentence describing what the question asks)
 - Match each question to the most relevant topic based on the topic descriptions
 - If a question spans multiple topics, choose the primary/most relevant topic
 - Extract ALL questions from the provided exam paper
@@ -119,6 +120,15 @@ Important guidelines:
 - Solution objectives should be specific, actionable criteria (e.g., "Define the term 'entropy'", "Calculate the equilibrium constant", "Explain two factors affecting reaction rate")
 - If a question has multiple parts (a, b, c), extract objectives for each part
 - Each objective should be a clear, measurable criterion from the markscheme
+{{/if}}
+
+OUTPUT FORMAT REQUIREMENT:
+Every question object in the output array MUST contain:
+1. questionText (string) - The complete question text
+2. summary (string) - A one-sentence summary (REQUIRED, cannot be omitted)
+3. topicName (string) - The topic this question belongs to
+{{#if markschemeDataUri}}
+4. solutionObjectives (array of strings) - Marking criteria from the markscheme
 {{/if}}`,
       });
 
@@ -133,7 +143,22 @@ Important guidelines:
           const output = response.output;
           const paperTypeName = output?.paperTypeName ?? 'Unknown';
           const questions = output?.questions ?? [];
-          return { paperTypeName, questions };
+
+          // Validate and fix questions missing required fields
+          const validatedQuestions = questions.map((q, index) => {
+            if (!q.summary || q.summary.trim() === '') {
+              console.warn(`[Question Extraction] Question ${index + 1} missing summary, generating default`);
+              // Generate a basic summary from the question text
+              const textPreview = q.questionText?.substring(0, 100) || 'Question';
+              return {
+                ...q,
+                summary: `Question about ${q.topicName || 'the topic'}: ${textPreview}...`
+              };
+            }
+            return q;
+          });
+
+          return { paperTypeName, questions: validatedQuestions };
         }
       );
 

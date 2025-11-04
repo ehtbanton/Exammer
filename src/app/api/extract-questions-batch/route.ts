@@ -119,6 +119,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Step 2: Extract questions from each paper IN PARALLEL with its matched markscheme
+    // Use Promise.allSettled to handle individual failures gracefully
     console.log(`[Batch Extraction] Step 2: Extracting questions from ${examPapersDataUris.length} papers in parallel...`);
 
     const topicsInfo = paperTypes.flatMap(pt =>
@@ -126,105 +127,145 @@ export async function POST(req: NextRequest) {
     );
     const paperTypesInfo = paperTypes.map(pt => ({ name: pt.name }));
 
-    const allQuestionsResults = await Promise.all(
-      examPapersDataUris.map((examPaperDataUri, index) => {
-        const markschemeDataUri = paperMarkschemeMap.get(index);
-        console.log(`[Batch Extraction] Extracting paper ${index + 1}/${examPapersDataUris.length}${markschemeDataUri ? ' (with markscheme)' : ' (no markscheme)'}`);
-        return extractExamQuestions({
+    // Helper function to save questions for a single paper immediately
+    const saveQuestionsForPaper = async (result: any, paperIndex: number) => {
+      let paperSavedCount = 0;
+
+      // paperTypeName is at the result level, not per-question
+      const paperTypeName = result.paperTypeName;
+
+      if (!paperTypeName) {
+        console.warn(`[Batch Extraction] Paper ${paperIndex + 1} has no paperTypeName, skipping all questions`);
+        return 0;
+      }
+
+      for (const question of result.questions) {
+        // Validate question has required fields
+        if (!question.topicName) {
+          console.warn(`[Batch Extraction] Skipping question with missing topicName:`, {
+            summary: question.summary
+          });
+          continue;
+        }
+
+        // Find matching topic
+        let questionSaved = false;
+        for (const pt of paperTypes) {
+          for (const topic of pt.topics) {
+            // Use paperTypeName from result level
+            const matchesPaperType = paperTypeName === pt.name ||
+                                     pt.name.includes(paperTypeName) ||
+                                     paperTypeName.includes(pt.name);
+
+            const matchesTopic = topic.name.toLowerCase().includes(question.topicName.toLowerCase()) ||
+                                question.topicName.toLowerCase().includes(topic.name.toLowerCase());
+
+            if (matchesPaperType && matchesTopic) {
+              const solutionObjectivesJson = question.solutionObjectives ? JSON.stringify(question.solutionObjectives) : null;
+
+              await db.run(
+                'INSERT INTO questions (topic_id, question_text, summary, solution_objectives) VALUES (?, ?, ?, ?)',
+                [topic.id, question.questionText, question.summary, solutionObjectivesJson]
+              );
+              paperSavedCount++;
+              questionSaved = true;
+              break; // Question saved, move to next question
+            }
+          }
+          if (questionSaved) break;
+        }
+      }
+
+      return paperSavedCount;
+    };
+
+    // Process papers in parallel, handling failures gracefully
+    const extractionPromises = examPapersDataUris.map(async (examPaperDataUri, index) => {
+      const markschemeDataUri = paperMarkschemeMap.get(index);
+      const paperName = dbPapers[index]?.name || `Paper ${index + 1}`;
+
+      console.log(`[Batch Extraction] Extracting paper ${index + 1}/${examPapersDataUris.length}: "${paperName}"${markschemeDataUri ? ' (with markscheme)' : ' (no markscheme)'}`);
+
+      try {
+        const result = await extractExamQuestions({
           examPaperDataUri,
           markschemeDataUri: markschemeDataUri || undefined,
           paperTypes: paperTypesInfo,
           topics: topicsInfo,
         });
-      })
-    );
 
-    console.log(`[Batch Extraction] Extraction complete. Persisting to database...`);
+        console.log(`[Batch Extraction] ✓ Paper ${index + 1} extracted: ${result.questions.length} questions`);
 
-    // Flatten all extracted questions
-    const allExtractedQuestions: Array<{
-      paperTypeName: string;
-      questionText: string;
-      summary: string;
-      topicName: string;
-      solutionObjectives?: string[];
-    }> = [];
+        // Save questions immediately to database
+        const savedCount = await saveQuestionsForPaper(result, index);
+        console.log(`[Batch Extraction] ✓ Paper ${index + 1} saved: ${savedCount} questions persisted to database`);
 
-    allQuestionsResults.forEach(result => {
-      result.questions.forEach(q => {
-        allExtractedQuestions.push({
-          paperTypeName: result.paperTypeName,
-          questionText: q.questionText,
-          summary: q.summary,
-          topicName: q.topicName,
-          solutionObjectives: q.solutionObjectives,
-        });
-      });
+        return {
+          status: 'success' as const,
+          paperIndex: index,
+          paperName,
+          questionsExtracted: result.questions.length,
+          questionsSaved: savedCount
+        };
+      } catch (error: any) {
+        console.error(`[Batch Extraction] ✗ Paper ${index + 1} failed: ${error.message}`);
+        if (error.message?.includes('Generation blocked')) {
+          console.error(`[Batch Extraction]   Reason: Gemini safety filter blocked content in "${paperName}"`);
+        }
+        return {
+          status: 'failed' as const,
+          paperIndex: index,
+          paperName,
+          error: error.message
+        };
+      }
     });
 
-    console.log(`[Batch Extraction] Total questions extracted: ${allExtractedQuestions.length}`);
+    const results = await Promise.allSettled(extractionPromises);
 
-    // Log sample of what AI returned for debugging
-    if (allExtractedQuestions.length > 0) {
-      const sample = allExtractedQuestions.slice(0, 3);
-      console.log(`[Batch Extraction] Sample extracted questions:`);
-      sample.forEach((q, i) => {
-        console.log(`  ${i+1}. Paper: "${q.paperTypeName}" | Topic: "${q.topicName}" | Objectives: ${q.solutionObjectives?.length || 0}`);
-        if (q.solutionObjectives && q.solutionObjectives.length > 0) {
-          console.log(`      First objective: "${q.solutionObjectives[0]}"`);
+    // Summarize results
+    let totalSuccessful = 0;
+    let totalFailed = 0;
+    let totalQuestionsExtracted = 0;
+    let totalQuestionsSaved = 0;
+    const failedPapers: string[] = [];
+
+    results.forEach((result) => {
+      if (result.status === 'fulfilled') {
+        const paperResult = result.value;
+        if (paperResult.status === 'success') {
+          totalSuccessful++;
+          totalQuestionsExtracted += paperResult.questionsExtracted;
+          totalQuestionsSaved += paperResult.questionsSaved;
+        } else {
+          totalFailed++;
+          failedPapers.push(`${paperResult.paperName}: ${paperResult.error}`);
         }
-      });
-
-      // Count how many questions have objectives
-      const withObjectives = allExtractedQuestions.filter(q => q.solutionObjectives && q.solutionObjectives.length > 0).length;
-      const withoutObjectives = allExtractedQuestions.length - withObjectives;
-      console.log(`[Batch Extraction] Questions with objectives: ${withObjectives}, without: ${withoutObjectives}`);
-    }
-
-    // Persist questions to database
-    let savedCount = 0;
-    for (const pt of paperTypes) {
-      for (const topic of pt.topics) {
-        // Match questions by checking if the AI's topic name is contained in the database topic name
-        // This handles cases where DB has "b202: Engineering Ethics" but AI returns "Engineering Ethics"
-        const topicQuestions = allExtractedQuestions.filter(q => {
-          const matchesPaperType = q.paperTypeName === pt.name ||
-                                   pt.name.includes(q.paperTypeName) ||
-                                   q.paperTypeName.includes(pt.name);
-
-          const matchesTopic = topic.name.toLowerCase().includes(q.topicName.toLowerCase()) ||
-                              q.topicName.toLowerCase().includes(topic.name.toLowerCase());
-
-          return matchesPaperType && matchesTopic;
-        });
-
-        if (topicQuestions.length > 0) {
-          const questionsWithObjectivesCount = topicQuestions.filter(q => q.solutionObjectives && q.solutionObjectives.length > 0).length;
-          console.log(`[Batch Extraction] Saving ${topicQuestions.length} questions for "${topic.name}" (${questionsWithObjectivesCount} with objectives)`);
-        }
-
-        for (const q of topicQuestions) {
-          const solutionObjectivesJson = q.solutionObjectives ? JSON.stringify(q.solutionObjectives) : null;
-
-          if (savedCount < 3 && solutionObjectivesJson) {
-            console.log(`[Batch Extraction]   Saving question with ${q.solutionObjectives?.length} objectives: ${solutionObjectivesJson.substring(0, 100)}...`);
-          }
-
-          await db.run(
-            'INSERT INTO questions (topic_id, question_text, summary, solution_objectives) VALUES (?, ?, ?, ?)',
-            [topic.id, q.questionText, q.summary, solutionObjectivesJson]
-          );
-          savedCount++;
-        }
+      } else {
+        totalFailed++;
+        failedPapers.push(`Unknown paper: ${result.reason}`);
       }
-    }
+    });
 
-    console.log(`[Batch Extraction] Successfully saved ${savedCount} questions to database`);
+    console.log(`\n[Batch Extraction] ========== SUMMARY ==========`);
+    console.log(`[Batch Extraction] Successful: ${totalSuccessful}/${examPapersDataUris.length} papers`);
+    console.log(`[Batch Extraction] Failed: ${totalFailed}/${examPapersDataUris.length} papers`);
+    console.log(`[Batch Extraction] Total questions extracted: ${totalQuestionsExtracted}`);
+    console.log(`[Batch Extraction] Total questions saved: ${totalQuestionsSaved}`);
+
+    if (failedPapers.length > 0) {
+      console.log(`[Batch Extraction] Failed papers:`);
+      failedPapers.forEach(fp => console.log(`  - ${fp}`));
+    }
+    console.log(`[Batch Extraction] ================================\n`);
 
     return NextResponse.json({
-      success: true,
-      questionsExtracted: allExtractedQuestions.length,
-      questionsSaved: savedCount
+      success: totalFailed === 0,
+      papersProcessed: totalSuccessful,
+      papersFailed: totalFailed,
+      failedPapers: failedPapers,
+      questionsExtracted: totalQuestionsExtracted,
+      questionsSaved: totalQuestionsSaved
     });
 
   } catch (error: any) {

@@ -276,10 +276,10 @@ function InterviewPageContent() {
 
   const handleAcceptScore = () => {
     if (paperType && topic && completedObjectives.length > 0 && generatedVariant) {
-      // Calculate score as percentage of objectives completed
+      // Calculate score out of 10 based on objectives completed
       const totalObjectives = generatedVariant.solutionObjectives.length;
-      const percentageScore = (completedObjectives.length / totalObjectives) * 100;
-      updateExamQuestionScore(subject.id, paperType.name, topic.name, examQuestion.id, percentageScore);
+      const scoreOutOf10 = (completedObjectives.length / totalObjectives) * 10;
+      updateExamQuestionScore(subject.id, paperType.name, topic.name, examQuestion.id, scoreOutOf10);
       toast({
         title: "Progress Saved",
         description: `Completed ${completedObjectives.length}/${totalObjectives} objectives.`,
