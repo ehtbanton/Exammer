@@ -70,21 +70,20 @@ export async function extractPaperQuestions(
         name: 'extractPaperQuestionsPrompt',
         input: {schema: ExtractPaperQuestionsInputSchema},
         output: {schema: ExtractPaperQuestionsOutputSchema},
-        prompt: `You are an expert educator analyzing an exam paper to extract questions and metadata.
+        prompt: `You are analyzing an exam paper to extract structured data. Please follow these instructions carefully to ensure consistency.
 
-Your task is to:
-1. Determine which paper type this exam belongs to by examining the title/header
-2. Extract a unique identifier for this specific paper from the content (year, session, variant)
-3. Extract each discrete question with its question number
-4. Categorize each question into the most appropriate topic
-5. Write a brief summary for each question
+Task Overview:
+1. Identify the paper type by examining the document header/title
+2. Extract a standardized identifier for this specific exam
+3. Extract all questions with their numbers and categorize by topic
+4. Provide a brief summary for each question
 
-Available paper types (0-indexed array):
+Available Paper Types (0-indexed):
 {{#each paperTypes}}
-{{@index}}. {{name}}
+Index {{@index}}: {{name}}
 {{/each}}
 
-Topics available for categorization:
+Available Topics:
 {{#each topics}}
 - {{name}}: {{description}}
 {{/each}}
@@ -92,36 +91,43 @@ Topics available for categorization:
 Exam Paper:
 {{media url=examPaperDataUri}}
 
-CRITICAL INSTRUCTIONS:
+Instructions:
 
-Paper Type Identification:
-- Examine the exam paper title/header carefully
-- Output the 0-based INDEX (number) of the matching paper type from the list above
-- Example: If this is "Paper 1", output paperTypeIndex: 0 (if "Paper 1" is at index 0)
+Step 1 - Paper Type Index:
+Examine the paper's title or header to determine which paper type this is.
+Output the 0-based index number from the paper types list above.
+Example: If the paper says "Paper 2" and "Paper 2" appears at index 1 in the list, output paperTypeIndex: 1
 
-Paper Identifier Extraction:
-- Extract the specific identifier from the paper content (NOT the filename)
-- Look for year, session/month, variant, specimen/sample designation
-- Examples: "2022 June", "2023 November Variant 1", "Specimen 2024", "Sample Paper"
-- This should uniquely identify which specific past paper this is
-- Be consistent in format (e.g., always "YYYY Month" or "Specimen YYYY")
+Step 2 - Paper Identifier:
+Extract a standardized identifier from the paper content itself (not the filename).
+Use this exact format: "YYYY Month" for regular exams, or "Specimen YYYY" / "Sample YYYY" for specimen/sample papers.
 
-Question Extraction:
-- Extract the main question number only (1, 2, 3, 4, etc.)
-- For multi-part questions (e.g., 1a, 1b, 1c), treat as a single question with number 1
-- Include ALL parts (a, b, c, etc.) in the questionText
-- Each question MUST have: questionNumber (integer), topicName, questionText, summary
-- Extract ALL questions from the paper
+Format examples:
+- "2022 June" (for June 2022 exam)
+- "2023 November" (for November 2023 exam)
+- "Specimen 2024" (for 2024 specimen paper)
+- "Sample 2023" (for 2023 sample paper)
 
-Topic Categorization:
-- Match each question to the most relevant topic based on descriptions
-- If a question spans multiple topics, choose the primary one
-- Use exact topic names from the provided list
+Important: Always use the full 4-digit year. Use the month name, not numbers. Maintain this exact format for consistency with markschemes.
 
-Summary Requirements:
-- Write a concise one-sentence summary for each question
-- Focus on what the question asks, not how to solve it
-- Must be informative and specific to the question content`,
+Step 3 - Question Numbers:
+Extract the main question number as an integer (1, 2, 3, 4, etc.).
+For questions with multiple parts (e.g., Question 1 has parts a, b, c), use the main number only (1).
+Include all sub-parts in the questionText field.
+
+Step 4 - Question Extraction:
+For each question, provide:
+- questionNumber: Integer (e.g., 1, 2, 3)
+- topicName: The most relevant topic from the topics list (use exact name)
+- questionText: Complete question including all parts
+- summary: One-sentence description of what the question asks
+
+Extract all questions from the paper.
+
+Output Requirements:
+- paperTypeIndex: Must be a valid index from the paper types list (0, 1, 2, etc.)
+- paperIdentifier: Must follow the format "YYYY Month" or "Specimen YYYY"
+- questions: Array of all questions with required fields`,
       });
 
       const flow = aiInstance.defineFlow(

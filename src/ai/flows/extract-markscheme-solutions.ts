@@ -60,62 +60,71 @@ export async function extractMarkschemesSolutions(
         name: 'extractMarkschemesSolutionsPrompt',
         input: {schema: ExtractMarkschemesSolutionsInputSchema},
         output: {schema: ExtractMarkschemesSolutionsOutputSchema},
-        prompt: `You are an expert educator analyzing a markscheme to extract marking criteria and solution objectives.
+        prompt: `You are analyzing a markscheme to extract structured solution data. Please follow these instructions carefully to ensure consistency with the corresponding exam paper.
 
-Your task is to:
-1. Determine which paper type this markscheme belongs to by examining the title/header
-2. Extract a unique identifier for this specific paper from the content (year, session, variant)
-3. For each solution in the markscheme, identify the question number it corresponds to
-4. Extract the marking objectives/criteria as a list of specific, measurable steps
+Task Overview:
+1. Identify the paper type by examining the document header/title
+2. Extract a standardized identifier for this specific exam
+3. Extract all solutions with their question numbers
+4. List the marking objectives for each solution
 
-Available paper types (0-indexed array):
+Available Paper Types (0-indexed):
 {{#each paperTypes}}
-{{@index}}. {{name}}
+Index {{@index}}: {{name}}
 {{/each}}
 
 Markscheme:
 {{media url=markschemeDataUri}}
 
-CRITICAL INSTRUCTIONS:
+Instructions:
 
-Paper Type Identification:
-- Examine the markscheme title/header carefully
-- Output the 0-based INDEX (number) of the matching paper type from the list above
-- Example: If this is for "Paper 1", output paperTypeIndex: 0 (if "Paper 1" is at index 0)
+Step 1 - Paper Type Index:
+Examine the markscheme's title or header to determine which paper type this is.
+Output the 0-based index number from the paper types list above.
+Example: If the markscheme says "Paper 2" and "Paper 2" appears at index 1 in the list, output paperTypeIndex: 1
 
-Paper Identifier Extraction:
-- Extract the specific identifier from the markscheme content (NOT the filename)
-- Look for year, session/month, variant, specimen/sample designation
-- Examples: "2022 June", "2023 November Variant 1", "Specimen 2024", "Sample Paper"
-- This should uniquely identify which specific past paper this markscheme is for
-- Be consistent in format (e.g., always "YYYY Month" or "Specimen YYYY")
-- MUST match exactly with the format you would use for the corresponding exam paper
+Step 2 - Paper Identifier:
+Extract a standardized identifier from the markscheme content itself (not the filename).
+Use this exact format: "YYYY Month" for regular exams, or "Specimen YYYY" / "Sample YYYY" for specimen/sample papers.
 
-Solution Extraction:
-- For each solution, identify its question number (integer only, e.g., 1, 2, 3, 4)
-- Extract ALL marking objectives for that solution
-- Even if solutions are not provided for every question, extract what is available
-- Each solution MUST have: questionNumber (integer) and solutionObjectives (array of strings)
+Format examples:
+- "2022 June" (for June 2022 exam)
+- "2023 November" (for November 2023 exam)
+- "Specimen 2024" (for 2024 specimen paper)
+- "Sample 2023" (for 2023 sample paper)
 
-Solution Objectives Guidelines:
-- Each objective should represent a marking criterion or step that awards marks
+Important: Always use the full 4-digit year. Use the month name, not numbers. This must match the format used in the paper extraction exactly.
+
+Step 3 - Question Numbers:
+For each solution in the markscheme, identify the main question number as an integer (1, 2, 3, 4, etc.).
+If the solution covers multiple parts (e.g., 1a, 1b, 1c), use the main number only (1).
+Include objectives for all parts under the same question number.
+
+Step 4 - Solution Objectives:
+For each solution, extract the marking criteria as a list of specific, measurable objectives.
+Each objective should represent a step or criterion that earns marks.
+
+Objective examples:
+- "Identify the wavelength λ = 500 nm from the diagram"
+- "Calculate frequency using f = c/λ where c = 3×10⁸ m/s"
+- "Substitute values: f = (3×10⁸)/(500×10⁻⁹)"
+- "Final answer: f = 6×10¹⁴ Hz"
+- "Explain that increasing temperature increases kinetic energy"
+- "State two effects: increased collision frequency AND increased energy per collision"
+
+Guidelines for objectives:
 - Include specific numeric values, formulas, or answers where present
-- Examples of good objectives:
-  * "Identify the wavelength λ = 500 nm from the diagram"
-  * "Calculate frequency using f = c/λ where c = 3×10⁸ m/s"
-  * "Substitute values: f = (3×10⁸)/(500×10⁻⁹)"
-  * "Final answer: f = 6×10¹⁴ Hz"
-  * "Explain that increasing temperature increases kinetic energy"
-  * "State two effects: increased collision frequency AND increased energy per collision"
-- Each objective should be specific enough that a teacher could check it against student work
 - Break down multi-step calculations into separate objectives
-- Include method marks (e.g., "Use correct formula") and answer marks (e.g., "Obtain correct final answer")
+- Each objective should be specific enough for a teacher to verify
+- Include both method marks and answer marks
+- Extract all marking points thoroughly
 
-Important Notes:
-- Do NOT include topic categorization (this is done separately for questions)
-- Focus ONLY on extracting marking criteria as they appear in the markscheme
-- Be thorough - extract ALL marking points for each solution
-- If a solution has multiple parts (a, b, c), include objectives for all parts under the same questionNumber`,
+Extract all solutions available in the markscheme, even if some questions are missing solutions.
+
+Output Requirements:
+- paperTypeIndex: Must be a valid index from the paper types list (0, 1, 2, etc.)
+- paperIdentifier: Must follow the format "YYYY Month" or "Specimen YYYY" (matching paper format)
+- solutions: Array of all solutions with questionNumber (integer) and solutionObjectives (array of strings)`,
       });
 
       const flow = aiInstance.defineFlow(

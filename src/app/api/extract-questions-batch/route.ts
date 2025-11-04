@@ -144,15 +144,30 @@ export async function POST(req: NextRequest) {
 
     console.log(`[Batch Extraction] Successful extractions: ${successfulPapers.length} papers, ${successfulMarkschemes.length} markschemes`);
 
+    // Log extracted identifiers for debugging
+    console.log(`\n[Batch Extraction] Extracted Paper Identifiers:`);
+    successfulPapers.forEach((p, idx) => {
+      const qCount = p.data.questions.length;
+      console.log(`  ${idx + 1}. "${p.data.paperIdentifier}" (Type ${p.data.paperTypeIndex}) - ${qCount} questions`);
+    });
+
+    console.log(`\n[Batch Extraction] Extracted Markscheme Identifiers:`);
+    successfulMarkschemes.forEach((m, idx) => {
+      const sCount = m.data.solutions.length;
+      console.log(`  ${idx + 1}. "${m.data.paperIdentifier}" (Type ${m.data.paperTypeIndex}) - ${sCount} solutions`);
+    });
+
     // Step 2: Mechanical matching of questions to solutions
-    console.log(`[Batch Extraction] Step 2: Matching questions to solutions...`);
+    console.log(`\n[Batch Extraction] Step 2: Matching questions to solutions...`);
 
     // Helper function to normalize paper identifiers for fuzzy matching
     const normalizePaperIdentifier = (identifier: string): string => {
       return identifier
         .toLowerCase()
-        .replace(/[_\s-]+/g, '')
-        .replace(/variant|var|v/gi, '')
+        .replace(/[_\s-/]+/g, '') // Remove separators including slashes
+        .replace(/variant|var|specimen|sample|paper/gi, '') // Remove common keywords
+        .replace(/\(.+?\)/g, '') // Remove parentheses and content
+        .replace(/[^\w]/g, '') // Remove any remaining non-alphanumeric
         .trim();
     };
 
@@ -166,6 +181,24 @@ export async function POST(req: NextRequest) {
 
       // Contains match (for cases like "2022 June" vs "June 2022")
       if (norm1.includes(norm2) || norm2.includes(norm1)) return true;
+
+      // Check if they share a significant portion (year + month)
+      // Extract year patterns (4 consecutive digits)
+      const year1 = norm1.match(/\d{4}/)?.[0];
+      const year2 = norm2.match(/\d{4}/)?.[0];
+
+      if (year1 && year2 && year1 === year2) {
+        // Years match, check for month overlap
+        const months = ['january', 'february', 'march', 'april', 'may', 'june',
+                        'july', 'august', 'september', 'october', 'november', 'december',
+                        'jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+
+        for (const month of months) {
+          if (norm1.includes(month) && norm2.includes(month)) {
+            return true; // Same year and month found
+          }
+        }
+      }
 
       return false;
     };
