@@ -15,7 +15,7 @@ import {
   isValidPaperIdentifier,
   getPaperIdentifierErrorMessage,
   getPaperIdentifierPromptRules,
-  getQuestionIdPromptRules
+  getSolutionIdPromptRules
 } from './paper-identifier-validation';
 
 const PaperTypeInfoSchema = z.object({
@@ -91,18 +91,19 @@ EXTRACTION REQUIREMENTS:
 
    CRITICAL: Must match corresponding exam paper format exactly.
 
-2. QUESTION IDs
-   ${getQuestionIdPromptRules()}
+2. SOLUTION IDs
+   ${getSolutionIdPromptRules()}
 
    Construction steps:
    - Take paper date from step 1 (YYYY-MM-P)
    - Append question number (1, 2, 3, etc.)
    - For multi-part solutions (1a, 1b), use main number only
+   - DO NOT append topic index (solutions don't include topics)
 
-   Example: Paper date "2022-06-1", Question 3 → Question ID: "2022-06-1-3"
+   Example: Paper date "2022-06-1", Question 3 → Solution ID: "2022-06-1-3"
 
 3. FOR EACH SOLUTION OUTPUT:
-   - questionId: YYYY-MM-P-Q format (atomic string)
+   - questionId: YYYY-MM-P-Q format (atomic string, NO topic index)
    - solutionObjectives: Array of marking criteria
 
    Objective requirements:
@@ -131,7 +132,7 @@ OUTPUT STRUCTURE:
   ]
 }
 
-CRITICAL: Each questionId must be a complete, properly formatted identifier combining paper date and question number.`,
+CRITICAL: Solution IDs have 4 parts only (no topic). Format: YYYY-MM-P-Q`,
       });
 
       const flow = aiInstance.defineFlow(
@@ -206,9 +207,14 @@ CRITICAL: Each questionId must be a complete, properly formatted identifier comb
                     questionId: fallbackId
                   };
                 }
-                // Validate questionId format starts with paperIdentifier
+                // Validate questionId format: must have 4 parts (YYYY-MM-P-Q)
+                const parts = s.questionId.split('-');
+                if (parts.length !== 4) {
+                  console.warn(`[Markscheme Extraction] Solution ID ${s.questionId} has wrong format (expected 4 parts, got ${parts.length}). Solutions should NOT include topic index.`);
+                }
+                // Validate questionId starts with paperIdentifier
                 if (!s.questionId.startsWith(paperIdentifier + '-')) {
-                  console.warn(`[Markscheme Extraction] Question ID ${s.questionId} does not match paper date ${paperIdentifier}`);
+                  console.warn(`[Markscheme Extraction] Solution ID ${s.questionId} does not match paper date ${paperIdentifier}`);
                 }
                 if (!Array.isArray(s.solutionObjectives) || s.solutionObjectives.length === 0) {
                   console.warn(`[Markscheme Extraction] Solution ${s.questionId} has no objectives, adding placeholder`);

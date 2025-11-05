@@ -55,7 +55,7 @@ export async function POST(req: NextRequest) {
 
     // Prepare data for AI flows
     const topicsInfo = paperTypes.flatMap(pt =>
-      pt.topics.map(t => ({ name: t.name, description: t.description }))
+      pt.topics.map(t => ({ id: t.id, name: t.name, description: t.description }))
     );
     const paperTypesInfo = paperTypes.map(pt => ({ name: pt.name }));
 
@@ -169,7 +169,7 @@ export async function POST(req: NextRequest) {
       paperTypeIndex: number;
       paperIdentifier: string;
       questionId: string;
-      topicName: string;
+      topicIndex: number;
       questionText: string;
       summary: string;
       solutionObjectives: string[];
@@ -179,20 +179,31 @@ export async function POST(req: NextRequest) {
     const unmatchedQuestions: any[] = [];
     const unmatchedSolutions: any[] = [];
 
-    // Match each question to its solution using exact question ID matching
+    // Match questions to solutions: match on first 4 parts (YYYY-MM-P-Q), use 5th part (topic index)
     for (const paperResult of successfulPapers) {
       const { index: paperIndex, paperName, data: paperData } = paperResult;
 
       for (const question of paperData.questions) {
         let matched = false;
 
-        // Try to find a matching solution by question ID
+        // Parse question ID: YYYY-MM-P-Q-T (5 parts)
+        const questionParts = question.questionId.split('-');
+        if (questionParts.length !== 5) {
+          console.warn(`[Matching] ✗ ${question.questionId} has invalid format (expected 5 parts, got ${questionParts.length})`);
+          continue;
+        }
+
+        // Extract first 4 parts for matching (date-paper-question)
+        const matchingKey = questionParts.slice(0, 4).join('-'); // YYYY-MM-P-Q
+        const topicIndex = parseInt(questionParts[4], 10); // T
+
+        // Try to find a matching solution by first 4 parts
         for (const msResult of successfulMarkschemes) {
           const { data: msData } = msResult;
 
-          // Find solution with matching question ID (exact string match)
+          // Find solution with matching first 4 parts (YYYY-MM-P-Q)
           const matchingSolution = msData.solutions.find(
-            (sol: any) => sol.questionId === question.questionId
+            (sol: any) => sol.questionId === matchingKey
           );
 
           if (matchingSolution) {
@@ -203,13 +214,13 @@ export async function POST(req: NextRequest) {
               paperTypeIndex: paperData.paperTypeIndex,
               paperIdentifier: paperData.paperIdentifier,
               questionId: question.questionId,
-              topicName: question.topicName,
+              topicIndex,
               questionText: question.questionText,
               summary: question.summary,
               solutionObjectives: matchingSolution.solutionObjectives
             });
             matched = true;
-            console.log(`[Matching] ✓ ${question.questionId} matched → ${question.topicName}`);
+            console.log(`[Matching] ✓ ${matchingKey} matched, topic index: ${topicIndex}`);
             break;
           }
         }
@@ -220,9 +231,9 @@ export async function POST(req: NextRequest) {
             paperIdentifier: paperData.paperIdentifier,
             paperTypeIndex: paperData.paperTypeIndex,
             questionId: question.questionId,
-            topicName: question.topicName
+            topicIndex
           });
-          console.log(`[Matching] ✗ ${question.questionId} unmatched`);
+          console.log(`[Matching] ✗ ${matchingKey} unmatched (full ID: ${question.questionId})`);
         }
       }
     }
@@ -232,9 +243,12 @@ export async function POST(req: NextRequest) {
       const { msName, data: msData } = msResult;
 
       for (const solution of msData.solutions) {
-        const isMatched = matchedQuestions.some(
-          mq => mq.questionId === solution.questionId
-        );
+        // Check if any matched question has this solution ID (first 4 parts)
+        const isMatched = matchedQuestions.some(mq => {
+          const questionParts = mq.questionId.split('-');
+          const matchingKey = questionParts.slice(0, 4).join('-');
+          return matchingKey === solution.questionId;
+        });
 
         if (!isMatched) {
           unmatchedSolutions.push({
@@ -257,37 +271,16 @@ export async function POST(req: NextRequest) {
 
     for (const matchedQuestion of matchedQuestions) {
       try {
-        // Find matching topic in database
-        let topicId: string | null = null;
+        // Get topic ID from topicsInfo using topic index
+        const allTopics = paperTypes.flatMap(pt => pt.topics);
+        const topic = allTopics[matchedQuestion.topicIndex];
 
-        for (const pt of paperTypes) {
-          // Match paper type by index
-          const paperTypeName = paperTypesInfo[matchedQuestion.paperTypeIndex]?.name;
-          const matchesPaperType = paperTypeName === pt.name ||
-                                   pt.name.includes(paperTypeName) ||
-                                   paperTypeName.includes(pt.name);
-
-          if (!matchesPaperType) continue;
-
-          // Match topic by name
-          for (const topic of pt.topics) {
-            const matchesTopic = topic.name.toLowerCase().includes(matchedQuestion.topicName.toLowerCase()) ||
-                                matchedQuestion.topicName.toLowerCase().includes(topic.name.toLowerCase());
-
-            if (matchesTopic) {
-              topicId = topic.id;
-              break;
-            }
-          }
-
-          if (topicId) break;
-        }
-
-        if (!topicId) {
-          console.warn(`[Database] Skipping question: Could not find matching topic for "${matchedQuestion.topicName}"`);
+        if (!topic) {
+          console.warn(`[Database] Skipping question ${matchedQuestion.questionId}: Topic index ${matchedQuestion.topicIndex} out of range (total topics: ${allTopics.length})`);
           continue;
         }
 
+        const topicId = topic.id;
         const solutionObjectivesJson = JSON.stringify(matchedQuestion.solutionObjectives);
 
         await db.run(
@@ -296,8 +289,9 @@ export async function POST(req: NextRequest) {
         );
 
         totalQuestionsSaved++;
+        console.log(`[Database] ✓ Saved question ${matchedQuestion.questionId} → Topic: ${topic.name}`);
       } catch (error: any) {
-        console.error(`[Database] Error saving question Q${matchedQuestion.questionNumber} from "${matchedQuestion.paperName}":`, error.message);
+        console.error(`[Database] Error saving question ${matchedQuestion.questionId} from "${matchedQuestion.paperName}":`, error.message);
       }
     }
 
@@ -330,7 +324,7 @@ export async function POST(req: NextRequest) {
     }
     if (unmatchedQuestions.length > 0) {
       console.log(`[Batch Extraction] Unmatched questions (no corresponding solutions):`);
-      unmatchedQuestions.forEach(uq => console.log(`  - ${uq.questionId}: ${uq.topicName}`));
+      unmatchedQuestions.forEach(uq => console.log(`  - ${uq.questionId} (topic index: ${uq.topicIndex})`));
     }
     if (unmatchedSolutions.length > 0) {
       console.log(`[Batch Extraction] Unmatched solutions (no corresponding questions):`);

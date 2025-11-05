@@ -7,10 +7,16 @@
  * - P: 1-digit paper type index (0-9)
  * Example: "2022-06-1" = June 2022, Paper Type Index 1
  *
- * Question ID Format: YYYY-MM-P-Q
+ * Paper Question ID Format: YYYY-MM-P-Q-T
  * - YYYY-MM-P: Paper date
  * - Q: Question number (1-99)
- * Example: "2022-06-1-1" = June 2022, Paper 1, Question 1
+ * - T: Topic index (0-99)
+ * Example: "2022-06-1-3-5" = June 2022, Paper 1, Question 3, Topic 5
+ *
+ * Markscheme Solution ID Format: YYYY-MM-P-Q
+ * - YYYY-MM-P: Paper date
+ * - Q: Question number (1-99)
+ * Example: "2022-06-1-3" = June 2022, Paper 1, Question 3
  *
  * NOTE: Only dated papers are processed. Specimen/sample papers are ignored.
  */
@@ -22,10 +28,16 @@
 const PAPER_DATE_REGEX = /^(\d{4})-(0[1-9]|1[0-2])-([0-9])$/;
 
 /**
- * Regular expression pattern for valid question identifiers.
+ * Regular expression pattern for paper question identifiers (with topic).
+ * Format: YYYY-MM-P-Q-T where Q is 1-99, T is 0-99
+ */
+const PAPER_QUESTION_ID_REGEX = /^(\d{4})-(0[1-9]|1[0-2])-([0-9])-([1-9][0-9]?)-([0-9]|[1-9][0-9])$/;
+
+/**
+ * Regular expression pattern for markscheme solution identifiers (no topic).
  * Format: YYYY-MM-P-Q where Q is 1-99
  */
-const QUESTION_ID_REGEX = /^(\d{4})-(0[1-9]|1[0-2])-([0-9])-([1-9][0-9]?)$/;
+const SOLUTION_ID_REGEX = /^(\d{4})-(0[1-9]|1[0-2])-([0-9])-([1-9][0-9]?)$/;
 
 /**
  * Validates whether a paper date follows the required format.
@@ -86,17 +98,45 @@ export const PAPER_DATE_FORMAT_RULES = {
   }
 } as const;
 
-export const QUESTION_ID_FORMAT_RULES = {
-  description: 'Question ID combines paper date with question number',
+export const PAPER_QUESTION_ID_FORMAT_RULES = {
+  description: 'Paper question ID combines date, question number, and topic index',
+  format: 'YYYY-MM-P-Q-T',
+  structure: {
+    paperDate: 'YYYY-MM-P: Paper date',
+    questionNumber: 'Q: Question number (1-99)',
+    topicIndex: 'T: Topic index from topics list (0-99)'
+  },
+  requirements: [
+    'Combine paper date, question number, and topic index',
+    'Use hyphen separators',
+    'Question number without zero-padding (1, 2, 3)',
+    'Topic index matches position in topics list (0-based)'
+  ],
+  examples: {
+    valid: [
+      '2022-06-1-1-0 (June 2022, Paper 1, Question 1, Topic 0)',
+      '2023-11-0-5-3 (November 2023, Paper 0, Question 5, Topic 3)',
+      '2024-03-2-12-15 (March 2024, Paper 2, Question 12, Topic 15)'
+    ],
+    invalid: [
+      '2022-06-1-1 (missing topic index)',
+      '2022-06-1-01-0 (question number zero-padded)',
+      '2022-06-1-1-T0 (extra characters)'
+    ]
+  }
+} as const;
+
+export const SOLUTION_ID_FORMAT_RULES = {
+  description: 'Solution ID combines date and question number (no topic)',
   format: 'YYYY-MM-P-Q',
   structure: {
-    paperDate: 'YYYY-MM-P: Paper date as defined above',
+    paperDate: 'YYYY-MM-P: Paper date',
     questionNumber: 'Q: Question number (1-99)'
   },
   requirements: [
     'Combine paper date with question number',
     'Use hyphen separator',
-    'Question number without zero-padding (1, 2, 3, not 01, 02, 03)'
+    'Question number without zero-padding (1, 2, 3)'
   ],
   examples: {
     valid: [
@@ -160,13 +200,42 @@ CRITICAL: Format must be exact. Character-by-character compliance is mandatory.
 }
 
 /**
- * Returns formatted rules for question ID (used in prompts).
+ * Returns formatted rules for paper question ID (used in paper extraction prompts).
  */
-export function getQuestionIdPromptRules(): string {
-  const rules = QUESTION_ID_FORMAT_RULES;
+export function getPaperQuestionIdPromptRules(): string {
+  const rules = PAPER_QUESTION_ID_FORMAT_RULES;
 
   return `
-QUESTION ID FORMAT (MANDATORY):
+PAPER QUESTION ID FORMAT (MANDATORY):
+
+Required Format: ${rules.format}
+
+Structure:
+- ${rules.structure.paperDate}
+- ${rules.structure.questionNumber}
+- ${rules.structure.topicIndex}
+
+Requirements:
+${rules.requirements.map((r, i) => `${i + 1}. ${r}`).join('\n')}
+
+Valid Examples:
+${rules.examples.valid.map(ex => `✓ ${ex}`).join('\n')}
+
+Invalid Examples:
+${rules.examples.invalid.map(ex => `✗ ${ex}`).join('\n')}
+
+CRITICAL: Format must be exact. Output question ID as single atomic string with topic index.
+`.trim();
+}
+
+/**
+ * Returns formatted rules for solution ID (used in markscheme extraction prompts).
+ */
+export function getSolutionIdPromptRules(): string {
+  const rules = SOLUTION_ID_FORMAT_RULES;
+
+  return `
+SOLUTION ID FORMAT (MANDATORY):
 
 Required Format: ${rules.format}
 
@@ -183,6 +252,6 @@ ${rules.examples.valid.map(ex => `✓ ${ex}`).join('\n')}
 Invalid Examples:
 ${rules.examples.invalid.map(ex => `✗ ${ex}`).join('\n')}
 
-CRITICAL: Format must be exact. Output question ID as single atomic string.
+CRITICAL: Format must be exact. Output solution ID as single atomic string (no topic).
 `.trim();
 }

@@ -15,7 +15,7 @@ import {
   isValidPaperIdentifier,
   getPaperIdentifierErrorMessage,
   getPaperIdentifierPromptRules,
-  getQuestionIdPromptRules
+  getPaperQuestionIdPromptRules
 } from './paper-identifier-validation';
 
 const PaperTypeInfoSchema = z.object({
@@ -23,6 +23,7 @@ const PaperTypeInfoSchema = z.object({
 });
 
 const TopicInfoSchema = z.object({
+  id: z.string().describe('The unique ID of the topic.'),
   name: z.string().describe('The name of the topic.'),
   description: z.string().describe('The description of what this topic covers.'),
 });
@@ -43,8 +44,7 @@ const ExtractPaperQuestionsInputSchema = z.object({
 export type ExtractPaperQuestionsInput = z.infer<typeof ExtractPaperQuestionsInputSchema>;
 
 const PaperQuestionSchema = z.object({
-  questionId: z.string().describe('Question identifier in YYYY-MM-P-Q format (e.g., "2022-06-1-1" for June 2022, Paper 1, Question 1).'),
-  topicName: z.string().describe('The name of the topic this question belongs to from the provided topics list.'),
+  questionId: z.string().describe('Question identifier in YYYY-MM-P-Q-T format (e.g., "2022-06-1-1-0" for June 2022, Paper 1, Question 1, Topic 0).'),
   questionText: z.string().describe('The complete text of the exam question, including all parts and sub-questions.'),
   summary: z.string().describe('A brief one-sentence summary of what this question is about.'),
 });
@@ -83,9 +83,9 @@ PAPER TYPES (0-indexed):
 {{@index}}: {{name}}
 {{/each}}
 
-TOPICS:
+TOPICS (0-indexed):
 {{#each topics}}
-- {{name}}: {{description}}
+{{@index}}: {{name}} - {{description}}
 {{/each}}
 
 DOCUMENT:
@@ -105,18 +105,19 @@ EXTRACTION REQUIREMENTS:
    Example: Document shows "June 2022" and "Paper 2" (index 1) → Paper date: "2022-06-1"
 
 2. QUESTION IDs
-   ${getQuestionIdPromptRules()}
+   ${getPaperQuestionIdPromptRules()}
 
    Construction steps:
    - Take paper date from step 1 (YYYY-MM-P)
    - Append question number (1, 2, 3, etc.)
+   - Identify topic from topics list (use 0-based index)
+   - Append topic index
    - For multi-part questions (1a, 1b), use main number only
 
-   Example: Paper date "2022-06-1", Question 3 → Question ID: "2022-06-1-3"
+   Example: Paper date "2022-06-1", Question 3, Topic 5 → Question ID: "2022-06-1-3-5"
 
 3. FOR EACH QUESTION OUTPUT:
-   - questionId: YYYY-MM-P-Q format (atomic string)
-   - topicName: Exact topic name from topics list
+   - questionId: YYYY-MM-P-Q-T format (atomic string with topic index)
    - questionText: Complete text including all sub-parts
    - summary: Single sentence description
 
@@ -126,15 +127,14 @@ OUTPUT STRUCTURE:
   "paperIdentifier": "<YYYY-MM-P>",
   "questions": [
     {
-      "questionId": "<YYYY-MM-P-Q>",
-      "topicName": "<exact topic>",
+      "questionId": "<YYYY-MM-P-Q-T>",
       "questionText": "<complete text>",
       "summary": "<single sentence>"
     }
   ]
 }
 
-CRITICAL: Each questionId must be a complete, properly formatted identifier combining paper date and question number.`,
+CRITICAL: Each questionId must include topic index as 5th field. Topic index must match position in topics list (0-based).`,
       });
 
       const flow = aiInstance.defineFlow(
@@ -206,18 +206,23 @@ CRITICAL: Each questionId must be a complete, properly formatted identifier comb
                   const textPreview = q.questionText?.substring(0, 100) || 'Question';
                   return {
                     ...q,
-                    summary: `Question about ${q.topicName || 'the topic'}: ${textPreview}...`
+                    summary: `Question text: ${textPreview}...`
                   };
                 }
                 if (!q.questionId || typeof q.questionId !== 'string') {
                   console.warn(`[Paper Extraction] Question at index ${index} has invalid questionId`);
-                  const fallbackId = `${paperIdentifier}-${index + 1}`;
+                  const fallbackId = `${paperIdentifier}-${index + 1}-0`;
                   return {
                     ...q,
                     questionId: fallbackId
                   };
                 }
-                // Validate questionId format starts with paperIdentifier
+                // Validate questionId format: must have 5 parts (YYYY-MM-P-Q-T)
+                const parts = q.questionId.split('-');
+                if (parts.length !== 5) {
+                  console.warn(`[Paper Extraction] Question ID ${q.questionId} missing topic index (expected 5 parts, got ${parts.length})`);
+                }
+                // Validate questionId starts with paperIdentifier
                 if (!q.questionId.startsWith(paperIdentifier + '-')) {
                   console.warn(`[Paper Extraction] Question ID ${q.questionId} does not match paper date ${paperIdentifier}`);
                 }
