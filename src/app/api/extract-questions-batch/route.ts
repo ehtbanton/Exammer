@@ -160,48 +160,8 @@ export async function POST(req: NextRequest) {
     // Step 2: Mechanical matching of questions to solutions
     console.log(`\n[Batch Extraction] Step 2: Matching questions to solutions...`);
 
-    // Helper function to normalize paper identifiers for fuzzy matching
-    const normalizePaperIdentifier = (identifier: string): string => {
-      return identifier
-        .toLowerCase()
-        .replace(/[_\s-/]+/g, '') // Remove separators including slashes
-        .replace(/variant|var|specimen|sample|paper/gi, '') // Remove common keywords
-        .replace(/\(.+?\)/g, '') // Remove parentheses and content
-        .replace(/[^\w]/g, '') // Remove any remaining non-alphanumeric
-        .trim();
-    };
-
-    // Helper function to check if two identifiers match (fuzzy)
-    const identifiersMatch = (id1: string, id2: string): boolean => {
-      const norm1 = normalizePaperIdentifier(id1);
-      const norm2 = normalizePaperIdentifier(id2);
-
-      // Exact match after normalization
-      if (norm1 === norm2) return true;
-
-      // Contains match (for cases like "2022 June" vs "June 2022")
-      if (norm1.includes(norm2) || norm2.includes(norm1)) return true;
-
-      // Check if they share a significant portion (year + month)
-      // Extract year patterns (4 consecutive digits)
-      const year1 = norm1.match(/\d{4}/)?.[0];
-      const year2 = norm2.match(/\d{4}/)?.[0];
-
-      if (year1 && year2 && year1 === year2) {
-        // Years match, check for month overlap
-        const months = ['january', 'february', 'march', 'april', 'may', 'june',
-                        'july', 'august', 'september', 'october', 'november', 'december',
-                        'jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
-
-        for (const month of months) {
-          if (norm1.includes(month) && norm2.includes(month)) {
-            return true; // Same year and month found
-          }
-        }
-      }
-
-      return false;
-    };
+    // Exact matching on paper date format (YYYY-MM-P)
+    // No fuzzy matching - dates must match exactly
 
     interface MatchedQuestion {
       paperIndex: number;
@@ -219,7 +179,7 @@ export async function POST(req: NextRequest) {
     const unmatchedQuestions: any[] = [];
     const unmatchedSolutions: any[] = [];
 
-    // Match each question to its solution
+    // Match each question to its solution using exact date matching
     for (const paperResult of successfulPapers) {
       const { index: paperIndex, paperName, data: paperData } = paperResult;
 
@@ -230,11 +190,14 @@ export async function POST(req: NextRequest) {
         for (const msResult of successfulMarkschemes) {
           const { data: msData } = msResult;
 
-          // Check if paper types match
-          if (paperData.paperTypeIndex !== msData.paperTypeIndex) continue;
+          // Check if paper dates match exactly (YYYY-MM-P format)
+          if (paperData.paperIdentifier !== msData.paperIdentifier) continue;
 
-          // Check if paper identifiers match (fuzzy)
-          if (!identifiersMatch(paperData.paperIdentifier, msData.paperIdentifier)) continue;
+          // Paper type index is redundant (included in paperIdentifier) but verify anyway
+          if (paperData.paperTypeIndex !== msData.paperTypeIndex) {
+            console.warn(`[Matching] Date match but type mismatch: "${paperData.paperIdentifier}" has types ${paperData.paperTypeIndex} vs ${msData.paperTypeIndex}`);
+            continue;
+          }
 
           // Find solution with matching question number
           const matchingSolution = msData.solutions.find(
@@ -242,7 +205,7 @@ export async function POST(req: NextRequest) {
           );
 
           if (matchingSolution) {
-            // We found a match!
+            // Match found
             matchedQuestions.push({
               paperIndex,
               paperName,
@@ -255,7 +218,7 @@ export async function POST(req: NextRequest) {
               solutionObjectives: matchingSolution.solutionObjectives
             });
             matched = true;
-            console.log(`[Matching] ✓ Matched question: Paper "${paperData.paperIdentifier}" Type ${paperData.paperTypeIndex} Q${question.questionNumber} → Topic: ${question.topicName}`);
+            console.log(`[Matching] ✓ Q${question.questionNumber} matched: ${paperData.paperIdentifier} → ${question.topicName}`);
             break;
           }
         }
@@ -268,7 +231,7 @@ export async function POST(req: NextRequest) {
             questionNumber: question.questionNumber,
             topicName: question.topicName
           });
-          console.log(`[Matching] ✗ Unmatched question: Paper "${paperData.paperIdentifier}" Type ${paperData.paperTypeIndex} Q${question.questionNumber}`);
+          console.log(`[Matching] ✗ Q${question.questionNumber} unmatched: ${paperData.paperIdentifier} Type ${paperData.paperTypeIndex}`);
         }
       }
     }
@@ -279,8 +242,7 @@ export async function POST(req: NextRequest) {
 
       for (const solution of msData.solutions) {
         const isMatched = matchedQuestions.some(
-          mq => mq.paperTypeIndex === msData.paperTypeIndex &&
-                identifiersMatch(mq.paperIdentifier, msData.paperIdentifier) &&
+          mq => mq.paperIdentifier === msData.paperIdentifier &&
                 mq.questionNumber === solution.questionNumber
         );
 
@@ -291,7 +253,7 @@ export async function POST(req: NextRequest) {
             paperTypeIndex: msData.paperTypeIndex,
             questionNumber: solution.questionNumber
           });
-          console.log(`[Matching] ✗ Unmatched solution: Markscheme "${msData.paperIdentifier}" Type ${msData.paperTypeIndex} Q${solution.questionNumber}`);
+          console.log(`[Matching] ✗ Solution unmatched: ${msData.paperIdentifier} Q${solution.questionNumber}`);
         }
       }
     }
@@ -378,11 +340,11 @@ export async function POST(req: NextRequest) {
     }
     if (unmatchedQuestions.length > 0) {
       console.log(`[Batch Extraction] Unmatched questions (no corresponding solutions):`);
-      unmatchedQuestions.forEach(uq => console.log(`  - ${uq.paperName} (${uq.paperIdentifier}) Type ${uq.paperTypeIndex} Q${uq.questionNumber}: ${uq.topicName}`));
+      unmatchedQuestions.forEach(uq => console.log(`  - ${uq.paperIdentifier} Q${uq.questionNumber}: ${uq.topicName}`));
     }
     if (unmatchedSolutions.length > 0) {
       console.log(`[Batch Extraction] Unmatched solutions (no corresponding questions):`);
-      unmatchedSolutions.forEach(us => console.log(`  - ${us.msName} (${us.paperIdentifier}) Type ${us.paperTypeIndex} Q${us.questionNumber}`));
+      unmatchedSolutions.forEach(us => console.log(`  - ${us.paperIdentifier} Q${us.questionNumber}`));
     }
     console.log(`[Batch Extraction] ================================\n`);
 

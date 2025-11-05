@@ -11,6 +11,11 @@ import {genkit} from 'genkit';
 import {googleAI} from '@genkit-ai/google-genai';
 import {z} from 'genkit';
 import {geminiApiKeyManager} from '@root/gemini-api-key-manager';
+import {
+  isValidPaperIdentifier,
+  getPaperIdentifierErrorMessage,
+  getPaperIdentifierPromptRules
+} from './paper-identifier-validation';
 
 const PaperTypeInfoSchema = z.object({
   name: z.string().describe('The name of the paper type.'),
@@ -35,7 +40,7 @@ const MarkschemesSolutionSchema = z.object({
 
 const ExtractMarkschemesSolutionsOutputSchema = z.object({
   paperTypeIndex: z.number().describe('The 0-based index of the paper type from the provided paperTypes array.'),
-  paperIdentifier: z.string().describe('A unique identifier for the specific exam this markscheme belongs to, extracted from the markscheme content (e.g., "2022 June", "Specimen 2023").'),
+  paperIdentifier: z.string().describe('Paper date in YYYY-MM-P format where YYYY=year, MM=month (01-12), P=paper type index. Example: "2022-06-1" for June 2022, Paper Type 1. Must match corresponding exam paper exactly.'),
   solutions: z.array(MarkschemesSolutionSchema).describe('All solutions with marking objectives extracted from this markscheme.'),
 });
 export type ExtractMarkschemesSolutionsOutput = z.infer<typeof ExtractMarkschemesSolutionsOutputSchema>;
@@ -60,71 +65,66 @@ export async function extractMarkschemesSolutions(
         name: 'extractMarkschemesSolutionsPrompt',
         input: {schema: ExtractMarkschemesSolutionsInputSchema},
         output: {schema: ExtractMarkschemesSolutionsOutputSchema},
-        prompt: `You are analyzing a markscheme to extract structured solution data. Please follow these instructions carefully to ensure consistency with the corresponding exam paper.
+        prompt: `TASK: Extract solutions from dated markscheme.
 
-Task Overview:
-1. Identify the paper type by examining the document header/title
-2. Extract a standardized identifier for this specific exam
-3. Extract all solutions with their question numbers
-4. List the marking objectives for each solution
-
-Available Paper Types (0-indexed):
+PAPER TYPES (0-indexed):
 {{#each paperTypes}}
-Index {{@index}}: {{name}}
+{{@index}}: {{name}}
 {{/each}}
 
-Markscheme:
+DOCUMENT:
 {{media url=markschemeDataUri}}
 
-Instructions:
+EXTRACTION REQUIREMENTS:
 
-Step 1 - Paper Type Index:
-Examine the markscheme's title or header to determine which paper type this is.
-Output the 0-based index number from the paper types list above.
-Example: If the markscheme says "Paper 2" and "Paper 2" appears at index 1 in the list, output paperTypeIndex: 1
+1. PAPER DATE
+   ${getPaperIdentifierPromptRules()}
 
-Step 2 - Paper Identifier:
-Extract a standardized identifier from the markscheme content itself (not the filename).
-Use this exact format: "YYYY Month" for regular exams, or "Specimen YYYY" / "Sample YYYY" for specimen/sample papers.
+   Steps:
+   - Locate year in document (4 digits)
+   - Locate month in document (convert to 2-digit: 01-12)
+   - Identify paper type from header (use 0-based index)
+   - Format as: YYYY-MM-P
 
-Format examples:
-- "2022 June" (for June 2022 exam)
-- "2023 November" (for November 2023 exam)
-- "Specimen 2024" (for 2024 specimen paper)
-- "Sample 2023" (for 2023 sample paper)
+   Example: Document shows "June 2022" and "Paper 2" (index 1) → Output: "2022-06-1"
 
-Important: Always use the full 4-digit year. Use the month name, not numbers. This must match the format used in the paper extraction exactly.
+   CRITICAL: Must match corresponding exam paper format exactly.
 
-Step 3 - Question Numbers:
-For each solution in the markscheme, identify the main question number as an integer (1, 2, 3, 4, etc.).
-If the solution covers multiple parts (e.g., 1a, 1b, 1c), use the main number only (1).
-Include objectives for all parts under the same question number.
+2. PAPER TYPE INDEX
+   Output 0-based index matching paper type in document header.
 
-Step 4 - Solution Objectives:
-For each solution, extract the marking criteria as a list of specific, measurable objectives.
-Each objective should represent a step or criterion that earns marks.
+3. SOLUTIONS
+   For each solution:
+   - questionNumber: Integer (1, 2, 3, etc.). For multi-part (1a, 1b), use main number only.
+   - solutionObjectives: Array of marking criteria as specific, measurable objectives.
 
-Objective examples:
-- "Identify the wavelength λ = 500 nm from the diagram"
-- "Calculate frequency using f = c/λ where c = 3×10⁸ m/s"
-- "Substitute values: f = (3×10⁸)/(500×10⁻⁹)"
-- "Final answer: f = 6×10¹⁴ Hz"
-- "Explain that increasing temperature increases kinetic energy"
-- "State two effects: increased collision frequency AND increased energy per collision"
+   Objective requirements:
+   - Include numeric values, formulas, answers where present
+   - Break multi-step calculations into separate objectives
+   - Make each objective verifiable
+   - Extract all marking points
 
-Guidelines for objectives:
-- Include specific numeric values, formulas, or answers where present
-- Break down multi-step calculations into separate objectives
-- Each objective should be specific enough for a teacher to verify
-- Include both method marks and answer marks
-- Extract all marking points thoroughly
+   Valid examples:
+   - "Identify wavelength λ = 500 nm from diagram"
+   - "Calculate frequency using f = c/λ where c = 3×10⁸ m/s"
+   - "Substitute: f = (3×10⁸)/(500×10⁻⁹)"
+   - "Final answer: f = 6×10¹⁴ Hz"
+   - "Explain: increasing temperature increases kinetic energy"
+   - "State: increased collision frequency AND increased energy per collision"
 
-Extract all solutions available in the markscheme, even if some questions are missing solutions.
+OUTPUT STRUCTURE:
+{
+  "paperTypeIndex": <integer 0-9>,
+  "paperIdentifier": "<YYYY-MM-P format>",
+  "solutions": [
+    {
+      "questionNumber": <integer>,
+      "solutionObjectives": ["<objective 1>", "<objective 2>", ...]
+    }
+  ]
+}
 
-Output Requirements:
-- paperTypeIndex: Must be a valid index from the paper types list (0, 1, 2, etc.)
-- paperIdentifier: Must follow the format "YYYY Month" or "Specimen YYYY" (matching paper format)
-- solutions: Array of all solutions with questionNumber (integer) and solutionObjectives (array of strings)`,
+VALIDATION: Format will be checked. Non-compliant output will be rejected and retried.`,
       });
 
       const flow = aiInstance.defineFlow(
@@ -134,46 +134,97 @@ Output Requirements:
           outputSchema: ExtractMarkschemesSolutionsOutputSchema,
         },
         async input => {
-          const response = await prompt(input);
-          const output = response.output;
+          const MAX_RETRIES = 3;
+          let lastError: string = '';
 
-          if (!output) {
-            throw new Error('No output received from AI model');
+          for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+            try {
+              const response = await prompt(input);
+              const output = response.output;
+
+              if (!output) {
+                throw new Error('No output received from AI model');
+              }
+
+              // Validate paper identifier format (STRICT)
+              const paperIdentifier = output.paperIdentifier || '';
+              if (!isValidPaperIdentifier(paperIdentifier)) {
+                lastError = getPaperIdentifierErrorMessage(paperIdentifier);
+                console.warn(`[Markscheme Extraction] Attempt ${attempt}/${MAX_RETRIES} - ${lastError}`);
+
+                if (attempt < MAX_RETRIES) {
+                  // Re-prompt with error feedback
+                  console.log(`[Markscheme Extraction] Retrying with format correction...`);
+                  continue;
+                }
+
+                throw new Error(`Paper identifier validation failed after ${MAX_RETRIES} attempts. ${lastError}`);
+              }
+
+              // Validate paper type index
+              const paperTypeIndex = output.paperTypeIndex ?? -1;
+              if (paperTypeIndex < 0 || paperTypeIndex >= paperTypes.length) {
+                lastError = `Invalid paperTypeIndex: ${paperTypeIndex}. Must be between 0 and ${paperTypes.length - 1}.`;
+                console.warn(`[Markscheme Extraction] Attempt ${attempt}/${MAX_RETRIES} - ${lastError}`);
+
+                if (attempt < MAX_RETRIES) {
+                  console.log(`[Markscheme Extraction] Retrying with index correction...`);
+                  continue;
+                }
+
+                throw new Error(`Paper type index validation failed after ${MAX_RETRIES} attempts. ${lastError}`);
+              }
+
+              // Validate solutions array
+              const solutions = output.solutions || [];
+              if (solutions.length === 0) {
+                lastError = 'No solutions extracted from markscheme.';
+                console.warn(`[Markscheme Extraction] Attempt ${attempt}/${MAX_RETRIES} - ${lastError}`);
+
+                if (attempt < MAX_RETRIES) {
+                  console.log(`[Markscheme Extraction] Retrying solution extraction...`);
+                  continue;
+                }
+
+                throw new Error(`Solution extraction failed after ${MAX_RETRIES} attempts. ${lastError}`);
+              }
+
+              // Validate each solution structure
+              const validatedSolutions = solutions.map((s, index) => {
+                if (typeof s.questionNumber !== 'number') {
+                  console.warn(`[Markscheme Extraction] Solution at index ${index} has invalid questionNumber, using index`);
+                  return {
+                    ...s,
+                    questionNumber: index + 1
+                  };
+                }
+                if (!Array.isArray(s.solutionObjectives) || s.solutionObjectives.length === 0) {
+                  console.warn(`[Markscheme Extraction] Solution ${s.questionNumber} has no objectives, adding placeholder`);
+                  return {
+                    ...s,
+                    solutionObjectives: ['Complete the question as per the markscheme']
+                  };
+                }
+                return s;
+              });
+
+              console.log(`[Markscheme Extraction] ✓ Validation passed on attempt ${attempt}`);
+
+              return {
+                paperTypeIndex,
+                paperIdentifier,
+                solutions: validatedSolutions
+              };
+
+            } catch (error: any) {
+              if (attempt === MAX_RETRIES) {
+                throw error;
+              }
+              console.warn(`[Markscheme Extraction] Attempt ${attempt}/${MAX_RETRIES} failed: ${error.message}`);
+            }
           }
 
-          // Validate required fields
-          const paperTypeIndex = output.paperTypeIndex ?? -1;
-          const paperIdentifier = output.paperIdentifier || 'Unknown';
-          const solutions = output.solutions || [];
-
-          if (paperTypeIndex < 0 || paperTypeIndex >= paperTypes.length) {
-            console.warn(`[Markscheme Extraction] Invalid paperTypeIndex: ${paperTypeIndex}, defaulting to 0`);
-          }
-
-          // Validate each solution
-          const validatedSolutions = solutions.map((s, index) => {
-            if (typeof s.questionNumber !== 'number') {
-              console.warn(`[Markscheme Extraction] Solution at index ${index} has invalid questionNumber, using index`);
-              return {
-                ...s,
-                questionNumber: index + 1
-              };
-            }
-            if (!Array.isArray(s.solutionObjectives) || s.solutionObjectives.length === 0) {
-              console.warn(`[Markscheme Extraction] Solution ${s.questionNumber} has no objectives, adding placeholder`);
-              return {
-                ...s,
-                solutionObjectives: ['Complete the question as per the markscheme']
-              };
-            }
-            return s;
-          });
-
-          return {
-            paperTypeIndex: Math.max(0, Math.min(paperTypeIndex, paperTypes.length - 1)),
-            paperIdentifier,
-            solutions: validatedSolutions
-          };
+          throw new Error(`Extraction failed after ${MAX_RETRIES} attempts. Last error: ${lastError}`);
         }
       );
 

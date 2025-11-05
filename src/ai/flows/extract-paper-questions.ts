@@ -11,6 +11,11 @@ import {genkit} from 'genkit';
 import {googleAI} from '@genkit-ai/google-genai';
 import {z} from 'genkit';
 import {geminiApiKeyManager} from '@root/gemini-api-key-manager';
+import {
+  isValidPaperIdentifier,
+  getPaperIdentifierErrorMessage,
+  getPaperIdentifierPromptRules
+} from './paper-identifier-validation';
 
 const PaperTypeInfoSchema = z.object({
   name: z.string().describe('The name of the paper type.'),
@@ -45,7 +50,7 @@ const PaperQuestionSchema = z.object({
 
 const ExtractPaperQuestionsOutputSchema = z.object({
   paperTypeIndex: z.number().describe('The 0-based index of the paper type from the provided paperTypes array (e.g., 0 for first paper type, 1 for second).'),
-  paperIdentifier: z.string().describe('A unique identifier for this specific exam paper extracted from the paper content (e.g., "2022 June", "Specimen 2023", "Sample Paper 1").'),
+  paperIdentifier: z.string().describe('Paper date in YYYY-MM-P format where YYYY=year, MM=month (01-12), P=paper type index. Example: "2022-06-1" for June 2022, Paper Type 1.'),
   questions: z.array(PaperQuestionSchema).describe('All questions extracted from this exam paper.'),
 });
 export type ExtractPaperQuestionsOutput = z.infer<typeof ExtractPaperQuestionsOutputSchema>;
@@ -70,64 +75,59 @@ export async function extractPaperQuestions(
         name: 'extractPaperQuestionsPrompt',
         input: {schema: ExtractPaperQuestionsInputSchema},
         output: {schema: ExtractPaperQuestionsOutputSchema},
-        prompt: `You are analyzing an exam paper to extract structured data. Please follow these instructions carefully to ensure consistency.
+        prompt: `TASK: Extract questions from dated exam paper.
 
-Task Overview:
-1. Identify the paper type by examining the document header/title
-2. Extract a standardized identifier for this specific exam
-3. Extract all questions with their numbers and categorize by topic
-4. Provide a brief summary for each question
-
-Available Paper Types (0-indexed):
+PAPER TYPES (0-indexed):
 {{#each paperTypes}}
-Index {{@index}}: {{name}}
+{{@index}}: {{name}}
 {{/each}}
 
-Available Topics:
+TOPICS:
 {{#each topics}}
 - {{name}}: {{description}}
 {{/each}}
 
-Exam Paper:
+DOCUMENT:
 {{media url=examPaperDataUri}}
 
-Instructions:
+EXTRACTION REQUIREMENTS:
 
-Step 1 - Paper Type Index:
-Examine the paper's title or header to determine which paper type this is.
-Output the 0-based index number from the paper types list above.
-Example: If the paper says "Paper 2" and "Paper 2" appears at index 1 in the list, output paperTypeIndex: 1
+1. PAPER DATE
+   ${getPaperIdentifierPromptRules()}
 
-Step 2 - Paper Identifier:
-Extract a standardized identifier from the paper content itself (not the filename).
-Use this exact format: "YYYY Month" for regular exams, or "Specimen YYYY" / "Sample YYYY" for specimen/sample papers.
+   Steps:
+   - Locate year in document (4 digits)
+   - Locate month in document (convert to 2-digit: 01-12)
+   - Identify paper type from header (use 0-based index)
+   - Format as: YYYY-MM-P
 
-Format examples:
-- "2022 June" (for June 2022 exam)
-- "2023 November" (for November 2023 exam)
-- "Specimen 2024" (for 2024 specimen paper)
-- "Sample 2023" (for 2023 sample paper)
+   Example: Document shows "June 2022" and "Paper 2" (index 1) → Output: "2022-06-1"
 
-Important: Always use the full 4-digit year. Use the month name, not numbers. Maintain this exact format for consistency with markschemes.
+2. PAPER TYPE INDEX
+   Output 0-based index matching paper type in document header.
 
-Step 3 - Question Numbers:
-Extract the main question number as an integer (1, 2, 3, 4, etc.).
-For questions with multiple parts (e.g., Question 1 has parts a, b, c), use the main number only (1).
-Include all sub-parts in the questionText field.
+3. QUESTIONS
+   For each question:
+   - questionNumber: Integer (1, 2, 3, etc.). For multi-part (1a, 1b), use main number only.
+   - topicName: Exact topic name from topics list above.
+   - questionText: Complete question text including all sub-parts.
+   - summary: Single sentence describing question content.
 
-Step 4 - Question Extraction:
-For each question, provide:
-- questionNumber: Integer (e.g., 1, 2, 3)
-- topicName: The most relevant topic from the topics list (use exact name)
-- questionText: Complete question including all parts
-- summary: One-sentence description of what the question asks
+OUTPUT STRUCTURE:
+{
+  "paperTypeIndex": <integer 0-9>,
+  "paperIdentifier": "<YYYY-MM-P format>",
+  "questions": [
+    {
+      "questionNumber": <integer>,
+      "topicName": "<exact topic name>",
+      "questionText": "<complete text>",
+      "summary": "<single sentence>"
+    }
+  ]
+}
 
-Extract all questions from the paper.
-
-Output Requirements:
-- paperTypeIndex: Must be a valid index from the paper types list (0, 1, 2, etc.)
-- paperIdentifier: Must follow the format "YYYY Month" or "Specimen YYYY"
-- questions: Array of all questions with required fields`,
+VALIDATION: Format will be checked. Non-compliant output will be rejected and retried.`,
       });
 
       const flow = aiInstance.defineFlow(
@@ -137,47 +137,98 @@ Output Requirements:
           outputSchema: ExtractPaperQuestionsOutputSchema,
         },
         async input => {
-          const response = await prompt(input);
-          const output = response.output;
+          const MAX_RETRIES = 3;
+          let lastError: string = '';
 
-          if (!output) {
-            throw new Error('No output received from AI model');
+          for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+            try {
+              const response = await prompt(input);
+              const output = response.output;
+
+              if (!output) {
+                throw new Error('No output received from AI model');
+              }
+
+              // Validate paper identifier format (STRICT)
+              const paperIdentifier = output.paperIdentifier || '';
+              if (!isValidPaperIdentifier(paperIdentifier)) {
+                lastError = getPaperIdentifierErrorMessage(paperIdentifier);
+                console.warn(`[Paper Extraction] Attempt ${attempt}/${MAX_RETRIES} - ${lastError}`);
+
+                if (attempt < MAX_RETRIES) {
+                  // Re-prompt with error feedback
+                  console.log(`[Paper Extraction] Retrying with format correction...`);
+                  continue;
+                }
+
+                throw new Error(`Paper identifier validation failed after ${MAX_RETRIES} attempts. ${lastError}`);
+              }
+
+              // Validate paper type index
+              const paperTypeIndex = output.paperTypeIndex ?? -1;
+              if (paperTypeIndex < 0 || paperTypeIndex >= paperTypes.length) {
+                lastError = `Invalid paperTypeIndex: ${paperTypeIndex}. Must be between 0 and ${paperTypes.length - 1}.`;
+                console.warn(`[Paper Extraction] Attempt ${attempt}/${MAX_RETRIES} - ${lastError}`);
+
+                if (attempt < MAX_RETRIES) {
+                  console.log(`[Paper Extraction] Retrying with index correction...`);
+                  continue;
+                }
+
+                throw new Error(`Paper type index validation failed after ${MAX_RETRIES} attempts. ${lastError}`);
+              }
+
+              // Validate questions array
+              const questions = output.questions || [];
+              if (questions.length === 0) {
+                lastError = 'No questions extracted from paper.';
+                console.warn(`[Paper Extraction] Attempt ${attempt}/${MAX_RETRIES} - ${lastError}`);
+
+                if (attempt < MAX_RETRIES) {
+                  console.log(`[Paper Extraction] Retrying question extraction...`);
+                  continue;
+                }
+
+                throw new Error(`Question extraction failed after ${MAX_RETRIES} attempts. ${lastError}`);
+              }
+
+              // Validate each question structure
+              const validatedQuestions = questions.map((q, index) => {
+                if (!q.summary || q.summary.trim() === '') {
+                  console.warn(`[Paper Extraction] Question ${q.questionNumber} missing summary, generating default`);
+                  const textPreview = q.questionText?.substring(0, 100) || 'Question';
+                  return {
+                    ...q,
+                    summary: `Question about ${q.topicName || 'the topic'}: ${textPreview}...`
+                  };
+                }
+                if (typeof q.questionNumber !== 'number') {
+                  console.warn(`[Paper Extraction] Question at index ${index} has invalid questionNumber, using index`);
+                  return {
+                    ...q,
+                    questionNumber: index + 1
+                  };
+                }
+                return q;
+              });
+
+              console.log(`[Paper Extraction] ✓ Validation passed on attempt ${attempt}`);
+
+              return {
+                paperTypeIndex,
+                paperIdentifier,
+                questions: validatedQuestions
+              };
+
+            } catch (error: any) {
+              if (attempt === MAX_RETRIES) {
+                throw error;
+              }
+              console.warn(`[Paper Extraction] Attempt ${attempt}/${MAX_RETRIES} failed: ${error.message}`);
+            }
           }
 
-          // Validate required fields
-          const paperTypeIndex = output.paperTypeIndex ?? -1;
-          const paperIdentifier = output.paperIdentifier || 'Unknown';
-          const questions = output.questions || [];
-
-          if (paperTypeIndex < 0 || paperTypeIndex >= paperTypes.length) {
-            console.warn(`[Paper Extraction] Invalid paperTypeIndex: ${paperTypeIndex}, defaulting to 0`);
-          }
-
-          // Validate each question
-          const validatedQuestions = questions.map((q, index) => {
-            if (!q.summary || q.summary.trim() === '') {
-              console.warn(`[Paper Extraction] Question ${q.questionNumber} missing summary, generating default`);
-              const textPreview = q.questionText?.substring(0, 100) || 'Question';
-              return {
-                ...q,
-                summary: `Question about ${q.topicName || 'the topic'}: ${textPreview}...`
-              };
-            }
-            if (typeof q.questionNumber !== 'number') {
-              console.warn(`[Paper Extraction] Question at index ${index} has invalid questionNumber, using index`);
-              return {
-                ...q,
-                questionNumber: index + 1
-              };
-            }
-            return q;
-          });
-
-          return {
-            paperTypeIndex: Math.max(0, Math.min(paperTypeIndex, paperTypes.length - 1)),
-            paperIdentifier,
-            questions: validatedQuestions
-          };
+          throw new Error(`Extraction failed after ${MAX_RETRIES} attempts. Last error: ${lastError}`);
         }
       );
 
