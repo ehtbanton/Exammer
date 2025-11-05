@@ -1,4 +1,5 @@
-Exammer: get hooked on revision
+# Exammer: Get Hooked on Revision
+
 An app to gamify and track progress on the completion of exam past paper questions
 
 Quick setup guide:
