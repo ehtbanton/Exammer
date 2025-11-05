@@ -38,11 +38,11 @@ function HomePageContent() {
       setSyllabusFile(file);
       // Start processing syllabus in background
       const subjectId = await createSubjectFromSyllabus(file);
-      // Close the dialog and redirect to the new subject page
+      // Close the dialog and redirect to the new subject page with auto-open parameter
       setUploadStage('initial');
       setSyllabusFile(null);
       if (subjectId) {
-        router.push(`/subject/${subjectId}`);
+        router.push(`/subject/${subjectId}?openPapers=true`);
       }
     }
   };

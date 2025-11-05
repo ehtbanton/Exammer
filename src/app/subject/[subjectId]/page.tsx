@@ -1,7 +1,7 @@
 "use client";
 
 import { ChangeEvent, useRef, useState, useEffect } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useAppContext } from '@/app/context/AppContext';
 import { AuthGuard } from '@/components/AuthGuard';
@@ -29,6 +29,7 @@ export default function SubjectPage() {
 function SubjectPageContent() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { subjects, processExamPapers, isLoading, setLoading } = useAppContext();
   const subjectId = params.subjectId as string;
   const subject = subjects.find(s => s.id === subjectId);
@@ -55,6 +56,15 @@ function SubjectPageContent() {
       subject.paperTypes.forEach(pt => setLoading(`navigate-paper-${pt.id}`, false));
     }
   }, [subject, setLoading]);
+
+  useEffect(() => {
+    // Auto-open paper upload dialog if redirected from syllabus upload
+    if (searchParams.get('openPapers') === 'true') {
+      setPaperDialogOpen(true);
+      // Clean up the URL parameter
+      router.replace(`/subject/${subjectId}`);
+    }
+  }, [searchParams, subjectId, router]);
 
   const handlePaperSelect = (e: ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
