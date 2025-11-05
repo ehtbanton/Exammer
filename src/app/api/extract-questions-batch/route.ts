@@ -168,7 +168,7 @@ export async function POST(req: NextRequest) {
       paperName: string;
       paperTypeIndex: number;
       paperIdentifier: string;
-      questionNumber: number;
+      questionId: string;
       topicName: string;
       questionText: string;
       summary: string;
@@ -179,29 +179,20 @@ export async function POST(req: NextRequest) {
     const unmatchedQuestions: any[] = [];
     const unmatchedSolutions: any[] = [];
 
-    // Match each question to its solution using exact date matching
+    // Match each question to its solution using exact question ID matching
     for (const paperResult of successfulPapers) {
       const { index: paperIndex, paperName, data: paperData } = paperResult;
 
       for (const question of paperData.questions) {
         let matched = false;
 
-        // Try to find a matching solution
+        // Try to find a matching solution by question ID
         for (const msResult of successfulMarkschemes) {
           const { data: msData } = msResult;
 
-          // Check if paper dates match exactly (YYYY-MM-P format)
-          if (paperData.paperIdentifier !== msData.paperIdentifier) continue;
-
-          // Paper type index is redundant (included in paperIdentifier) but verify anyway
-          if (paperData.paperTypeIndex !== msData.paperTypeIndex) {
-            console.warn(`[Matching] Date match but type mismatch: "${paperData.paperIdentifier}" has types ${paperData.paperTypeIndex} vs ${msData.paperTypeIndex}`);
-            continue;
-          }
-
-          // Find solution with matching question number
+          // Find solution with matching question ID (exact string match)
           const matchingSolution = msData.solutions.find(
-            (sol: any) => sol.questionNumber === question.questionNumber
+            (sol: any) => sol.questionId === question.questionId
           );
 
           if (matchingSolution) {
@@ -211,14 +202,14 @@ export async function POST(req: NextRequest) {
               paperName,
               paperTypeIndex: paperData.paperTypeIndex,
               paperIdentifier: paperData.paperIdentifier,
-              questionNumber: question.questionNumber,
+              questionId: question.questionId,
               topicName: question.topicName,
               questionText: question.questionText,
               summary: question.summary,
               solutionObjectives: matchingSolution.solutionObjectives
             });
             matched = true;
-            console.log(`[Matching] ✓ Q${question.questionNumber} matched: ${paperData.paperIdentifier} → ${question.topicName}`);
+            console.log(`[Matching] ✓ ${question.questionId} matched → ${question.topicName}`);
             break;
           }
         }
@@ -228,10 +219,10 @@ export async function POST(req: NextRequest) {
             paperName,
             paperIdentifier: paperData.paperIdentifier,
             paperTypeIndex: paperData.paperTypeIndex,
-            questionNumber: question.questionNumber,
+            questionId: question.questionId,
             topicName: question.topicName
           });
-          console.log(`[Matching] ✗ Q${question.questionNumber} unmatched: ${paperData.paperIdentifier} Type ${paperData.paperTypeIndex}`);
+          console.log(`[Matching] ✗ ${question.questionId} unmatched`);
         }
       }
     }
@@ -242,8 +233,7 @@ export async function POST(req: NextRequest) {
 
       for (const solution of msData.solutions) {
         const isMatched = matchedQuestions.some(
-          mq => mq.paperIdentifier === msData.paperIdentifier &&
-                mq.questionNumber === solution.questionNumber
+          mq => mq.questionId === solution.questionId
         );
 
         if (!isMatched) {
@@ -251,9 +241,9 @@ export async function POST(req: NextRequest) {
             msName,
             paperIdentifier: msData.paperIdentifier,
             paperTypeIndex: msData.paperTypeIndex,
-            questionNumber: solution.questionNumber
+            questionId: solution.questionId
           });
-          console.log(`[Matching] ✗ Solution unmatched: ${msData.paperIdentifier} Q${solution.questionNumber}`);
+          console.log(`[Matching] ✗ ${solution.questionId} solution unmatched`);
         }
       }
     }
@@ -340,11 +330,11 @@ export async function POST(req: NextRequest) {
     }
     if (unmatchedQuestions.length > 0) {
       console.log(`[Batch Extraction] Unmatched questions (no corresponding solutions):`);
-      unmatchedQuestions.forEach(uq => console.log(`  - ${uq.paperIdentifier} Q${uq.questionNumber}: ${uq.topicName}`));
+      unmatchedQuestions.forEach(uq => console.log(`  - ${uq.questionId}: ${uq.topicName}`));
     }
     if (unmatchedSolutions.length > 0) {
       console.log(`[Batch Extraction] Unmatched solutions (no corresponding questions):`);
-      unmatchedSolutions.forEach(us => console.log(`  - ${us.paperIdentifier} Q${us.questionNumber}`));
+      unmatchedSolutions.forEach(us => console.log(`  - ${us.questionId}`));
     }
     console.log(`[Batch Extraction] ================================\n`);
 

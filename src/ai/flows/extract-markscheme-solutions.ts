@@ -14,7 +14,8 @@ import {geminiApiKeyManager} from '@root/gemini-api-key-manager';
 import {
   isValidPaperIdentifier,
   getPaperIdentifierErrorMessage,
-  getPaperIdentifierPromptRules
+  getPaperIdentifierPromptRules,
+  getQuestionIdPromptRules
 } from './paper-identifier-validation';
 
 const PaperTypeInfoSchema = z.object({
@@ -34,7 +35,7 @@ const ExtractMarkschemesSolutionsInputSchema = z.object({
 export type ExtractMarkschemesSolutionsInput = z.infer<typeof ExtractMarkschemesSolutionsInputSchema>;
 
 const MarkschemesSolutionSchema = z.object({
-  questionNumber: z.number().describe('The question number this solution corresponds to (e.g., 1, 2, 3, 4).'),
+  questionId: z.string().describe('Question identifier in YYYY-MM-P-Q format (e.g., "2022-06-1-1" for June 2022, Paper 1, Question 1).'),
   solutionObjectives: z.array(z.string()).describe('List of specific marking objectives/criteria that students must achieve to gain full marks. Each objective should be a clear, measurable step including numeric/formulaic answers where applicable.'),
 });
 
@@ -86,17 +87,23 @@ EXTRACTION REQUIREMENTS:
    - Identify paper type from header (use 0-based index)
    - Format as: YYYY-MM-P
 
-   Example: Document shows "June 2022" and "Paper 2" (index 1) → Output: "2022-06-1"
+   Example: Document shows "June 2022" and "Paper 2" (index 1) → Paper date: "2022-06-1"
 
    CRITICAL: Must match corresponding exam paper format exactly.
 
-2. PAPER TYPE INDEX
-   Output 0-based index matching paper type in document header.
+2. QUESTION IDs
+   ${getQuestionIdPromptRules()}
 
-3. SOLUTIONS
-   For each solution:
-   - questionNumber: Integer (1, 2, 3, etc.). For multi-part (1a, 1b), use main number only.
-   - solutionObjectives: Array of marking criteria as specific, measurable objectives.
+   Construction steps:
+   - Take paper date from step 1 (YYYY-MM-P)
+   - Append question number (1, 2, 3, etc.)
+   - For multi-part solutions (1a, 1b), use main number only
+
+   Example: Paper date "2022-06-1", Question 3 → Question ID: "2022-06-1-3"
+
+3. FOR EACH SOLUTION OUTPUT:
+   - questionId: YYYY-MM-P-Q format (atomic string)
+   - solutionObjectives: Array of marking criteria
 
    Objective requirements:
    - Include numeric values, formulas, answers where present
@@ -115,16 +122,16 @@ EXTRACTION REQUIREMENTS:
 OUTPUT STRUCTURE:
 {
   "paperTypeIndex": <integer 0-9>,
-  "paperIdentifier": "<YYYY-MM-P format>",
+  "paperIdentifier": "<YYYY-MM-P>",
   "solutions": [
     {
-      "questionNumber": <integer>,
+      "questionId": "<YYYY-MM-P-Q>",
       "solutionObjectives": ["<objective 1>", "<objective 2>", ...]
     }
   ]
 }
 
-VALIDATION: Format will be checked. Non-compliant output will be rejected and retried.`,
+CRITICAL: Each questionId must be a complete, properly formatted identifier combining paper date and question number.`,
       });
 
       const flow = aiInstance.defineFlow(
@@ -191,15 +198,20 @@ VALIDATION: Format will be checked. Non-compliant output will be rejected and re
 
               // Validate each solution structure
               const validatedSolutions = solutions.map((s, index) => {
-                if (typeof s.questionNumber !== 'number') {
-                  console.warn(`[Markscheme Extraction] Solution at index ${index} has invalid questionNumber, using index`);
+                if (!s.questionId || typeof s.questionId !== 'string') {
+                  console.warn(`[Markscheme Extraction] Solution at index ${index} has invalid questionId`);
+                  const fallbackId = `${paperIdentifier}-${index + 1}`;
                   return {
                     ...s,
-                    questionNumber: index + 1
+                    questionId: fallbackId
                   };
                 }
+                // Validate questionId format starts with paperIdentifier
+                if (!s.questionId.startsWith(paperIdentifier + '-')) {
+                  console.warn(`[Markscheme Extraction] Question ID ${s.questionId} does not match paper date ${paperIdentifier}`);
+                }
                 if (!Array.isArray(s.solutionObjectives) || s.solutionObjectives.length === 0) {
-                  console.warn(`[Markscheme Extraction] Solution ${s.questionNumber} has no objectives, adding placeholder`);
+                  console.warn(`[Markscheme Extraction] Solution ${s.questionId} has no objectives, adding placeholder`);
                   return {
                     ...s,
                     solutionObjectives: ['Complete the question as per the markscheme']

@@ -1,15 +1,16 @@
 /**
- * @fileOverview Strict validation rules for paper dates to ensure consistent matching.
+ * @fileOverview Strict validation rules for paper and question identifiers.
  *
- * Paper dates must follow exact character-wise format for reliable mechanical matching
- * between exam papers and their corresponding markschemes.
- *
- * Format: YYYY-MM-P
+ * Paper Date Format: YYYY-MM-P
  * - YYYY: 4-digit year (e.g., 2022, 2023)
  * - MM: 2-digit month (01-12)
  * - P: 1-digit paper type index (0-9)
- *
  * Example: "2022-06-1" = June 2022, Paper Type Index 1
+ *
+ * Question ID Format: YYYY-MM-P-Q
+ * - YYYY-MM-P: Paper date
+ * - Q: Question number (1-99)
+ * Example: "2022-06-1-1" = June 2022, Paper 1, Question 1
  *
  * NOTE: Only dated papers are processed. Specimen/sample papers are ignored.
  */
@@ -17,11 +18,14 @@
 /**
  * Regular expression pattern for valid paper dates.
  * Format: YYYY-MM-P
- * - YYYY: 4-digit year
- * - MM: 2-digit month (01-12)
- * - P: 1-digit paper type index (0-9)
  */
 const PAPER_DATE_REGEX = /^(\d{4})-(0[1-9]|1[0-2])-([0-9])$/;
+
+/**
+ * Regular expression pattern for valid question identifiers.
+ * Format: YYYY-MM-P-Q where Q is 1-99
+ */
+const QUESTION_ID_REGEX = /^(\d{4})-(0[1-9]|1[0-2])-([0-9])-([1-9][0-9]?)$/;
 
 /**
  * Validates whether a paper date follows the required format.
@@ -48,7 +52,7 @@ export function getPaperIdentifierErrorMessage(paperDate: string): string {
 }
 
 /**
- * Format requirements for paper dates (used in prompts).
+ * Format requirements for paper dates and question IDs (used in prompts).
  */
 export const PAPER_DATE_FORMAT_RULES = {
   description: 'Paper date must follow exact character-wise format',
@@ -82,6 +86,32 @@ export const PAPER_DATE_FORMAT_RULES = {
   }
 } as const;
 
+export const QUESTION_ID_FORMAT_RULES = {
+  description: 'Question ID combines paper date with question number',
+  format: 'YYYY-MM-P-Q',
+  structure: {
+    paperDate: 'YYYY-MM-P: Paper date as defined above',
+    questionNumber: 'Q: Question number (1-99)'
+  },
+  requirements: [
+    'Combine paper date with question number',
+    'Use hyphen separator',
+    'Question number without zero-padding (1, 2, 3, not 01, 02, 03)'
+  ],
+  examples: {
+    valid: [
+      '2022-06-1-1 (June 2022, Paper 1, Question 1)',
+      '2023-11-0-5 (November 2023, Paper 0, Question 5)',
+      '2024-03-2-12 (March 2024, Paper 2, Question 12)'
+    ],
+    invalid: [
+      '2022-06-1 (missing question number)',
+      '2022-06-1-01 (question number zero-padded)',
+      '2022-06-1-Q1 (extra characters)'
+    ]
+  }
+} as const;
+
 /**
  * Month name to number mapping for conversion.
  */
@@ -101,7 +131,7 @@ export const MONTH_MAP: Record<string, string> = {
 };
 
 /**
- * Returns formatted rules for inclusion in AI prompts.
+ * Returns formatted rules for paper date (used in prompts).
  */
 export function getPaperIdentifierPromptRules(): string {
   const rules = PAPER_DATE_FORMAT_RULES;
@@ -126,5 +156,33 @@ Invalid Examples:
 ${rules.examples.invalid.map(ex => `✗ ${ex}`).join('\n')}
 
 CRITICAL: Format must be exact. Character-by-character compliance is mandatory.
+`.trim();
+}
+
+/**
+ * Returns formatted rules for question ID (used in prompts).
+ */
+export function getQuestionIdPromptRules(): string {
+  const rules = QUESTION_ID_FORMAT_RULES;
+
+  return `
+QUESTION ID FORMAT (MANDATORY):
+
+Required Format: ${rules.format}
+
+Structure:
+- ${rules.structure.paperDate}
+- ${rules.structure.questionNumber}
+
+Requirements:
+${rules.requirements.map((r, i) => `${i + 1}. ${r}`).join('\n')}
+
+Valid Examples:
+${rules.examples.valid.map(ex => `✓ ${ex}`).join('\n')}
+
+Invalid Examples:
+${rules.examples.invalid.map(ex => `✗ ${ex}`).join('\n')}
+
+CRITICAL: Format must be exact. Output question ID as single atomic string.
 `.trim();
 }
