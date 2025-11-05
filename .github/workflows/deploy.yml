@@ -75,7 +75,7 @@ jobs:
             npm install --omit=dev
 
             # Restart the application using PM2
-            pm2 restart exammer-deploy || pm2 start npm --name "exammer-deploy" -- start -- -p 8933
+            pm2 restart exammer-deploy || pm2 start npm --name "exammer-deploy" --max-memory-restart 1G -- start -- -p 8933
 
             # Save PM2 process list
             pm2 save
