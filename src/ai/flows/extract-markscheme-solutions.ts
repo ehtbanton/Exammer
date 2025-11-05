@@ -102,6 +102,37 @@ EXTRACTION REQUIREMENTS:
 
    Example: Paper date "2022-06-1", Question 3 → Solution ID: "2022-06-1-3"
 
+   QUESTION NUMBER IDENTIFICATION PROCEDURE (MARKSCHEME-SPECIFIC):
+
+   Markschemes mirror the structure of exam papers. To correctly identify solution numbers:
+
+   a) Locate solution markers in the document:
+      - Standard formats: "Question 1", "Question 2", "Q1", "Q2", "Answer 1", "Solution 1"
+      - Numeric formats: "1.", "2)", "3." at the start of solution blocks
+      - Visual emphasis: Numbers in bold or larger font preceding solution content
+
+   b) Distinguish solution numbers from marking notation:
+      - Marking codes (M1, A1, B1, E1, etc.) are NOT question numbers - these are marking points
+      - Mark allocations ("[3]", "(5 marks)") are NOT question numbers
+      - Page numbers in headers/footers are NOT question numbers
+      - Sub-part labels standalone are NOT question numbers
+
+   c) Handle multi-part solutions:
+      - Solutions for "1a", "1(a)", "1 (a)", "1(i)", "1 i" all belong to Question 1
+      - Combine all marking objectives from all sub-parts into a single solution array
+      - Use the main question number only in the solution ID
+
+   d) Validate against exam paper structure:
+      - Markschemes have the same number of questions as the corresponding exam paper
+      - Solutions should be numbered consecutively: 1, 2, 3, 4, 5, etc.
+      - Typical markschemes contain 5-15 solutions
+      - If numbering contains gaps, re-examine the document
+
+   e) Extract comprehensive solution objectives:
+      - Include all marking criteria for each question
+      - Combine objectives from all sub-parts under the main question number
+      - Ensure objectives are specific and verifiable
+
 3. FOR EACH SOLUTION OUTPUT:
    - questionId: YYYY-MM-P-Q format (atomic string, NO topic index)
    - solutionObjectives: Array of marking criteria
@@ -119,6 +150,15 @@ EXTRACTION REQUIREMENTS:
    - "Final answer: f = 6×10¹⁴ Hz"
    - "Explain: increasing temperature increases kinetic energy"
    - "State: increased collision frequency AND increased energy per collision"
+
+VALIDATION REQUIREMENTS:
+
+Before generating output, verify the following:
+- Solution numbers are sequential without gaps (1, 2, 3, 4...)
+- Total solution count matches expected question count (typically 5-15 solutions)
+- Each solution has marking objectives (not empty)
+- Multi-part solutions (1a, 1b, 1c) are combined under a single main number
+- No marking codes (M1, A1, B1), page numbers, or mark allocations were misidentified as question numbers
 
 OUTPUT STRUCTURE:
 {

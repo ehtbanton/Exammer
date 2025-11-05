@@ -116,10 +116,50 @@ EXTRACTION REQUIREMENTS:
 
    Example: Paper date "2022-06-1", Question 3, Topic 5 → Question ID: "2022-06-1-3-5"
 
+   QUESTION NUMBER IDENTIFICATION PROCEDURE:
+
+   To correctly identify question numbers in the document, follow this protocol:
+
+   a) Locate question markers in the document:
+      - Standard formats: "Question 1", "Question 2", "Q1", "Q2", "Q.1", "Q.2"
+      - Numeric formats: "1.", "2)", "3." at the start of content blocks
+      - Visual emphasis: Numbers in bold or larger font preceding question content
+
+   b) Distinguish question numbers from other numeric elements:
+      - Page numbers (typically in headers, footers, or page corners) are NOT question numbers
+      - Section headers ("Section A", "Part I", "Part II") are NOT question numbers
+      - Mark allocations ("[3 marks]", "(5 marks)", "[Total: 20]") are NOT question numbers
+      - Years and dates ("2023", "June 2022") are NOT question numbers
+
+   c) Handle multi-part questions:
+      - Treat "1a", "1(a)", "1 (a)", "1(i)", "1 i" as sub-parts of Question 1
+      - Combine all sub-parts into a single question using the main number only
+      - Extract the complete text including all sub-parts
+
+   d) Validate sequential numbering:
+      - Questions should be numbered consecutively: 1, 2, 3, 4, 5, etc.
+      - Typical exam papers contain 5-15 questions
+      - If numbering contains gaps or appears incorrect, re-examine the document
+
+   e) Structural patterns in exam papers:
+      - Questions appear in numerical order
+      - Each question has substantial content (not just a number)
+      - Questions typically begin on a new line with clear spacing
+      - Formatting is consistent across all questions
+
 3. FOR EACH QUESTION OUTPUT:
    - questionId: YYYY-MM-P-Q-T format (atomic string with topic index)
    - questionText: Complete text including all sub-parts
    - summary: Single sentence description
+
+VALIDATION REQUIREMENTS:
+
+Before generating output, verify the following:
+- Question numbers are sequential without gaps (1, 2, 3, 4...)
+- Total question count is within expected range (typically 5-15 questions)
+- Each question has substantial content (not just a number)
+- Multi-part questions (1a, 1b, 1c) are combined under a single main number
+- No page numbers, section labels, or mark allocations were misidentified as questions
 
 OUTPUT STRUCTURE:
 {
