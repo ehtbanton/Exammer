@@ -32,6 +32,13 @@ export async function generateSimilarQuestion(
 ): Promise<GenerateSimilarQuestionOutput> {
   const startTime = Date.now();
   console.log('[Process C] Starting similar question generation...');
+  console.log('[Process C] ========== DEBUG: ORIGINAL QUESTION ==========');
+  console.log(input.originalQuestionText);
+  console.log('[Process C] ========== DEBUG: ORIGINAL SOLUTION ==========');
+  input.originalObjectives.forEach((obj, idx) => {
+    console.log(`  ${idx + 1}. ${obj}`);
+  });
+  console.log('[Process C] ================================================');
 
   // Use the global API key manager to execute this flow
 
