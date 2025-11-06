@@ -49,6 +49,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         q.question_text,
         q.summary,
         q.solution_objectives,
+        q.paper_date,
+        q.question_number,
         q.created_at as question_created_at,
         COALESCE(up.score, 0) as score,
         COALESCE(up.attempts, 0) as attempts,
@@ -123,6 +125,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
           completedObjectives,
           score: row.score,
           attempts: row.attempts,
+          paperDate: row.paper_date,
+          questionNumber: row.question_number,
         });
       }
     });

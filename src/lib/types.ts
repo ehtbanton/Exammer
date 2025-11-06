@@ -23,6 +23,8 @@ export interface ExamQuestion {
   solutionObjectives?: string[]; // List of objectives/marking criteria for full marks
   completedObjectives?: number[]; // Indices of objectives the user has achieved
   markschemeId?: string | null; // Reference to the markscheme used
+  paperDate?: string | null; // Exam date (e.g., '2022-06')
+  questionNumber?: string | null; // Question identifier (e.g., '1-3-5')
 }
 
 export interface Topic {

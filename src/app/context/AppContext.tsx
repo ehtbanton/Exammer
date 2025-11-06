@@ -13,7 +13,8 @@ interface AppContextType {
   otherSubjects: Subject[];
   isLevel3User: boolean;
   createSubjectFromSyllabus: (syllabusFile: File) => Promise<void>;
-  processExamPapers: (subjectId: string, examPapers: File[], markschemes?: File[]) => Promise<void>;
+  processExamPapers: (subjectId: string, examPapers: File[]) => Promise<void>;
+  processMarkschemes: (subjectId: string, markschemes: File[]) => Promise<void>;
   deleteSubject: (subjectId: string) => Promise<void>;
   addSubjectToWorkspace: (subjectId: string) => Promise<void>;
   removeSubjectFromWorkspace: (subjectId: string) => Promise<void>;
@@ -257,7 +258,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, [toast, setLoading]);
 
-  const processExamPapers = useCallback(async (subjectId: string, examPapers: File[], markschemes: File[] = []) => {
+  const processExamPapers = useCallback(async (subjectId: string, examPapers: File[]) => {
     const loadingKey = `process-papers-${subjectId}`;
     setLoading(loadingKey, true);
 
@@ -270,9 +271,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
       // Pre-process exam papers for storage
       const examPapersDataUris = await Promise.all(examPapers.map(file => fileToDataURI(file)));
-
-      // Pre-process markschemes for storage
-      const markschemesDataUris = await Promise.all(markschemes.map(file => fileToDataURI(file)));
 
       // Persist past papers to database
       const pastPapers: PastPaper[] = [];
@@ -301,39 +299,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
         });
       }
 
-      // Persist markschemes to database
-      const dbMarkschemes: Markscheme[] = [];
-      for (const markschemeFile of markschemes) {
-        const markschemeContent = await fileToString(markschemeFile);
-
-        // Save to database via API
-        const response = await fetch(`/api/subjects/${subjectId}/markschemes`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            name: markschemeFile.name,
-            content: markschemeContent
-          })
-        });
-
-        if (!response.ok) {
-          throw new Error(`Failed to save markscheme: ${markschemeFile.name}`);
-        }
-
-        const dbMarkscheme = await response.json();
-        dbMarkschemes.push({
-          id: dbMarkscheme.id.toString(),
-          name: dbMarkscheme.name,
-          content: dbMarkscheme.content,
-        });
-      }
-
-      // Update local state with persisted papers and markschemes
+      // Update local state with persisted papers
       setSubjects(prev => prev.map(s =>
         s.id === subjectId ? {
           ...s,
-          pastPapers: [...s.pastPapers, ...pastPapers],
-          markschemes: [...(s.markschemes || []), ...dbMarkschemes]
+          pastPapers: [...s.pastPapers, ...pastPapers]
         } : s
       ));
 
@@ -382,7 +352,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           }
 
           // Use batch API endpoint for parallel processing on server
-          console.log(`[Process B] Calling batch API to extract ${examPapersDataUris.length} papers with ${markschemesDataUris.length} markschemes in parallel`);
+          console.log(`[Process B] Calling batch API to extract ${examPapersDataUris.length} papers (no markschemes)`);
 
           const batchResponse = await fetch('/api/extract-questions-batch', {
             method: 'POST',
@@ -390,7 +360,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
             body: JSON.stringify({
               subjectId,
               examPapersDataUris,
-              markschemesDataUris,
+              markschemesDataUris: [], // No markschemes in Process B
               paperTypes
             })
           });
@@ -427,6 +397,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
                 attempts: q.attempts || 0,
                 solutionObjectives: q.solutionObjectives || undefined,
                 completedObjectives: q.completedObjectives || [],
+                paperDate: q.paperDate || null,
+                questionNumber: q.questionNumber || null,
               }))
             }))
           }));
@@ -459,6 +431,165 @@ export function AppProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       console.error(error);
       toast({ variant: "destructive", title: "Error", description: "Failed to process exam papers." });
+    } finally {
+      setLoading(loadingKey, false);
+    }
+  }, [subjects, toast, setLoading]);
+
+  const processMarkschemes = useCallback(async (subjectId: string, markschemes: File[]) => {
+    const loadingKey = `process-markschemes-${subjectId}`;
+    setLoading(loadingKey, true);
+
+    try {
+      // Get current subject to check if we have paper types
+      const currentSubject = subjects.find(s => s.id === subjectId);
+      if (!currentSubject) {
+        throw new Error('Subject not found');
+      }
+
+      // Pre-process markschemes for storage
+      const markschemesDataUris = await Promise.all(markschemes.map(file => fileToDataURI(file)));
+
+      // Persist markschemes to database
+      const dbMarkschemes: Markscheme[] = [];
+      for (const markschemeFile of markschemes) {
+        const markschemeContent = await fileToString(markschemeFile);
+
+        // Save to database via API
+        const response = await fetch(`/api/subjects/${subjectId}/markschemes`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: markschemeFile.name,
+            content: markschemeContent
+          })
+        });
+
+        if (!response.ok) {
+          throw new Error(`Failed to save markscheme: ${markschemeFile.name}`);
+        }
+
+        const dbMarkscheme = await response.json();
+        dbMarkschemes.push({
+          id: dbMarkscheme.id.toString(),
+          name: dbMarkscheme.name,
+          content: dbMarkscheme.content,
+        });
+      }
+
+      // Update local state with persisted markschemes
+      setSubjects(prev => prev.map(s =>
+        s.id === subjectId ? {
+          ...s,
+          markschemes: [...(s.markschemes || []), ...dbMarkschemes]
+        } : s
+      ));
+
+      // Create Process M task and add it to the queue
+      const processMId = `process-m-${subjectId}-${Date.now()}`;
+      backgroundQueue.addTask({
+        id: processMId,
+        type: 'process_m',
+        status: 'pending',
+        displayName: 'P_M: Matching markschemes to questions...',
+        subjectId,
+        execute: async () => {
+          // Fetch latest paper types with topics
+          const response = await fetch(`/api/subjects/${subjectId}`);
+          if (!response.ok) {
+            throw new Error('Failed to fetch subject');
+          }
+          const apiSubject = await response.json();
+          if (!apiSubject || !apiSubject.paperTypes || apiSubject.paperTypes.length === 0) {
+            throw new Error('No paper types found for markscheme matching');
+          }
+
+          // Convert API format to client format
+          const paperTypes = apiSubject.paperTypes.map((pt: any) => ({
+            id: pt.id.toString(),
+            name: pt.name,
+            topics: (pt.topics || []).map((t: any) => ({
+              id: t.id.toString(),
+              name: t.name,
+              description: t.description || '',
+            }))
+          }));
+
+          // Call markscheme matching API endpoint
+          console.log(`[Process M] Calling match-markschemes API with ${markschemesDataUris.length} markschemes`);
+
+          const matchResponse = await fetch('/api/match-markschemes', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              subjectId,
+              markschemesDataUris,
+              paperTypes
+            })
+          });
+
+          if (!matchResponse.ok) {
+            const errorData = await matchResponse.json();
+            throw new Error(`Markscheme matching failed: ${errorData.error || 'Unknown error'}`);
+          }
+
+          const matchResult = await matchResponse.json();
+          console.log(`[Process M] Markscheme matching complete: ${matchResult.solutionsMatched} matched, ${matchResult.questionsUpdated} questions updated`);
+
+          // Fetch updated subject from database to get questions with new solution objectives
+          const subjectResponse = await fetch(`/api/subjects/${subjectId}`);
+          if (!subjectResponse.ok) {
+            throw new Error('Failed to fetch updated subject');
+          }
+
+          const updatedSubjectData = await subjectResponse.json();
+
+          // Convert API format to client format
+          const updatedPaperTypes = updatedSubjectData.paperTypes.map((pt: any) => ({
+            id: pt.id.toString(),
+            name: pt.name,
+            topics: (pt.topics || []).map((t: any) => ({
+              id: t.id.toString(),
+              name: t.name,
+              description: t.description || '',
+              examQuestions: (t.examQuestions || []).map((q: any) => ({
+                id: q.id.toString(),
+                questionText: q.question_text,
+                summary: q.summary,
+                score: q.score || (q.attempts === 0 ? 50 : 0), // Default 50% if no attempts
+                attempts: q.attempts || 0,
+                solutionObjectives: q.solutionObjectives || undefined,
+                completedObjectives: q.completedObjectives || [],
+                paperDate: q.paperDate || null,
+                questionNumber: q.questionNumber || null,
+              }))
+            }))
+          }));
+
+          // Update local state with the fresh data from database
+          setSubjects(prev => prev.map(s => {
+            if (s.id !== subjectId) return s;
+            return {
+              ...s,
+              paperTypes: updatedPaperTypes
+            };
+          }));
+
+          toast({
+            title: "Markschemes Matched",
+            description: `Updated ${matchResult.questionsUpdated} questions with solution objectives from ${markschemes.length} markscheme(s).`
+          });
+        }
+      });
+
+      toast({
+        title: "Markschemes Uploaded",
+        description: `${markschemes.length} markscheme(s) uploaded. Starting matching to existing questions...`
+      });
+
+    } catch (error) {
+      console.error(error);
+      toast({ variant: "destructive", title: "Error", description: "Failed to process markschemes." });
     } finally {
       setLoading(loadingKey, false);
     }
@@ -609,11 +740,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const question = topic.examQuestions.find(q => q.id === questionId);
     if (!question) throw new Error('Question not found');
 
-    if (!question.solutionObjectives || question.solutionObjectives.length === 0) {
-      throw new Error('Question has no solution objectives - cannot generate variant');
-    }
+    const hasObjectives = question.solutionObjectives && question.solutionObjectives.length > 0;
 
-    console.log('[Process C] Generating similar question variant with adapted objectives...');
+    if (hasObjectives) {
+      console.log('[Process C] Generating similar question variant with adapted objectives...');
+    } else {
+      console.log('[Process C] Generating similar question variant WITHOUT markscheme (will manufacture objectives)...');
+    }
 
     // Generate the variant directly (synchronously from the caller's perspective)
     const result = await generateSimilarQuestion({
@@ -623,7 +756,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       originalObjectives: question.solutionObjectives,
     });
 
-    console.log('[Process C] Question variant generated successfully with', result.solutionObjectives.length, 'adapted objectives');
+    console.log(`[Process C] Question variant generated successfully with ${result.solutionObjectives.length} ${hasObjectives ? 'adapted' : 'manufactured'} objectives`);
 
     return {
       questionText: result.questionText,
@@ -737,7 +870,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [toast, setLoading]);
 
   return (
-    <AppContext.Provider value={{ subjects, otherSubjects, isLevel3User, createSubjectFromSyllabus, processExamPapers, deleteSubject, addSubjectToWorkspace, removeSubjectFromWorkspace, searchSubjects, getSubjectById, addPastPaperToSubject, updateExamQuestionScore, generateQuestionVariant, isLoading, setLoading }}>
+    <AppContext.Provider value={{ subjects, otherSubjects, isLevel3User, createSubjectFromSyllabus, processExamPapers, processMarkschemes, deleteSubject, addSubjectToWorkspace, removeSubjectFromWorkspace, searchSubjects, getSubjectById, addPastPaperToSubject, updateExamQuestionScore, generateQuestionVariant, isLoading, setLoading }}>
       {children}
     </AppContext.Provider>
   );

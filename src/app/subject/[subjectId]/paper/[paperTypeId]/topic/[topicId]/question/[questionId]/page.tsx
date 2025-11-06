@@ -59,6 +59,7 @@ function InterviewPageContent() {
   const [completedObjectives, setCompletedObjectives] = useState<number[]>([]);
   const [showExitDialog, setShowExitDialog] = useState(false);
   const [noMarkscheme, setNoMarkscheme] = useState(false);
+  const hasOriginalMarkscheme = examQuestion?.solutionObjectives && examQuestion.solutionObjectives.length > 0;
 
   // Compute if all objectives are completed
   const isCompleted = generatedVariant
@@ -342,7 +343,14 @@ function InterviewPageContent() {
                 <>
                   <div className="p-6 pb-4 border-b space-y-2">
                     <div className="flex items-center justify-between">
-                      <h2 className="text-sm font-semibold text-muted-foreground uppercase">Question</h2>
+                      <div className="flex items-center gap-2">
+                        <h2 className="text-sm font-semibold text-muted-foreground uppercase">Question</h2>
+                        {!hasOriginalMarkscheme && (
+                          <span className="inline-flex items-center text-xs px-2 py-1 bg-amber-100 dark:bg-amber-900 text-amber-800 dark:text-amber-200 rounded">
+                            No Markscheme
+                          </span>
+                        )}
+                      </div>
                       {generatedVariant && (
                         <span className="text-sm font-bold">{completedObjectives.length}/{generatedVariant.solutionObjectives.length} objectives</span>
                       )}
@@ -359,14 +367,14 @@ function InterviewPageContent() {
                             {formatQuestionText(generatedVariant.questionText)}
                           </div>
                         </div>
-                        {completedObjectives.length > 0 && (
-                          <div className="mt-6 p-4 bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-lg">
-                            <h3 className="text-sm font-semibold mb-2 text-green-800 dark:text-green-200">✓ Objectives Achieved:</h3>
+                        {accessLevel !== null && accessLevel >= 3 && (
+                          <div className="mt-6 p-4 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg">
+                            <h3 className="text-sm font-semibold mb-2 text-blue-800 dark:text-blue-200">📋 All Solution Objectives:</h3>
                             <ul className="space-y-1">
-                              {completedObjectives.map(idx => (
-                                <li key={idx} className="text-sm text-green-700 dark:text-green-300 flex items-start gap-2">
+                              {generatedVariant.solutionObjectives.map((objective, idx) => (
+                                <li key={idx} className="text-sm text-blue-700 dark:text-blue-300 flex items-start gap-2">
                                   <span className="font-mono text-xs mt-0.5">[{idx}]</span>
-                                  <span>{generatedVariant.solutionObjectives[idx]}</span>
+                                  <span>{objective}</span>
                                 </li>
                               ))}
                             </ul>

@@ -15,7 +15,7 @@ const GenerateSimilarQuestionInputSchema = z.object({
   originalQuestionText: z.string().describe('The original exam question to base the variant on.'),
   topicName: z.string().describe('The name of the topic this question covers.'),
   topicDescription: z.string().describe('The description of what this topic covers.'),
-  originalObjectives: z.array(z.string()).describe('The marking objectives from the original question markscheme.'),
+  originalObjectives: z.array(z.string()).optional().describe('The marking objectives from the original question markscheme. If not provided, objectives will be manufactured from the question text.'),
 });
 export type GenerateSimilarQuestionInput = z.infer<typeof GenerateSimilarQuestionInputSchema>;
 
@@ -31,13 +31,20 @@ export async function generateSimilarQuestion(
   input: GenerateSimilarQuestionInput
 ): Promise<GenerateSimilarQuestionOutput> {
   const startTime = Date.now();
+  const hasObjectives = input.originalObjectives && input.originalObjectives.length > 0;
   console.log('[Process C] Starting similar question generation...');
+  console.log(`[Process C] Mode: ${hasObjectives ? 'WITH solution objectives' : 'WITHOUT solution objectives (will manufacture)'}`);
   console.log('[Process C] ========== DEBUG: ORIGINAL QUESTION ==========');
   console.log(input.originalQuestionText);
-  console.log('[Process C] ========== DEBUG: ORIGINAL SOLUTION ==========');
-  input.originalObjectives.forEach((obj, idx) => {
-    console.log(`  ${idx + 1}. ${obj}`);
-  });
+  if (hasObjectives) {
+    console.log('[Process C] ========== DEBUG: ORIGINAL SOLUTION ==========');
+    input.originalObjectives!.forEach((obj, idx) => {
+      console.log(`  ${idx + 1}. ${obj}`);
+    });
+  } else {
+    console.log('[Process C] ========== DEBUG: NO MARKSCHEME AVAILABLE ==========');
+    console.log('[Process C] Will manufacture solution objectives from question');
+  }
   console.log('[Process C] ================================================');
 
   // Use the global API key manager to execute this flow
@@ -49,7 +56,7 @@ export async function generateSimilarQuestion(
       output: {schema: GenerateSimilarQuestionOutputSchema},
       prompt: `You are an expert educator creating practice exam questions for students.
 
-Your task is to generate a NEW question that is SIMILAR to the original question provided, but NOT IDENTICAL. You must also adapt the marking objectives to match your new variant.
+Your task is to generate a NEW question that is SIMILAR to the original question provided, but NOT IDENTICAL. You must also create marking objectives for your new variant.
 
 Topic: {{topicName}}
 Topic Description: {{topicDescription}}
@@ -57,10 +64,16 @@ Topic Description: {{topicDescription}}
 Original Question:
 {{originalQuestionText}}
 
+{{#if originalObjectives}}
 Original Marking Objectives (from markscheme):
 {{#each originalObjectives}}
   {{@index}}. {{this}}
 {{/each}}
+
+MODE: With Markscheme - Adapt the provided objectives to match your variant.
+{{else}}
+MODE: No Markscheme - You must manufacture appropriate marking objectives from scratch based on the question content.
+{{/if}}
 
 CRITICAL REQUIREMENT: The variant question MUST be similar but NOT the same as the original. You MUST change specific details, numbers, scenarios, or contexts.
 
@@ -83,7 +96,8 @@ Examples of proper variations:
 - If the original describes a pendulum experiment → variant describes a similar but different pendulum setup
 - If the original asks to "calculate velocity at 5 seconds" → variant asks to "calculate velocity at 8 seconds"
 
-After generating the question, adapt the marking objectives:
+{{#if originalObjectives}}
+After generating the question, ADAPT the marking objectives:
 - Keep the SAME NUMBER of objectives as the original
 - Maintain the SAME LEVEL of specificity and difficulty
 - For ANY changes you made to the question, make corresponding changes to the objectives
@@ -96,6 +110,20 @@ Examples of proper objective adaptation:
 - Original: "Substitute velocity v = 10 m/s into equation" → Variant: "Substitute velocity v = 15 m/s into equation"
 - Original: "Final answer: 25 Joules" → Variant: "Final answer: 40 Joules" (recalculated for new values)
 - Original: "Explain photosynthesis in leaf cells" → Variant: "Explain photosynthesis in algae cells"
+{{else}}
+After generating the question, MANUFACTURE marking objectives from scratch:
+- Analyze the question structure and identify all parts that need to be answered
+- Create 3-6 specific marking objectives that cover all aspects of the answer
+- Each objective should describe a specific step, concept, or piece of knowledge required
+- Include expected calculations, formulas, or specific answers where applicable
+- Make objectives specific enough that they could guide a marker to assess the answer
+- Follow standard markscheme format (e.g., "State that...", "Calculate using...", "Explain the relationship between...")
+
+Examples of manufactured objectives for different question types:
+- Calculation question: ["Identify the correct formula F = ma", "Substitute values: m = 5 kg, a = 10 m/s²", "Calculate final answer: F = 50 N"]
+- Explanation question: ["Define the term 'photosynthesis'", "Describe the role of chlorophyll", "Explain how light energy is converted to chemical energy"]
+- Multi-part question: ["Part (a): State the definition of velocity", "Part (b): Calculate velocity using v = d/t with d = 100m, t = 10s", "Part (c): Explain why velocity is a vector quantity"]
+{{/if}}
 
 VALIDATION STEP (MANDATORY):
 After generating both the question and objectives:

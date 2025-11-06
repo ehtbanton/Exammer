@@ -90,16 +90,11 @@ function TopicPageContent() {
 
       <p className="text-muted-foreground mb-8">Select a question to start practicing.</p>
 
-      {(() => {
-        // Filter to only show questions with objectives
-        const questionsWithObjectives = topic.examQuestions.filter(q =>
-          q.solutionObjectives && q.solutionObjectives.length > 0
-        );
-
-        return questionsWithObjectives.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {questionsWithObjectives.map(question => {
+      {topic.examQuestions.length > 0 ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {topic.examQuestions.map(question => {
             const hasAttempts = question.attempts > 0;
+            const hasMarkscheme = question.solutionObjectives && question.solutionObjectives.length > 0;
             const boxStyle = hasAttempts ? getScoreColorStyle(question.score) : getUnattemptedBoxStyle();
 
             return (
@@ -110,7 +105,14 @@ function TopicPageContent() {
                 onClick={() => handleNavigate(question.id)}
               >
                 <CardHeader>
-                  <CardTitle className="text-lg text-black">{question.summary}</CardTitle>
+                  <CardTitle className="text-lg text-black flex items-center gap-2">
+                    {question.summary}
+                    {!hasMarkscheme && (
+                      <span className="inline-flex items-center text-xs font-normal px-2 py-1 bg-amber-100 dark:bg-amber-900 text-amber-800 dark:text-amber-200 rounded">
+                        No MS
+                      </span>
+                    )}
+                  </CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="flex items-center justify-between">
@@ -132,19 +134,18 @@ function TopicPageContent() {
          <Card className="text-center py-12 border-2 border-dashed">
             <CardContent>
               <AlertCircle className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-              <h3 className="text-lg font-semibold mb-2">No Questions with Markschemes Available</h3>
+              <h3 className="text-lg font-semibold mb-2">No Questions Available</h3>
               <p className="text-muted-foreground mb-4">
-                Questions can only be practiced if they have been extracted with a markscheme. To practice questions for this topic, please upload exam papers along with their corresponding markschemes.
+                No questions have been extracted for this topic yet. Upload exam papers to get started.
               </p>
-              <div className="bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-lg p-4 max-w-md mx-auto">
-                <p className="text-sm text-amber-800 dark:text-amber-200">
-                  <strong>Tip:</strong> Upload both exam papers and markschemes via the "Manage Past Papers" button on the paper type page. Questions without markschemes cannot be practiced.
+              <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-4 max-w-md mx-auto">
+                <p className="text-sm text-blue-800 dark:text-blue-200">
+                  <strong>Tip:</strong> Upload exam papers via the "Add All Past Papers" button on the subject page. You can optionally upload markschemes later to enable objective-based grading.
                 </p>
               </div>
             </CardContent>
           </Card>
-      );
-      })()}
+      )}
     </div>
   );
 }

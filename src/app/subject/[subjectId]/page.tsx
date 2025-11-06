@@ -30,7 +30,7 @@ function SubjectPageContent() {
   const params = useParams();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { subjects, processExamPapers, isLoading, setLoading } = useAppContext();
+  const { subjects, processExamPapers, processMarkschemes, isLoading, setLoading } = useAppContext();
   const subjectId = params.subjectId as string;
   const subject = subjects.find(s => s.id === subjectId);
   const [navigatingTo, setNavigatingTo] = useState<string | null>(null);
@@ -38,7 +38,7 @@ function SubjectPageContent() {
   const paperInputRef = useRef<HTMLInputElement>(null);
   const markschemeInputRef = useRef<HTMLInputElement>(null);
   const [isPaperDialogOpen, setPaperDialogOpen] = useState(false);
-  const [uploadStage, setUploadStage] = useState<'papers' | 'markschemes'>('papers');
+  const [isMarkschemeDialogOpen, setMarkschemeDialogOpen] = useState(false);
   const [selectedPapers, setSelectedPapers] = useState<File[]>([]);
   const [selectedMarkschemes, setSelectedMarkschemes] = useState<File[]>([]);
   const [hideEmptyPapers, setHideEmptyPapers] = useState(true);
@@ -84,25 +84,30 @@ function SubjectPageContent() {
     setSelectedMarkschemes(prev => prev.filter((_, i) => i !== index));
   };
 
-  const handleContinueToMarkschemes = () => {
-    setUploadStage('markschemes');
-  };
-
   const handleUploadPapers = async () => {
     if (selectedPapers.length > 0 && subject) {
-      await processExamPapers(subject.id, selectedPapers, selectedMarkschemes);
+      await processExamPapers(subject.id, selectedPapers);
       setSelectedPapers([]);
-      setSelectedMarkschemes([]);
-      setUploadStage('papers');
       setPaperDialogOpen(false);
     }
   };
 
-  const handleCancelDialog = () => {
+  const handleUploadMarkschemes = async () => {
+    if (selectedMarkschemes.length > 0 && subject) {
+      await processMarkschemes(subject.id, selectedMarkschemes);
+      setSelectedMarkschemes([]);
+      setMarkschemeDialogOpen(false);
+    }
+  };
+
+  const handleCancelPaperDialog = () => {
     setSelectedPapers([]);
-    setSelectedMarkschemes([]);
-    setUploadStage('papers');
     setPaperDialogOpen(false);
+  };
+
+  const handleCancelMarkschemeDialog = () => {
+    setSelectedMarkschemes([]);
+    setMarkschemeDialogOpen(false);
   };
 
   const handleNavigate = (paperTypeId: string) => {
@@ -132,6 +137,7 @@ function SubjectPageContent() {
   }
 
   const isPaperLoading = isLoading(`process-papers-${subject.id}`);
+  const isMarkschemeLoading = isLoading(`process-markschemes-${subject.id}`);
 
   // Calculate average score for a paper type based only on attempted topics
   const getPaperTypeAverageScore = (paperType: PaperType): number | null => {
@@ -200,139 +206,138 @@ function SubjectPageContent() {
               <CardTitle className="flex items-center gap-2"><List /> Past Papers</CardTitle>
               <CardDescription>Resets existing past papers that were previously uploaded.</CardDescription>
             </CardHeader>
-            <CardFooter>
+            <CardFooter className="flex gap-2">
               <Dialog open={isPaperDialogOpen} onOpenChange={setPaperDialogOpen}>
                 <DialogTrigger asChild>
                   <Button variant="secondary">Add All Past Papers</Button>
                 </DialogTrigger>
                 <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-                  {uploadStage === 'papers' && (
-                    <>
-                      <DialogHeader>
-                        <DialogTitle>Upload Past Exam Papers</DialogTitle>
-                        <DialogDescription>
-                          Upload past exam papers to extract real exam questions for all topics in "{subject.name}".
-                        </DialogDescription>
-                      </DialogHeader>
+                  <DialogHeader>
+                    <DialogTitle>Upload Past Exam Papers</DialogTitle>
+                    <DialogDescription>
+                      Upload past exam papers to extract real exam questions for all topics in "{subject.name}". You can upload markschemes separately later.
+                    </DialogDescription>
+                  </DialogHeader>
 
-                      <div className="space-y-4">
-                        <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-                          <p className="text-sm text-blue-800 dark:text-blue-200">
-                            <strong>Recommended:</strong> Upload at least 1 paper for each paper type.
-                          </p>
-                        </div>
+                  <div className="space-y-4">
+                    <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                      <p className="text-sm text-blue-800 dark:text-blue-200">
+                        <strong>Note:</strong> Questions will be extracted even without markschemes. You can add markschemes later to enable objective-based grading.
+                      </p>
+                    </div>
 
-                        <div>
-                          <Button onClick={() => paperInputRef.current?.click()} variant="outline" type="button" className="w-full">
-                            <FileText className="mr-2 h-4 w-4" />
-                            Add Exam Papers
-                          </Button>
-                          <Input
-                            type="file"
-                            ref={paperInputRef}
-                            className="hidden"
-                            onChange={handlePaperSelect}
-                            accept=".pdf,.txt,.md"
-                            multiple
-                          />
+                    <div>
+                      <Button onClick={() => paperInputRef.current?.click()} variant="outline" type="button" className="w-full">
+                        <FileText className="mr-2 h-4 w-4" />
+                        Add Exam Papers
+                      </Button>
+                      <Input
+                        type="file"
+                        ref={paperInputRef}
+                        className="hidden"
+                        onChange={handlePaperSelect}
+                        accept=".pdf,.txt,.md"
+                        multiple
+                      />
 
-                          {selectedPapers.length > 0 && (
-                            <div className="mt-3 max-h-64 overflow-y-auto overflow-x-hidden border rounded-md p-2 space-y-2">
-                              {selectedPapers.map((paper, index) => (
-                                <div key={index} className="flex items-center justify-between gap-2 p-2 bg-muted rounded">
-                                  <span className="text-sm flex-1">{truncateFilename(paper.name)}</span>
-                                  <Button variant="ghost" size="sm" onClick={() => removePaper(index)} className="shrink-0 whitespace-nowrap">
-                                    <span className="text-xs">Remove</span>
-                                  </Button>
-                                </div>
-                              ))}
+                      {selectedPapers.length > 0 && (
+                        <div className="mt-3 max-h-64 overflow-y-auto overflow-x-hidden border rounded-md p-2 space-y-2">
+                          {selectedPapers.map((paper, index) => (
+                            <div key={index} className="flex items-center justify-between gap-2 p-2 bg-muted rounded">
+                              <span className="text-sm flex-1">{truncateFilename(paper.name)}</span>
+                              <Button variant="ghost" size="sm" onClick={() => removePaper(index)} className="shrink-0 whitespace-nowrap">
+                                <span className="text-xs">Remove</span>
+                              </Button>
                             </div>
-                          )}
+                          ))}
                         </div>
+                      )}
+                    </div>
 
-                        <div className="flex gap-2 pt-2">
-                          <Button
-                            variant="outline"
-                            onClick={handleCancelDialog}
-                            className="flex-1"
-                          >
-                            Cancel
-                          </Button>
-                          <Button
-                            onClick={handleContinueToMarkschemes}
-                            className="flex-1"
-                            disabled={selectedPapers.length === 0}
-                          >
-                            Continue
-                          </Button>
-                        </div>
-                      </div>
-                    </>
-                  )}
+                    <div className="flex gap-2 pt-2">
+                      <Button
+                        variant="outline"
+                        onClick={handleCancelPaperDialog}
+                        className="flex-1"
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        onClick={handleUploadPapers}
+                        className="flex-1"
+                        disabled={isPaperLoading || selectedPapers.length === 0}
+                      >
+                        {isPaperLoading ? <LoadingSpinner /> : 'Process Papers & Extract Questions'}
+                      </Button>
+                    </div>
+                  </div>
+                </DialogContent>
+              </Dialog>
 
-                  {uploadStage === 'markschemes' && (
-                    <>
-                      <DialogHeader>
-                        <DialogTitle>Upload Markschemes</DialogTitle>
-                        <DialogDescription>
-                          Upload the markschemes for your past papers. We'll use these to extract solution objectives.
-                        </DialogDescription>
-                      </DialogHeader>
+              <Dialog open={isMarkschemeDialogOpen} onOpenChange={setMarkschemeDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="outline">Upload Markschemes</Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                  <DialogHeader>
+                    <DialogTitle>Upload Markschemes</DialogTitle>
+                    <DialogDescription>
+                      Upload markschemes to match with existing questions and enable objective-based grading.
+                    </DialogDescription>
+                  </DialogHeader>
 
-                      <div className="space-y-4">
-                        <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-                          <p className="text-sm text-blue-800 dark:text-blue-200">
-                            <strong>Note:</strong> Upload all markschemes. We'll automatically match them to the corresponding papers.
-                          </p>
-                        </div>
+                  <div className="space-y-4">
+                    <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                      <p className="text-sm text-blue-800 dark:text-blue-200">
+                        <strong>Note:</strong> Markschemes will be automatically matched to existing questions based on paper date and question number.
+                      </p>
+                    </div>
 
-                        <div>
-                          <Button onClick={() => markschemeInputRef.current?.click()} variant="outline" type="button" className="w-full">
-                            <FileText className="mr-2 h-4 w-4" />
-                            Add Markschemes
-                          </Button>
-                          <Input
-                            type="file"
-                            ref={markschemeInputRef}
-                            className="hidden"
-                            onChange={handleMarkschemeSelect}
-                            accept=".pdf,.txt,.md"
-                            multiple
-                          />
+                    <div>
+                      <Button onClick={() => markschemeInputRef.current?.click()} variant="outline" type="button" className="w-full">
+                        <FileText className="mr-2 h-4 w-4" />
+                        Add Markschemes
+                      </Button>
+                      <Input
+                        type="file"
+                        ref={markschemeInputRef}
+                        className="hidden"
+                        onChange={handleMarkschemeSelect}
+                        accept=".pdf,.txt,.md"
+                        multiple
+                      />
 
-                          {selectedMarkschemes.length > 0 && (
-                            <div className="mt-3 max-h-64 overflow-y-auto overflow-x-hidden border rounded-md p-2 space-y-2">
-                              {selectedMarkschemes.map((markscheme, index) => (
-                                <div key={index} className="flex items-center justify-between gap-2 p-2 bg-muted rounded">
-                                  <span className="text-sm flex-1">{truncateFilename(markscheme.name)}</span>
-                                  <Button variant="ghost" size="sm" onClick={() => removeMarkscheme(index)} className="shrink-0 whitespace-nowrap">
-                                    <span className="text-xs">Remove</span>
-                                  </Button>
-                                </div>
-                              ))}
+                      {selectedMarkschemes.length > 0 && (
+                        <div className="mt-3 max-h-64 overflow-y-auto overflow-x-hidden border rounded-md p-2 space-y-2">
+                          {selectedMarkschemes.map((markscheme, index) => (
+                            <div key={index} className="flex items-center justify-between gap-2 p-2 bg-muted rounded">
+                              <span className="text-sm flex-1">{truncateFilename(markscheme.name)}</span>
+                              <Button variant="ghost" size="sm" onClick={() => removeMarkscheme(index)} className="shrink-0 whitespace-nowrap">
+                                <span className="text-xs">Remove</span>
+                              </Button>
                             </div>
-                          )}
+                          ))}
                         </div>
+                      )}
+                    </div>
 
-                        <div className="flex gap-2 pt-2">
-                          <Button
-                            variant="outline"
-                            onClick={handleCancelDialog}
-                            className="flex-1"
-                          >
-                            Cancel
-                          </Button>
-                          <Button
-                            onClick={handleUploadPapers}
-                            className="flex-1"
-                            disabled={isPaperLoading || selectedMarkschemes.length === 0}
-                          >
-                            {isPaperLoading ? <LoadingSpinner /> : 'Process Papers & Extract Questions'}
-                          </Button>
-                        </div>
-                      </div>
-                    </>
-                  )}
+                    <div className="flex gap-2 pt-2">
+                      <Button
+                        variant="outline"
+                        onClick={handleCancelMarkschemeDialog}
+                        className="flex-1"
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        onClick={handleUploadMarkschemes}
+                        className="flex-1"
+                        disabled={isMarkschemeLoading || selectedMarkschemes.length === 0}
+                      >
+                        {isMarkschemeLoading ? <LoadingSpinner /> : 'Process Markschemes & Match'}
+                      </Button>
+                    </div>
+                  </div>
                 </DialogContent>
               </Dialog>
             </CardFooter>
