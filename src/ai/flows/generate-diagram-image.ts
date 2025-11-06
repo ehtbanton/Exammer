@@ -41,7 +41,6 @@ export async function generateDiagramImage(
         config: {
           numberOfImages: 1,
           aspectRatio: input.aspectRatio || '1:1',
-          imageSize: '1K', // Use 1K for faster generation and lower cost
           personGeneration: 'dont_allow', // Educational diagrams shouldn't need people
         },
       });

@@ -84,6 +84,7 @@ export async function GET(req: NextRequest) {
         q.question_text,
         q.summary,
         q.solution_objectives,
+        q.diagram_description,
         q.created_at as question_created_at,
         COALESCE(up.score, 0) as score,
         COALESCE(up.attempts, 0) as attempts,
@@ -164,6 +165,7 @@ export async function GET(req: NextRequest) {
               completedObjectives,
               score: row.score,
               attempts: row.attempts,
+              diagram_description: row.diagram_description,
             });
           }
         });

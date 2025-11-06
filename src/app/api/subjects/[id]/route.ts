@@ -49,6 +49,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         q.question_text,
         q.summary,
         q.solution_objectives,
+        q.diagram_description,
         q.paper_date,
         q.question_number,
         q.created_at as question_created_at,
@@ -127,6 +128,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
           attempts: row.attempts,
           paperDate: row.paper_date,
           questionNumber: row.question_number,
+          diagram_description: row.diagram_description,
         });
       }
     });

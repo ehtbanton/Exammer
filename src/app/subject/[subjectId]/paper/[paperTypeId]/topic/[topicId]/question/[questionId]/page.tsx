@@ -57,6 +57,7 @@ function InterviewPageContent() {
   const [generatedVariant, setGeneratedVariant] = useState<{questionText: string; solutionObjectives: string[]; diagramDescription?: string} | null>(null);
   const [diagramImage, setDiagramImage] = useState<string | null>(null);
   const [diagramLoading, setDiagramLoading] = useState(false);
+  const [diagramError, setDiagramError] = useState<string | null>(null);
   const [inputMode, setInputMode] = useState<'text' | 'whiteboard'>('text');
   const [accessLevel, setAccessLevel] = useState<number | null>(null);
   const [completedObjectives, setCompletedObjectives] = useState<number[]>([]);
@@ -133,21 +134,31 @@ function InterviewPageContent() {
 
         // Generate diagram image if the variant has a diagram description
         if (variantData.diagramDescription) {
-          console.log('Diagram description detected, generating image...');
+          console.log('[Diagram] Description detected, generating image...');
+          console.log('[Diagram] Description:', variantData.diagramDescription);
           setDiagramLoading(true);
+          setDiagramError(null);
           try {
             const imageResult = await generateDiagramImage({
               description: variantData.diagramDescription,
               aspectRatio: '1:1',
             });
             setDiagramImage(imageResult.imageDataUri);
-            console.log('Diagram image generated successfully');
-          } catch (imageError) {
-            console.error('Failed to generate diagram image:', imageError);
-            // Continue without diagram - not a fatal error
+            console.log('[Diagram] Image generated successfully');
+          } catch (imageError: any) {
+            const errorMsg = imageError?.message || 'Unknown error';
+            console.error('[Diagram] Failed to generate image:', errorMsg);
+            setDiagramError(errorMsg);
+            toast({
+              variant: 'destructive',
+              title: 'Diagram Generation Failed',
+              description: `Could not generate diagram: ${errorMsg}`
+            });
           } finally {
             setDiagramLoading(false);
           }
+        } else {
+          console.log('[Diagram] No diagram description found in variant');
         }
 
         // Start the interview with the generated variant and objectives
@@ -404,6 +415,15 @@ function InterviewPageContent() {
                                 alt="Question diagram"
                                 className="max-w-full h-auto rounded-lg border shadow-sm"
                               />
+                            </div>
+                          )}
+                          {diagramError && !diagramLoading && generatedVariant.diagramDescription && (
+                            <div className="mt-6 p-4 bg-destructive/10 border border-destructive/20 rounded-lg">
+                              <p className="text-sm font-semibold text-destructive mb-2">⚠️ Diagram generation failed</p>
+                              <p className="text-xs text-muted-foreground mb-3">Description: {diagramError}</p>
+                              <div className="text-sm text-foreground/80 italic">
+                                {generatedVariant.diagramDescription}
+                              </div>
                             </div>
                           )}
                         </div>
