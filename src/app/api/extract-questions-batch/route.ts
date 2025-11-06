@@ -156,14 +156,66 @@ export async function POST(req: NextRequest) {
     console.log(`\n[Batch Extraction] Extracted Markscheme Identifiers:`);
     successfulMarkschemes.forEach((m, idx) => {
       const sCount = m.data.solutions.length;
-      console.log(`  ${idx + 1}. "${m.data.paperIdentifier}" (Type ${m.data.paperTypeIndex}) - ${sCount} solutions`);
+      const monthPadded = m.data.month.toString().padStart(2, '0');
+      console.log(`  ${idx + 1}. ${m.data.year}-${monthPadded} "${m.data.paperTypeName}" - ${sCount} solutions`);
     });
 
-    // Step 2: Mechanical matching of questions to solutions (if markschemes provided)
-    console.log(`\n[Batch Extraction] Step 2: ${markschemesDataUris.length > 0 ? 'Matching questions to solutions...' : 'Processing questions without markschemes...'}`);
+    // Step 2: Preprocess markschemes with fuzzy matching
+    console.log(`\n[Batch Extraction] Step 2: ${markschemesDataUris.length > 0 ? 'Processing markschemes and matching to questions...' : 'Processing questions without markschemes...'}`);
 
-    // Exact matching on paper date format (YYYY-MM-P)
-    // No fuzzy matching - dates must match exactly
+    // Build solution lookup map: key = "YYYY-MM-P-Q", value = solution objectives
+    const solutionMap = new Map<string, string[]>();
+
+    if (markschemesDataUris.length > 0) {
+      for (const msResult of successfulMarkschemes) {
+        const { msName, data: msData } = msResult;
+
+        // Fuzzy match paper type name for markscheme
+        const aiPaperTypeName = msData.paperTypeName || '';
+        if (!aiPaperTypeName.trim()) {
+          console.warn(`[Markscheme Processing] ✗ Markscheme "${msName}" missing paper type name, skipping`);
+          continue;
+        }
+
+        let matchedPaperType = null;
+        let paperTypeIndex = -1;
+
+        for (let i = 0; i < paperTypes.length; i++) {
+          const dbPaperType = paperTypes[i];
+          const dbPaperTypeLower = dbPaperType.name.toLowerCase();
+          const aiPaperTypeLower = aiPaperTypeName.toLowerCase();
+
+          // Bidirectional substring matching
+          const dbContainsAi = dbPaperTypeLower.includes(aiPaperTypeLower);
+          const aiContainsDb = aiPaperTypeLower.includes(dbPaperTypeLower);
+
+          if (dbContainsAi || aiContainsDb) {
+            matchedPaperType = dbPaperType;
+            paperTypeIndex = i;
+            console.log(`[Markscheme Processing] ✓ Fuzzy matched paper type: AI="${aiPaperTypeName}" → DB="${dbPaperType.name}" (index ${paperTypeIndex})`);
+            break;
+          }
+        }
+
+        if (!matchedPaperType || paperTypeIndex === -1) {
+          console.warn(`[Markscheme Processing] ✗ Markscheme "${msName}" paper type "${aiPaperTypeName}" could not be matched, skipping`);
+          continue;
+        }
+
+        // Construct paper identifier for this markscheme
+        const monthPadded = msData.month.toString().padStart(2, '0');
+        const msPaperIdentifier = `${msData.year}-${monthPadded}-${paperTypeIndex}`;
+
+        // Add all solutions to the map
+        for (const solution of msData.solutions) {
+          const solutionKey = `${msPaperIdentifier}-${solution.questionNumber}`;
+          solutionMap.set(solutionKey, solution.solutionObjectives);
+          console.log(`[Markscheme Processing] ✓ Indexed solution: ${solutionKey} (${solution.solutionObjectives.length} objectives)`);
+        }
+      }
+
+      console.log(`[Markscheme Processing] Indexed ${solutionMap.size} solutions for matching`);
+    }
 
     interface QuestionToSave {
       paperIndex: number;
@@ -271,30 +323,19 @@ export async function POST(req: NextRequest) {
         const matchingKey = `${paperIdentifier}-${questionNumber}`; // YYYY-MM-P-Q (for markscheme matching)
         const fullQuestionId = `${matchingKey}-${topicIndex}`; // YYYY-MM-P-Q-T (complete ID with matched topic)
 
+        // Look up solution from preprocessed map
         let solutionObjectives: string[] | undefined = undefined;
 
-        // Try to find a matching solution if markschemes were provided
-        if (markschemesDataUris.length > 0) {
-          for (const msResult of successfulMarkschemes) {
-            const { data: msData } = msResult;
+        if (solutionMap.size > 0) {
+          solutionObjectives = solutionMap.get(matchingKey);
 
-            // Find solution with matching first 4 parts (YYYY-MM-P-Q)
-            const matchingSolution = msData.solutions.find(
-              (sol: any) => sol.questionId === matchingKey
-            );
-
-            if (matchingSolution) {
-              solutionObjectives = matchingSolution.solutionObjectives;
-              console.log(`[Processing] ✓ ${matchingKey} matched with solution → topic: ${matchedTopic.name}`);
-              break;
-            }
-          }
-
-          if (!solutionObjectives) {
+          if (solutionObjectives) {
+            console.log(`[Processing] ✓ ${matchingKey} matched with solution (${solutionObjectives.length} objectives) → topic: ${matchedTopic.name}`);
+          } else {
             unmatchedQuestions.push({
               paperName,
-              paperIdentifier: paperData.paperIdentifier,
-              paperTypeIndex: paperData.paperTypeIndex,
+              paperIdentifier,
+              paperTypeIndex,
               questionId: fullQuestionId,
               topicIndex,
               topicName: matchedTopic.name
@@ -323,27 +364,25 @@ export async function POST(req: NextRequest) {
     }
 
     // Find unmatched solutions (solutions without corresponding questions)
-    if (markschemesDataUris.length > 0) {
-      for (const msResult of successfulMarkschemes) {
-        const { msName, data: msData } = msResult;
+    if (solutionMap.size > 0) {
+      // Get all matched solution keys from questions
+      const matchedSolutionKeys = new Set<string>();
+      for (const question of questionsToSave) {
+        if (question.solutionObjectives) {
+          const questionParts = question.questionId.split('-');
+          const matchingKey = questionParts.slice(0, 4).join('-'); // YYYY-MM-P-Q
+          matchedSolutionKeys.add(matchingKey);
+        }
+      }
 
-        for (const solution of msData.solutions) {
-          // Check if any question has this solution ID (first 4 parts)
-          const isMatched = questionsToSave.some(q => {
-            const questionParts = q.questionId.split('-');
-            const matchingKey = questionParts.slice(0, 4).join('-');
-            return matchingKey === solution.questionId;
+      // Check which solutions in the map were not matched
+      for (const [solutionKey, objectives] of solutionMap.entries()) {
+        if (!matchedSolutionKeys.has(solutionKey)) {
+          unmatchedSolutions.push({
+            solutionKey,
+            objectiveCount: objectives.length
           });
-
-          if (!isMatched) {
-            unmatchedSolutions.push({
-              msName,
-              paperIdentifier: msData.paperIdentifier,
-              paperTypeIndex: msData.paperTypeIndex,
-              questionId: solution.questionId
-            });
-            console.log(`[Processing] ✗ ${solution.questionId} solution unmatched`);
-          }
+          console.log(`[Processing] ✗ ${solutionKey} solution unmatched (${objectives.length} objectives)`);
         }
       }
     }
@@ -418,7 +457,7 @@ export async function POST(req: NextRequest) {
     }
     if (unmatchedSolutions.length > 0) {
       console.log(`[Batch Extraction] Unmatched solutions (no corresponding questions):`);
-      unmatchedSolutions.forEach(us => console.log(`  - ${us.questionId}`));
+      unmatchedSolutions.forEach(us => console.log(`  - ${us.solutionKey} (${us.objectiveCount} objectives)`));
     }
     console.log(`[Batch Extraction] ================================\n`);
 

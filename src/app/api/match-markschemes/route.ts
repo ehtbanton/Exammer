@@ -63,7 +63,8 @@ export async function POST(req: NextRequest) {
           paperTypes: paperTypesInfo,
         });
 
-        console.log(`[Process M] ✓ Markscheme ${index + 1} extracted: "${msName}" → Paper: ${result.paperIdentifier}, Type: ${result.paperTypeIndex}, Solutions: ${result.solutions.length}`);
+        const monthPadded = result.month.toString().padStart(2, '0');
+        console.log(`[Process M] ✓ Markscheme ${index + 1} extracted: "${msName}" → Paper: ${result.year}-${monthPadded} "${result.paperTypeName}", Solutions: ${result.solutions.length}`);
 
         return {
           status: 'success' as const,
@@ -117,20 +118,56 @@ export async function POST(req: NextRequest) {
     let questionsUpdated = 0;
     const unmatchedSolutions: any[] = [];
 
-    // For each solution, try to find matching question
+    // For each markscheme, fuzzy match paper type and process solutions
     for (const msResult of successfulMarkschemes) {
       const { msName, data: msData } = msResult;
 
+      // Fuzzy match paper type name for markscheme
+      const aiPaperTypeName = msData.paperTypeName || '';
+      if (!aiPaperTypeName.trim()) {
+        console.warn(`[Process M] ✗ Markscheme "${msName}" missing paper type name, skipping`);
+        continue;
+      }
+
+      let matchedPaperType = null;
+      let paperTypeIndex = -1;
+
+      for (let i = 0; i < paperTypes.length; i++) {
+        const dbPaperType = paperTypes[i];
+        const dbPaperTypeLower = dbPaperType.name.toLowerCase();
+        const aiPaperTypeLower = aiPaperTypeName.toLowerCase();
+
+        // Bidirectional substring matching
+        const dbContainsAi = dbPaperTypeLower.includes(aiPaperTypeLower);
+        const aiContainsDb = aiPaperTypeLower.includes(dbPaperTypeLower);
+
+        if (dbContainsAi || aiContainsDb) {
+          matchedPaperType = dbPaperType;
+          paperTypeIndex = i;
+          console.log(`[Process M] ✓ Fuzzy matched paper type: AI="${aiPaperTypeName}" → DB="${dbPaperType.name}" (index ${paperTypeIndex})`);
+          break;
+        }
+      }
+
+      if (!matchedPaperType || paperTypeIndex === -1) {
+        console.warn(`[Process M] ✗ Markscheme "${msName}" paper type "${aiPaperTypeName}" could not be matched, skipping`);
+        continue;
+      }
+
+      // Construct paper identifier for this markscheme
+      const monthPadded = msData.month.toString().padStart(2, '0');
+      const paperDate = `${msData.year}-${monthPadded}`; // YYYY-MM
+
+      // Process each solution
       for (const solution of msData.solutions) {
-        // Parse solution ID: YYYY-MM-P-Q
-        const solutionParts = solution.questionId.split('-');
-        if (solutionParts.length !== 4) {
-          console.warn(`[Process M] ✗ ${solution.questionId} has invalid format (expected 4 parts, got ${solutionParts.length})`);
+        const questionNumber = solution.questionNumber;
+        if (typeof questionNumber !== 'number' || questionNumber < 1) {
+          console.warn(`[Process M] ✗ Markscheme "${msName}" has solution with invalid questionNumber: ${questionNumber}, skipping`);
           continue;
         }
 
-        const paperDate = `${solutionParts[0]}-${solutionParts[1]}`; // YYYY-MM
-        const questionNumber = `${solutionParts[2]}-${solutionParts[3]}`; // P-Q
+        const questionNumberStr = `${paperTypeIndex}-${questionNumber}`; // P-Q
+        const solutionKey = `${paperDate}-${paperTypeIndex}-${questionNumber}`; // YYYY-MM-P-Q
 
         // Try to find matching question(s) - there may be multiple questions with same paper_date and base question number
         // (e.g., one question for each topic in a multi-topic question)
@@ -145,7 +182,7 @@ export async function POST(req: NextRequest) {
           if (qParts.length < 2) return false;
           const qBaseNumber = `${qParts[0]}-${qParts[1]}`; // P-Q
 
-          return qBaseNumber === questionNumber;
+          return qBaseNumber === questionNumberStr;
         });
 
         if (matchingQuestions.length > 0) {
@@ -167,16 +204,16 @@ export async function POST(req: NextRequest) {
           }
 
           questionsMatched++;
-          console.log(`[Process M] ✓ ${solution.questionId} matched to ${matchingQuestions.length} question(s)`);
+          console.log(`[Process M] ✓ ${solutionKey} matched to ${matchingQuestions.length} question(s)`);
         } else {
           unmatchedSolutions.push({
             msName,
-            paperIdentifier: msData.paperIdentifier,
-            questionId: solution.questionId,
+            solutionKey,
             paperDate,
-            questionNumber
+            questionNumberStr,
+            objectiveCount: solution.solutionObjectives.length
           });
-          console.log(`[Process M] ✗ ${solution.questionId} no matching question found (${paperDate} ${questionNumber})`);
+          console.log(`[Process M] ✗ ${solutionKey} no matching question found (${paperDate} ${questionNumberStr})`);
         }
       }
     }
@@ -200,7 +237,7 @@ export async function POST(req: NextRequest) {
     }
     if (unmatchedSolutions.length > 0) {
       console.log(`[Process M] Unmatched solutions (no corresponding questions):`);
-      unmatchedSolutions.forEach(us => console.log(`  - ${us.questionId} (${us.paperDate} ${us.questionNumber})`));
+      unmatchedSolutions.forEach(us => console.log(`  - ${us.solutionKey} (${us.objectiveCount} objectives) from "${us.msName}"`));
     }
     console.log(`[Process M] ================================\n`);
 

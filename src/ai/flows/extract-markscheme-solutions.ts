@@ -35,13 +35,14 @@ const ExtractMarkschemesSolutionsInputSchema = z.object({
 export type ExtractMarkschemesSolutionsInput = z.infer<typeof ExtractMarkschemesSolutionsInputSchema>;
 
 const MarkschemesSolutionSchema = z.object({
-  questionId: z.string().describe('Question identifier in YYYY-MM-P-Q format (e.g., "2022-06-1-1" for June 2022, Paper 1, Question 1).'),
+  questionNumber: z.number().describe('The question number from the markscheme (e.g., 1, 2, 3). For multi-part solutions, use only the main number.'),
   solutionObjectives: z.array(z.string()).describe('List of specific marking objectives/criteria that students must achieve to gain full marks. Each objective should be a clear, measurable step including numeric/formulaic answers where applicable.'),
 });
 
 const ExtractMarkschemesSolutionsOutputSchema = z.object({
-  paperTypeIndex: z.number().describe('The 0-based index of the paper type from the provided paperTypes array.'),
-  paperIdentifier: z.string().describe('Paper date in YYYY-MM-P format where YYYY=year, MM=month (01-12), P=paper type index. Example: "2022-06-1" for June 2022, Paper Type 1. Must match corresponding exam paper exactly.'),
+  paperTypeName: z.string().describe('The name of the paper type identified from the markscheme header/title (e.g., "Paper 1", "Paper 2"). Must match one from the provided paperTypes list.'),
+  year: z.number().describe('The year from the markscheme (4 digits, e.g., 2022).'),
+  month: z.number().describe('The month from the markscheme (1-12, e.g., 6 for June).'),
   solutions: z.array(MarkschemesSolutionSchema).describe('All solutions with marking objectives extracted from this markscheme.'),
 });
 export type ExtractMarkschemesSolutionsOutput = z.infer<typeof ExtractMarkschemesSolutionsOutputSchema>;
@@ -68,9 +69,9 @@ export async function extractMarkschemesSolutions(
         output: {schema: ExtractMarkschemesSolutionsOutputSchema},
         prompt: `TASK: Extract solutions from dated markscheme.
 
-PAPER TYPES (0-indexed):
+PAPER TYPES:
 {{#each paperTypes}}
-{{@index}}: {{name}}
+- {{name}}
 {{/each}}
 
 DOCUMENT:
@@ -78,29 +79,24 @@ DOCUMENT:
 
 EXTRACTION REQUIREMENTS:
 
-1. PAPER DATE
-   ${getPaperIdentifierPromptRules()}
-
+1. PAPER IDENTIFICATION
    Steps:
-   - Locate year in document (4 digits)
-   - Locate month in document (convert to 2-digit: 01-12)
-   - Identify paper type from header (use 0-based index)
-   - Format as: YYYY-MM-P
+   - Locate year in document (4 digits, e.g., 2022)
+   - Locate month in document (as number 1-12, e.g., 6 for June)
+   - Identify paper type name from header (must match one from PAPER TYPES list above)
 
-   Example: Document shows "June 2022" and "Paper 2" (index 1) → Paper date: "2022-06-1"
+   Example: Document shows "June 2022" and "Paper 2" → year: 2022, month: 6, paperTypeName: "Paper 2"
 
-   CRITICAL: Must match corresponding exam paper format exactly.
+   CRITICAL: paperTypeName must match one from the PAPER TYPES list exactly.
 
-2. SOLUTION IDs
-   ${getSolutionIdPromptRules()}
+2. SOLUTION IDENTIFICATION
 
-   Construction steps:
-   - Take paper date from step 1 (YYYY-MM-P)
-   - Append question number (1, 2, 3, etc.)
-   - For multi-part solutions (1a, 1b), use main number only
-   - DO NOT append topic index (solutions don't include topics)
+   For each solution in the markscheme, identify the question number.
+   Question numbers will be matched to exam paper questions later.
 
-   Example: Paper date "2022-06-1", Question 3 → Solution ID: "2022-06-1-3"
+   For multi-part solutions (1a, 1b), use the main number only.
+
+   Example: Solution for Question 3 with parts a, b, c → Question number: 3
 
    QUESTION NUMBER IDENTIFICATION PROCEDURE (MARKSCHEME-SPECIFIC):
 
@@ -134,7 +130,7 @@ EXTRACTION REQUIREMENTS:
       - Ensure objectives are specific and verifiable
 
 3. FOR EACH SOLUTION OUTPUT:
-   - questionId: YYYY-MM-P-Q format (atomic string, NO topic index)
+   - questionNumber: Just the number (e.g., 1, 2, 3)
    - solutionObjectives: Array of marking criteria
 
    Objective requirements:
@@ -162,17 +158,18 @@ Before generating output, verify the following:
 
 OUTPUT STRUCTURE:
 {
-  "paperTypeIndex": <integer 0-9>,
-  "paperIdentifier": "<YYYY-MM-P>",
+  "paperTypeName": "<name from PAPER TYPES list>",
+  "year": <4-digit year>,
+  "month": <1-12>,
   "solutions": [
     {
-      "questionId": "<YYYY-MM-P-Q>",
+      "questionNumber": <integer>,
       "solutionObjectives": ["<objective 1>", "<objective 2>", ...]
     }
   ]
 }
 
-CRITICAL: Solution IDs have 4 parts only (no topic). Format: YYYY-MM-P-Q`,
+CRITICAL: paperTypeName must match one from the PAPER TYPES list provided above.`,
       });
 
       const flow = aiInstance.defineFlow(
@@ -194,33 +191,46 @@ CRITICAL: Solution IDs have 4 parts only (no topic). Format: YYYY-MM-P-Q`,
                 throw new Error('No output received from AI model');
               }
 
-              // Validate paper identifier format (STRICT)
-              const paperIdentifier = output.paperIdentifier || '';
-              if (!isValidPaperIdentifier(paperIdentifier)) {
-                lastError = getPaperIdentifierErrorMessage(paperIdentifier);
+              // Validate paper type name
+              const paperTypeName = output.paperTypeName || '';
+              if (!paperTypeName.trim()) {
+                lastError = 'Missing paper type name.';
                 console.warn(`[Markscheme Extraction] Attempt ${attempt}/${MAX_RETRIES} - ${lastError}`);
 
                 if (attempt < MAX_RETRIES) {
-                  // Re-prompt with error feedback
-                  console.log(`[Markscheme Extraction] Retrying with format correction...`);
+                  console.log(`[Markscheme Extraction] Retrying with paper type identification...`);
                   continue;
                 }
 
-                throw new Error(`Paper identifier validation failed after ${MAX_RETRIES} attempts. ${lastError}`);
+                throw new Error(`Paper type identification failed after ${MAX_RETRIES} attempts. ${lastError}`);
               }
 
-              // Validate paper type index
-              const paperTypeIndex = output.paperTypeIndex ?? -1;
-              if (paperTypeIndex < 0 || paperTypeIndex >= paperTypes.length) {
-                lastError = `Invalid paperTypeIndex: ${paperTypeIndex}. Must be between 0 and ${paperTypes.length - 1}.`;
+              // Validate year
+              const year = output.year ?? 0;
+              if (year < 1900 || year > 2100) {
+                lastError = `Invalid year: ${year}. Must be between 1900 and 2100.`;
                 console.warn(`[Markscheme Extraction] Attempt ${attempt}/${MAX_RETRIES} - ${lastError}`);
 
                 if (attempt < MAX_RETRIES) {
-                  console.log(`[Markscheme Extraction] Retrying with index correction...`);
+                  console.log(`[Markscheme Extraction] Retrying with year correction...`);
                   continue;
                 }
 
-                throw new Error(`Paper type index validation failed after ${MAX_RETRIES} attempts. ${lastError}`);
+                throw new Error(`Year validation failed after ${MAX_RETRIES} attempts. ${lastError}`);
+              }
+
+              // Validate month
+              const month = output.month ?? 0;
+              if (month < 1 || month > 12) {
+                lastError = `Invalid month: ${month}. Must be between 1 and 12.`;
+                console.warn(`[Markscheme Extraction] Attempt ${attempt}/${MAX_RETRIES} - ${lastError}`);
+
+                if (attempt < MAX_RETRIES) {
+                  console.log(`[Markscheme Extraction] Retrying with month correction...`);
+                  continue;
+                }
+
+                throw new Error(`Month validation failed after ${MAX_RETRIES} attempts. ${lastError}`);
               }
 
               // Validate solutions array
@@ -239,38 +249,33 @@ CRITICAL: Solution IDs have 4 parts only (no topic). Format: YYYY-MM-P-Q`,
 
               // Validate each solution structure
               const validatedSolutions = solutions.map((s, index) => {
-                if (!s.questionId || typeof s.questionId !== 'string') {
-                  console.warn(`[Markscheme Extraction] Solution at index ${index} has invalid questionId`);
-                  const fallbackId = `${paperIdentifier}-${index + 1}`;
+                // Validate question number
+                if (typeof s.questionNumber !== 'number' || s.questionNumber < 1) {
+                  console.warn(`[Markscheme Extraction] Solution at index ${index} has invalid questionNumber, using fallback`);
                   return {
                     ...s,
-                    questionId: fallbackId
+                    questionNumber: index + 1
                   };
                 }
-                // Validate questionId format: must have 4 parts (YYYY-MM-P-Q)
-                const parts = s.questionId.split('-');
-                if (parts.length !== 4) {
-                  console.warn(`[Markscheme Extraction] Solution ID ${s.questionId} has wrong format (expected 4 parts, got ${parts.length}). Solutions should NOT include topic index.`);
-                }
-                // Validate questionId starts with paperIdentifier
-                if (!s.questionId.startsWith(paperIdentifier + '-')) {
-                  console.warn(`[Markscheme Extraction] Solution ID ${s.questionId} does not match paper date ${paperIdentifier}`);
-                }
+
+                // Validate solution objectives
                 if (!Array.isArray(s.solutionObjectives) || s.solutionObjectives.length === 0) {
-                  console.warn(`[Markscheme Extraction] Solution ${s.questionId} has no objectives, adding placeholder`);
+                  console.warn(`[Markscheme Extraction] Solution Q${s.questionNumber} has no objectives, adding placeholder`);
                   return {
                     ...s,
                     solutionObjectives: ['Complete the question as per the markscheme']
                   };
                 }
+
                 return s;
               });
 
               console.log(`[Markscheme Extraction] ✓ Validation passed on attempt ${attempt}`);
 
               return {
-                paperTypeIndex,
-                paperIdentifier,
+                paperTypeName,
+                year,
+                month,
                 solutions: validatedSolutions
               };
 
@@ -294,7 +299,8 @@ CRITICAL: Solution IDs have 4 parts only (no topic). Format: YYYY-MM-P-Q`,
 
     const endTime = Date.now();
     const duration = ((endTime - startTime) / 1000).toFixed(2);
-    console.log(`[Markscheme Extraction] Completed in ${duration}s - Paper: ${result.paperIdentifier}, Type Index: ${result.paperTypeIndex}, Solutions: ${result.solutions.length}`);
+    const monthPadded = result.month.toString().padStart(2, '0');
+    console.log(`[Markscheme Extraction] Completed in ${duration}s - Paper: ${result.year}-${monthPadded} "${result.paperTypeName}", Solutions: ${result.solutions.length}`);
 
     return result;
   } catch (error) {
