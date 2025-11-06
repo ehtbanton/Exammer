@@ -39,5 +39,9 @@ export function getAvailableDevCommands(): Array<{command: string; description: 
       command: 'objans N',
       description: 'Generate an answer for the objective at index N',
     },
+    {
+      command: 'objans a',
+      description: 'Generate answers for all unachieved objectives',
+    },
   ];
 }

@@ -14,7 +14,7 @@ import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import LoadingSpinner from '@/components/LoadingSpinner';
-import { Send, User, Bot, ArrowLeft, MessageSquare, PenTool, Terminal } from 'lucide-react';
+import { Send, User, Bot, ArrowLeft, MessageSquare, PenTool, Terminal, Check } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
@@ -373,12 +373,18 @@ function InterviewPageContent() {
                           <div className="mt-6 p-4 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg">
                             <h3 className="text-sm font-semibold mb-2 text-blue-800 dark:text-blue-200">📋 All Solution Objectives:</h3>
                             <ul className="space-y-1">
-                              {generatedVariant.solutionObjectives.map((objective, idx) => (
-                                <li key={idx} className="text-sm text-blue-700 dark:text-blue-300 flex items-start gap-2">
-                                  <span className="font-mono text-xs mt-0.5">[{idx}]</span>
-                                  <span>{objective}</span>
-                                </li>
-                              ))}
+                              {generatedVariant.solutionObjectives.map((objective, idx) => {
+                                const isCompleted = completedObjectives.includes(idx);
+                                return (
+                                  <li key={idx} className="text-sm text-blue-700 dark:text-blue-300 flex items-start gap-2">
+                                    <span className="font-mono text-xs mt-0.5">[{idx}]</span>
+                                    <span className={isCompleted ? 'flex-1' : ''}>{objective}</span>
+                                    {isCompleted && (
+                                      <Check className="h-4 w-4 text-green-600 dark:text-green-400 shrink-0 mt-0.5" />
+                                    )}
+                                  </li>
+                                );
+                              })}
                             </ul>
                           </div>
                         )}
@@ -465,7 +471,7 @@ function InterviewPageContent() {
                       {accessLevel === 3 && (
                         <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted/50 px-2 py-1 rounded">
                           <Terminal className="h-3 w-3" />
-                          <span>Dev commands enabled: <code className="bg-background px-1 rounded">fullans</code>, <code className="bg-background px-1 rounded">objans [N]</code></span>
+                          <span>Dev commands enabled: <code className="bg-background px-1 rounded">fullans</code>, <code className="bg-background px-1 rounded">objans</code></span>
                         </div>
                       )}
                       <div className="flex items-center gap-2">
