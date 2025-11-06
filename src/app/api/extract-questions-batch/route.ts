@@ -149,7 +149,8 @@ export async function POST(req: NextRequest) {
     console.log(`\n[Batch Extraction] Extracted Paper Identifiers:`);
     successfulPapers.forEach((p, idx) => {
       const qCount = p.data.questions.length;
-      console.log(`  ${idx + 1}. "${p.data.paperIdentifier}" (Type ${p.data.paperTypeIndex}) - ${qCount} questions`);
+      const monthPadded = p.data.month.toString().padStart(2, '0');
+      console.log(`  ${idx + 1}. ${p.data.year}-${monthPadded} "${p.data.paperTypeName}" - ${qCount} questions`);
     });
 
     console.log(`\n[Batch Extraction] Extracted Markscheme Identifiers:`);
@@ -186,19 +187,89 @@ export async function POST(req: NextRequest) {
     for (const paperResult of successfulPapers) {
       const { index: paperIndex, paperName, data: paperData } = paperResult;
 
+      // Step 1: Fuzzy match paper type name to find paper type index
+      const aiPaperTypeName = paperData.paperTypeName || '';
+      if (!aiPaperTypeName.trim()) {
+        console.warn(`[Processing] ✗ Paper "${paperName}" missing paper type name, skipping all questions`);
+        continue;
+      }
+
+      let matchedPaperType = null;
+      let paperTypeIndex = -1;
+
+      for (let i = 0; i < paperTypes.length; i++) {
+        const dbPaperType = paperTypes[i];
+        const dbPaperTypeLower = dbPaperType.name.toLowerCase();
+        const aiPaperTypeLower = aiPaperTypeName.toLowerCase();
+
+        // Bidirectional case-insensitive substring matching (from old system)
+        const dbContainsAi = dbPaperTypeLower.includes(aiPaperTypeLower);
+        const aiContainsDb = aiPaperTypeLower.includes(dbPaperTypeLower);
+
+        if (dbContainsAi || aiContainsDb) {
+          matchedPaperType = dbPaperType;
+          paperTypeIndex = i;
+          console.log(`[Processing] ✓ Fuzzy matched paper type: AI="${aiPaperTypeName}" → DB="${dbPaperType.name}" (index ${paperTypeIndex})`);
+          break;
+        }
+      }
+
+      if (!matchedPaperType || paperTypeIndex === -1) {
+        console.warn(`[Processing] ✗ Paper "${paperName}" paper type "${aiPaperTypeName}" could not be matched to any database paper type, skipping all questions`);
+        continue;
+      }
+
+      // Construct paper identifier: YYYY-MM-P
+      const monthPadded = paperData.month.toString().padStart(2, '0');
+      const paperIdentifier = `${paperData.year}-${monthPadded}-${paperTypeIndex}`;
+      const paperDate = `${paperData.year}-${monthPadded}`; // YYYY-MM
+
+      // Step 2: Process each question
       for (const question of paperData.questions) {
-        // Parse question ID: YYYY-MM-P-Q-T (5 parts)
-        const questionParts = question.questionId.split('-');
-        if (questionParts.length !== 5) {
-          console.warn(`[Processing] ✗ ${question.questionId} has invalid format (expected 5 parts, got ${questionParts.length})`);
+        const questionNumber = question.questionNumber;
+        if (typeof questionNumber !== 'number' || questionNumber < 1) {
+          console.warn(`[Processing] ✗ Paper "${paperName}" has question with invalid number: ${questionNumber}, skipping`);
           continue;
         }
 
-        // Extract parts
-        const paperDate = `${questionParts[0]}-${questionParts[1]}`; // YYYY-MM
-        const questionNumber = `${questionParts[2]}-${questionParts[3]}-${questionParts[4]}`; // P-Q-T
-        const matchingKey = questionParts.slice(0, 4).join('-'); // YYYY-MM-P-Q
-        const topicIndex = parseInt(questionParts[4], 10); // T
+        // Get topic name from AI output
+        const aiTopicName = question.topicName || '';
+        if (!aiTopicName.trim()) {
+          console.warn(`[Processing] ✗ Paper "${paperName}" Q${questionNumber} missing topic name, skipping`);
+          continue;
+        }
+
+        // Fuzzy match topic name to find correct topic (using old system's bidirectional substring matching)
+        const allTopics = paperTypes.flatMap(pt => pt.topics);
+        let matchedTopic = null;
+        let topicIndex = -1;
+
+        for (let i = 0; i < allTopics.length; i++) {
+          const dbTopic = allTopics[i];
+          const dbTopicLower = dbTopic.name.toLowerCase();
+          const aiTopicLower = aiTopicName.toLowerCase();
+
+          // Bidirectional case-insensitive substring matching (from old system)
+          const dbContainsAi = dbTopicLower.includes(aiTopicLower);
+          const aiContainsDb = aiTopicLower.includes(dbTopicLower);
+
+          if (dbContainsAi || aiContainsDb) {
+            matchedTopic = dbTopic;
+            topicIndex = i;
+            console.log(`[Processing] ✓ Q${questionNumber} fuzzy matched topic: AI="${aiTopicName}" → DB="${dbTopic.name}" (index ${topicIndex})`);
+            break;
+          }
+        }
+
+        if (!matchedTopic || topicIndex === -1) {
+          console.warn(`[Processing] ✗ Paper "${paperName}" Q${questionNumber} topic "${aiTopicName}" could not be matched to any database topic, skipping`);
+          continue;
+        }
+
+        // Construct identifiers
+        const questionNumberStr = `${paperTypeIndex}-${questionNumber}-${topicIndex}`; // P-Q-T (for database storage)
+        const matchingKey = `${paperIdentifier}-${questionNumber}`; // YYYY-MM-P-Q (for markscheme matching)
+        const fullQuestionId = `${matchingKey}-${topicIndex}`; // YYYY-MM-P-Q-T (complete ID with matched topic)
 
         let solutionObjectives: string[] | undefined = undefined;
 
@@ -214,7 +285,7 @@ export async function POST(req: NextRequest) {
 
             if (matchingSolution) {
               solutionObjectives = matchingSolution.solutionObjectives;
-              console.log(`[Processing] ✓ ${matchingKey} matched with solution, topic index: ${topicIndex}`);
+              console.log(`[Processing] ✓ ${matchingKey} matched with solution → topic: ${matchedTopic.name}`);
               break;
             }
           }
@@ -224,28 +295,29 @@ export async function POST(req: NextRequest) {
               paperName,
               paperIdentifier: paperData.paperIdentifier,
               paperTypeIndex: paperData.paperTypeIndex,
-              questionId: question.questionId,
-              topicIndex
+              questionId: fullQuestionId,
+              topicIndex,
+              topicName: matchedTopic.name
             });
-            console.log(`[Processing] ℹ ${matchingKey} has no matching solution (will save without objectives)`);
+            console.log(`[Processing] ℹ ${matchingKey} has no matching solution (will save without objectives) → topic: ${matchedTopic.name}`);
           }
         } else {
-          console.log(`[Processing] ℹ ${matchingKey} processing without markscheme`);
+          console.log(`[Processing] ℹ ${matchingKey} processing without markscheme → topic: ${matchedTopic.name}`);
         }
 
         // Add question to save list (with or without solution objectives)
         questionsToSave.push({
           paperIndex,
           paperName,
-          paperTypeIndex: paperData.paperTypeIndex,
-          paperIdentifier: paperData.paperIdentifier,
-          questionId: question.questionId,
+          paperTypeIndex,
+          paperIdentifier,
+          questionId: fullQuestionId,
           topicIndex,
           questionText: question.questionText,
           summary: question.summary,
           solutionObjectives,
           paperDate,
-          questionNumber
+          questionNumber: questionNumberStr
         });
       }
     }
@@ -342,7 +414,7 @@ export async function POST(req: NextRequest) {
     }
     if (questionsWithoutSolutions > 0 && markschemesDataUris.length > 0) {
       console.log(`[Batch Extraction] Questions without matching solutions:`);
-      unmatchedQuestions.forEach(uq => console.log(`  - ${uq.questionId} (topic index: ${uq.topicIndex})`));
+      unmatchedQuestions.forEach(uq => console.log(`  - ${uq.questionId} → ${uq.topicName}`));
     }
     if (unmatchedSolutions.length > 0) {
       console.log(`[Batch Extraction] Unmatched solutions (no corresponding questions):`);

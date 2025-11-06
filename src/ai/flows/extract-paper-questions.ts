@@ -44,14 +44,16 @@ const ExtractPaperQuestionsInputSchema = z.object({
 export type ExtractPaperQuestionsInput = z.infer<typeof ExtractPaperQuestionsInputSchema>;
 
 const PaperQuestionSchema = z.object({
-  questionId: z.string().describe('Question identifier in YYYY-MM-P-Q-T format (e.g., "2022-06-1-1-0" for June 2022, Paper 1, Question 1, Topic 0).'),
+  questionNumber: z.number().describe('The question number from the exam paper (e.g., 1, 2, 3). For multi-part questions, use only the main number.'),
   questionText: z.string().describe('The complete text of the exam question, including all parts and sub-questions.'),
   summary: z.string().describe('A brief one-sentence summary of what this question is about.'),
+  topicName: z.string().describe('The name of the topic this question belongs to, chosen from the provided topics list.'),
 });
 
 const ExtractPaperQuestionsOutputSchema = z.object({
-  paperTypeIndex: z.number().describe('The 0-based index of the paper type from the provided paperTypes array (e.g., 0 for first paper type, 1 for second).'),
-  paperIdentifier: z.string().describe('Paper date in YYYY-MM-P format where YYYY=year, MM=month (01-12), P=paper type index. Example: "2022-06-1" for June 2022, Paper Type 1.'),
+  paperTypeName: z.string().describe('The name of the paper type identified from the exam paper header/title (e.g., "Paper 1", "Paper 2"). Must match one from the provided paperTypes list.'),
+  year: z.number().describe('The year from the exam paper (4 digits, e.g., 2022).'),
+  month: z.number().describe('The month from the exam paper (1-12, e.g., 6 for June).'),
   questions: z.array(PaperQuestionSchema).describe('All questions extracted from this exam paper.'),
 });
 export type ExtractPaperQuestionsOutput = z.infer<typeof ExtractPaperQuestionsOutputSchema>;
@@ -78,14 +80,14 @@ export async function extractPaperQuestions(
         output: {schema: ExtractPaperQuestionsOutputSchema},
         prompt: `TASK: Extract questions from dated exam paper.
 
-PAPER TYPES (0-indexed):
+PAPER TYPES:
 {{#each paperTypes}}
-{{@index}}: {{name}}
+- {{name}}
 {{/each}}
 
-TOPICS (0-indexed):
+TOPICS:
 {{#each topics}}
-{{@index}}: {{name}} - {{description}}
+- {{name}}: {{description}}
 {{/each}}
 
 DOCUMENT:
@@ -93,28 +95,23 @@ DOCUMENT:
 
 EXTRACTION REQUIREMENTS:
 
-1. PAPER DATE
-   ${getPaperIdentifierPromptRules()}
-
+1. PAPER IDENTIFICATION
    Steps:
-   - Locate year in document (4 digits)
-   - Locate month in document (convert to 2-digit: 01-12)
-   - Identify paper type from header (use 0-based index)
-   - Format as: YYYY-MM-P
+   - Locate year in document (4 digits, e.g., 2022)
+   - Locate month in document (as number 1-12, e.g., 6 for June)
+   - Identify paper type name from header (must match one from PAPER TYPES list above)
 
-   Example: Document shows "June 2022" and "Paper 2" (index 1) → Paper date: "2022-06-1"
+   Example: Document shows "June 2022" and "Paper 2" → year: 2022, month: 6, paperTypeName: "Paper 2"
 
 2. QUESTION IDs
-   ${getPaperQuestionIdPromptRules()}
 
-   Construction steps:
-   - Take paper date from step 1 (YYYY-MM-P)
-   - Append question number (1, 2, 3, etc.)
-   - Identify topic from topics list (use 0-based index)
-   - Append topic index
-   - For multi-part questions (1a, 1b), use main number only
+   For now, just identify the question number (1, 2, 3, etc.).
+   The full question ID will be constructed later during processing.
+   For multi-part questions (1a, 1b), use the main number only.
 
-   Example: Paper date "2022-06-1", Question 3, Topic 5 → Question ID: "2022-06-1-3-5"
+   Example: Question 3 with parts a, b, c → Question number: 3
+
+   Note: Paper type and topic will be matched later, not in the question ID at this stage.
 
    QUESTION NUMBER IDENTIFICATION PROCEDURE:
 
@@ -148,9 +145,10 @@ EXTRACTION REQUIREMENTS:
       - Formatting is consistent across all questions
 
 3. FOR EACH QUESTION OUTPUT:
-   - questionId: YYYY-MM-P-Q-T format (atomic string with topic index)
+   - questionNumber: Just the number (e.g., 1, 2, 3)
    - questionText: Complete text including all sub-parts
    - summary: Single sentence description
+   - topicName: The name of the topic this question belongs to (must match one from the TOPICS list)
 
 VALIDATION REQUIREMENTS:
 
@@ -163,18 +161,23 @@ Before generating output, verify the following:
 
 OUTPUT STRUCTURE:
 {
-  "paperTypeIndex": <integer 0-9>,
-  "paperIdentifier": "<YYYY-MM-P>",
+  "paperTypeName": "<name from PAPER TYPES list>",
+  "year": <4-digit year>,
+  "month": <1-12>,
   "questions": [
     {
-      "questionId": "<YYYY-MM-P-Q-T>",
+      "questionNumber": <integer>,
       "questionText": "<complete text>",
-      "summary": "<single sentence>"
+      "summary": "<single sentence>",
+      "topicName": "<topic name from TOPICS list>"
     }
   ]
 }
 
-CRITICAL: Each questionId must include topic index as 5th field. Topic index must match position in topics list (0-based).`,
+CRITICAL:
+- paperTypeName must match one of the paper type names from the PAPER TYPES list provided above
+- Each topicName must match one of the topic names from the TOPICS list provided above
+- If a question spans multiple topics, choose the primary/most relevant topic`,
       });
 
       const flow = aiInstance.defineFlow(
@@ -196,33 +199,46 @@ CRITICAL: Each questionId must include topic index as 5th field. Topic index mus
                 throw new Error('No output received from AI model');
               }
 
-              // Validate paper identifier format (STRICT)
-              const paperIdentifier = output.paperIdentifier || '';
-              if (!isValidPaperIdentifier(paperIdentifier)) {
-                lastError = getPaperIdentifierErrorMessage(paperIdentifier);
+              // Validate paper type name
+              const paperTypeName = output.paperTypeName || '';
+              if (!paperTypeName.trim()) {
+                lastError = 'Missing paper type name.';
                 console.warn(`[Paper Extraction] Attempt ${attempt}/${MAX_RETRIES} - ${lastError}`);
 
                 if (attempt < MAX_RETRIES) {
-                  // Re-prompt with error feedback
-                  console.log(`[Paper Extraction] Retrying with format correction...`);
+                  console.log(`[Paper Extraction] Retrying with paper type identification...`);
                   continue;
                 }
 
-                throw new Error(`Paper identifier validation failed after ${MAX_RETRIES} attempts. ${lastError}`);
+                throw new Error(`Paper type identification failed after ${MAX_RETRIES} attempts. ${lastError}`);
               }
 
-              // Validate paper type index
-              const paperTypeIndex = output.paperTypeIndex ?? -1;
-              if (paperTypeIndex < 0 || paperTypeIndex >= paperTypes.length) {
-                lastError = `Invalid paperTypeIndex: ${paperTypeIndex}. Must be between 0 and ${paperTypes.length - 1}.`;
+              // Validate year
+              const year = output.year ?? 0;
+              if (year < 1900 || year > 2100) {
+                lastError = `Invalid year: ${year}. Must be between 1900 and 2100.`;
                 console.warn(`[Paper Extraction] Attempt ${attempt}/${MAX_RETRIES} - ${lastError}`);
 
                 if (attempt < MAX_RETRIES) {
-                  console.log(`[Paper Extraction] Retrying with index correction...`);
+                  console.log(`[Paper Extraction] Retrying with year correction...`);
                   continue;
                 }
 
-                throw new Error(`Paper type index validation failed after ${MAX_RETRIES} attempts. ${lastError}`);
+                throw new Error(`Year validation failed after ${MAX_RETRIES} attempts. ${lastError}`);
+              }
+
+              // Validate month
+              const month = output.month ?? 0;
+              if (month < 1 || month > 12) {
+                lastError = `Invalid month: ${month}. Must be between 1 and 12.`;
+                console.warn(`[Paper Extraction] Attempt ${attempt}/${MAX_RETRIES} - ${lastError}`);
+
+                if (attempt < MAX_RETRIES) {
+                  console.log(`[Paper Extraction] Retrying with month correction...`);
+                  continue;
+                }
+
+                throw new Error(`Month validation failed after ${MAX_RETRIES} attempts. ${lastError}`);
               }
 
               // Validate questions array
@@ -241,39 +257,39 @@ CRITICAL: Each questionId must include topic index as 5th field. Topic index mus
 
               // Validate each question structure
               const validatedQuestions = questions.map((q, index) => {
+                // Validate summary
                 if (!q.summary || q.summary.trim() === '') {
-                  console.warn(`[Paper Extraction] Question ${q.questionId} missing summary, generating default`);
+                  console.warn(`[Paper Extraction] Question ${q.questionNumber || index + 1} missing summary, generating default`);
                   const textPreview = q.questionText?.substring(0, 100) || 'Question';
                   return {
                     ...q,
                     summary: `Question text: ${textPreview}...`
                   };
                 }
-                if (!q.questionId || typeof q.questionId !== 'string') {
-                  console.warn(`[Paper Extraction] Question at index ${index} has invalid questionId`);
-                  const fallbackId = `${paperIdentifier}-${index + 1}-0`;
+
+                // Validate question number
+                if (typeof q.questionNumber !== 'number' || q.questionNumber < 1) {
+                  console.warn(`[Paper Extraction] Question at index ${index} has invalid questionNumber, using fallback`);
                   return {
                     ...q,
-                    questionId: fallbackId
+                    questionNumber: index + 1
                   };
                 }
-                // Validate questionId format: must have 5 parts (YYYY-MM-P-Q-T)
-                const parts = q.questionId.split('-');
-                if (parts.length !== 5) {
-                  console.warn(`[Paper Extraction] Question ID ${q.questionId} missing topic index (expected 5 parts, got ${parts.length})`);
+
+                // Validate topicName is provided
+                if (!q.topicName || typeof q.topicName !== 'string' || q.topicName.trim() === '') {
+                  console.warn(`[Paper Extraction] Question ${q.questionNumber} missing topic name`);
                 }
-                // Validate questionId starts with paperIdentifier
-                if (!q.questionId.startsWith(paperIdentifier + '-')) {
-                  console.warn(`[Paper Extraction] Question ID ${q.questionId} does not match paper date ${paperIdentifier}`);
-                }
+
                 return q;
               });
 
               console.log(`[Paper Extraction] ✓ Validation passed on attempt ${attempt}`);
 
               return {
-                paperTypeIndex,
-                paperIdentifier,
+                paperTypeName,
+                year,
+                month,
                 questions: validatedQuestions
               };
 
@@ -298,7 +314,8 @@ CRITICAL: Each questionId must include topic index as 5th field. Topic index mus
 
     const endTime = Date.now();
     const duration = ((endTime - startTime) / 1000).toFixed(2);
-    console.log(`[Paper Extraction] Completed in ${duration}s - Paper: ${result.paperIdentifier}, Type Index: ${result.paperTypeIndex}, Questions: ${result.questions.length}`);
+    const monthPadded = result.month.toString().padStart(2, '0');
+    console.log(`[Paper Extraction] Completed in ${duration}s - Paper: ${result.year}-${monthPadded} "${result.paperTypeName}", Questions: ${result.questions.length}`);
 
     return result;
   } catch (error) {
