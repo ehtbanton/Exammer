@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Mic, Phone, PhoneOff } from 'lucide-react'
+import { Mic, Phone, PhoneOff, Volume2 } from 'lucide-react'
 
 interface VoiceInterviewLiveProps {
   question: string
@@ -14,18 +14,74 @@ interface VoiceInterviewLiveProps {
 export function VoiceInterviewLive({ question, solutionObjectives, subsection }: VoiceInterviewLiveProps) {
   const [isConnected, setIsConnected] = useState(false)
   const [isRecording, setIsRecording] = useState(false)
+  const [isSpeaking, setIsSpeaking] = useState(false)
   const [status, setStatus] = useState('Click Start to begin')
   const [error, setError] = useState<string | null>(null)
   const [logs, setLogs] = useState<string[]>([])
   
   const sessionRef = useRef<any>(null)
   const audioContextRef = useRef<AudioContext | null>(null)
+  const playbackContextRef = useRef<AudioContext | null>(null)
   const mediaStreamRef = useRef<MediaStream | null>(null)
   const processorRef = useRef<ScriptProcessorNode | null>(null)
+  const audioQueueRef = useRef<string[]>([])
+  const isPlayingRef = useRef(false)
 
   const log = (msg: string) => {
     console.log(msg)
     setLogs(prev => [...prev, msg])
+  }
+
+
+  const playAudio = (base64Data: string) => {
+    audioQueueRef.current.push(base64Data)
+    if (!isPlayingRef.current) {
+      playNextChunk()
+    }
+  }
+
+  const playNextChunk = async () => {
+    if (audioQueueRef.current.length === 0) {
+      isPlayingRef.current = false
+      setIsSpeaking(false)
+      return
+    }
+
+    isPlayingRef.current = true
+    setIsSpeaking(true)
+
+    try {
+      if (!playbackContextRef.current) {
+        playbackContextRef.current = new AudioContext({ sampleRate: 24000 })
+      }
+
+      const base64Data = audioQueueRef.current.shift()!
+      const binaryString = atob(base64Data)
+      const bytes = new Uint8Array(binaryString.length)
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i)
+      }
+
+      const pcm16 = new Int16Array(bytes.buffer)
+      const float32 = new Float32Array(pcm16.length)
+
+      for (let i = 0; i < pcm16.length; i++) {
+        float32[i] = pcm16[i] / (pcm16[i] < 0 ? 0x8000 : 0x7FFF)
+      }
+
+      const audioBuffer = playbackContextRef.current.createBuffer(1, float32.length, 24000)
+      audioBuffer.getChannelData(0).set(float32)
+
+      const source = playbackContextRef.current.createBufferSource()
+      source.buffer = audioBuffer
+      source.connect(playbackContextRef.current.destination)
+
+      source.onended = () => playNextChunk()
+      source.start()
+    } catch (err) {
+      console.error('Playback error:', err)
+      playNextChunk()
+    }
   }
 
   const connect = async () => {
@@ -60,7 +116,31 @@ export function VoiceInterviewLive({ question, solutionObjectives, subsection }:
             startMic()
           },
           onmessage: (msg: any) => {
-            log('Message: ' + JSON.stringify(msg).substring(0, 80))
+            // Log message structure
+            console.log('Full message:', msg)
+            log('Message type: ' + (msg.serverContent ? Object.keys(msg.serverContent).join(',') : 'no serverContent'))
+            
+            // Check for audio in serverContent.modelTurn
+            if (msg.serverContent?.modelTurn?.parts) {
+              log('Got modelTurn with ' + msg.serverContent.modelTurn.parts.length + ' parts')
+              for (const part of msg.serverContent.modelTurn.parts) {
+                if (part.inlineData) {
+                  log('Part has inlineData: ' + part.inlineData.mimeType)
+                  if (part.inlineData.mimeType?.startsWith('audio/pcm') && part.inlineData.data) {
+                    log('Playing audio (length: ' + part.inlineData.data.length + ')')
+                    playAudio(part.inlineData.data)
+                  }
+                }
+                if (part.text) {
+                  log('Part has text: ' + part.text.substring(0, 50))
+                }
+              }
+            }
+            
+            // Check for audio in other possible locations
+            if (msg.serverContent?.turnComplete) {
+              log('Turn complete')
+            }
           },
           onerror: (e: any) => {
             log('Error: ' + e.message)
@@ -116,14 +196,14 @@ export function VoiceInterviewLive({ question, solutionObjectives, subsection }:
         const b64 = btoa(String.fromCharCode(...new Uint8Array(pcm.buffer)))
         
         try {
-          sessionRef.current.send({
-            realtimeInput: { 
-              mediaChunks: [{ 
-                mimeType: 'audio/pcm', 
+          if (sessionRef.current && typeof sessionRef.current.sendRealtimeInput === 'function') {
+            sessionRef.current.sendRealtimeInput({
+              audio: { 
+                mimeType: 'audio/pcm;rate=16000', 
                 data: b64 
-              }] 
-            }
-          })
+              }
+            })
+          }
         } catch (err) {
           console.error('Send error:', err)
         }
@@ -164,7 +244,14 @@ export function VoiceInterviewLive({ question, solutionObjectives, subsection }:
       audioContextRef.current.close()
       audioContextRef.current = null
     }
+    if (playbackContextRef.current) {
+      playbackContextRef.current.close()
+      playbackContextRef.current = null
+    }
+    audioQueueRef.current = []
+    isPlayingRef.current = false
     setIsRecording(false)
+    setIsSpeaking(false)
     setStatus('Disconnected')
   }
 
@@ -183,6 +270,7 @@ export function VoiceInterviewLive({ question, solutionObjectives, subsection }:
       <CardContent className="space-y-4">
         <div className="flex items-center gap-2 p-4 bg-muted rounded-lg">
           {isRecording && <Mic className="h-4 w-4 animate-pulse text-destructive" />}
+          {isSpeaking && <Volume2 className="h-4 w-4 animate-pulse text-blue-500" />}
           <span className="text-sm">{status}</span>
         </div>
         
