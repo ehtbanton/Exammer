@@ -1,5 +1,5 @@
 {
-  "currentVersion": 4,
+  "currentVersion": 5,
   "versions": {
     "0": {
       "description": "Initial schema - subjects owned by users",
@@ -157,6 +157,25 @@
             "action": "add_column",
             "table": "questions",
             "sql": "ALTER TABLE questions ADD COLUMN question_number TEXT"
+          }
+        ]
+      }
+    },
+    "5": {
+      "description": "Add diagram_description to questions for image-based question support",
+      "schema": {
+        "questions": {
+          "columns": ["id", "topic_id", "question_text", "summary", "solution_objectives", "markscheme_id", "paper_date", "question_number", "diagram_description", "created_at"],
+          "note": "diagram_description stores text description of diagrams for image generation via Google Imagen 3"
+        }
+      },
+      "migration": {
+        "from": 4,
+        "steps": [
+          {
+            "action": "add_column",
+            "table": "questions",
+            "sql": "ALTER TABLE questions ADD COLUMN diagram_description TEXT"
           }
         ]
       }

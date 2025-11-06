@@ -116,6 +116,7 @@ CREATE TABLE IF NOT EXISTS questions (
   markscheme_id INTEGER,
   paper_date TEXT,
   question_number TEXT,
+  diagram_description TEXT,
   created_at INTEGER DEFAULT (unixepoch()),
   FOREIGN KEY (topic_id) REFERENCES topics(id) ON DELETE CASCADE,
   FOREIGN KEY (markscheme_id) REFERENCES markschemes(id) ON DELETE SET NULL

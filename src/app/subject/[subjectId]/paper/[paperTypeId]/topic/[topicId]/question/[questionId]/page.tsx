@@ -8,6 +8,7 @@ import { AuthGuard } from '@/components/AuthGuard';
 import { aiPoweredInterview, generateQuestion } from '@/ai/flows/ai-powered-interview';
 import { executeDevCommand } from '@/ai/flows/dev-commands';
 import { isDevCommand } from '@/lib/dev-commands-helpers';
+import { generateDiagramImage } from '@/ai/flows/generate-diagram-image';
 import type { ChatHistory } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -53,7 +54,9 @@ function InterviewPageContent() {
   const [chatHistory, setChatHistory] = useState<ChatHistory>([]);
   const [userInput, setUserInput] = useState('');
   const [isLoading, setIsLoading] = useState(true);
-  const [generatedVariant, setGeneratedVariant] = useState<{questionText: string; solutionObjectives: string[]} | null>(null);
+  const [generatedVariant, setGeneratedVariant] = useState<{questionText: string; solutionObjectives: string[]; diagramDescription?: string} | null>(null);
+  const [diagramImage, setDiagramImage] = useState<string | null>(null);
+  const [diagramLoading, setDiagramLoading] = useState(false);
   const [inputMode, setInputMode] = useState<'text' | 'whiteboard'>('text');
   const [accessLevel, setAccessLevel] = useState<number | null>(null);
   const [completedObjectives, setCompletedObjectives] = useState<number[]>([]);
@@ -127,6 +130,25 @@ function InterviewPageContent() {
         const variantData = await generateQuestionVariant(subject.id, paperType.id, topic.id, examQuestion.id);
         setGeneratedVariant(variantData);
         console.log('Question variant generated successfully with', variantData.solutionObjectives.length, 'objectives');
+
+        // Generate diagram image if the variant has a diagram description
+        if (variantData.diagramDescription) {
+          console.log('Diagram description detected, generating image...');
+          setDiagramLoading(true);
+          try {
+            const imageResult = await generateDiagramImage({
+              description: variantData.diagramDescription,
+              aspectRatio: '1:1',
+            });
+            setDiagramImage(imageResult.imageDataUri);
+            console.log('Diagram image generated successfully');
+          } catch (imageError) {
+            console.error('Failed to generate diagram image:', imageError);
+            // Continue without diagram - not a fatal error
+          } finally {
+            setDiagramLoading(false);
+          }
+        }
 
         // Start the interview with the generated variant and objectives
         console.log('Calling aiPoweredInterview with generated variant and objectives...');
@@ -368,6 +390,22 @@ function InterviewPageContent() {
                           <div className="text-base leading-relaxed whitespace-pre-wrap break-words font-normal">
                             {formatQuestionText(generatedVariant.questionText)}
                           </div>
+                          {/* Diagram display */}
+                          {diagramLoading && (
+                            <div className="mt-6 p-4 bg-muted rounded-lg flex items-center justify-center">
+                              <LoadingSpinner className="w-5 h-5 mr-2" />
+                              <span className="text-sm text-muted-foreground">Generating diagram...</span>
+                            </div>
+                          )}
+                          {diagramImage && !diagramLoading && (
+                            <div className="mt-6">
+                              <img
+                                src={diagramImage}
+                                alt="Question diagram"
+                                className="max-w-full h-auto rounded-lg border shadow-sm"
+                              />
+                            </div>
+                          )}
                         </div>
                         {accessLevel !== null && accessLevel >= 3 && (
                           <div className="mt-6 p-4 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg">

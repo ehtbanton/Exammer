@@ -227,6 +227,7 @@ export async function POST(req: NextRequest) {
       questionText: string;
       summary: string;
       solutionObjectives?: string[]; // Optional - may be null if no markscheme
+      diagramDescription?: string; // Optional - diagram description for image generation
       paperDate: string; // e.g., "2022-06"
       questionNumber: string; // e.g., "1-3-5"
     }
@@ -357,6 +358,7 @@ export async function POST(req: NextRequest) {
           questionText: question.questionText,
           summary: question.summary,
           solutionObjectives,
+          diagramDescription: question.diagramDescription,
           paperDate,
           questionNumber: questionNumberStr
         });
@@ -409,10 +411,11 @@ export async function POST(req: NextRequest) {
 
         const topicId = topic.id;
         const solutionObjectivesJson = question.solutionObjectives ? JSON.stringify(question.solutionObjectives) : null;
+        const diagramDescription = question.diagramDescription || null;
 
         await db.run(
-          'INSERT INTO questions (topic_id, question_text, summary, solution_objectives, paper_date, question_number) VALUES (?, ?, ?, ?, ?, ?)',
-          [topicId, question.questionText, question.summary, solutionObjectivesJson, question.paperDate, question.questionNumber]
+          'INSERT INTO questions (topic_id, question_text, summary, solution_objectives, paper_date, question_number, diagram_description) VALUES (?, ?, ?, ?, ?, ?, ?)',
+          [topicId, question.questionText, question.summary, solutionObjectivesJson, question.paperDate, question.questionNumber, diagramDescription]
         );
 
         totalQuestionsSaved++;

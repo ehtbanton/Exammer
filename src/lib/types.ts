@@ -25,6 +25,7 @@ export interface ExamQuestion {
   markschemeId?: string | null; // Reference to the markscheme used
   paperDate?: string | null; // Exam date (e.g., '2022-06')
   questionNumber?: string | null; // Question identifier (e.g., '1-3-5')
+  diagramDescription?: string; // Optional diagram description for image generation via Imagen
 }
 
 export interface Topic {

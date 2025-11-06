@@ -48,6 +48,7 @@ const PaperQuestionSchema = z.object({
   questionText: z.string().describe('The complete text of the exam question, including all parts and sub-questions.'),
   summary: z.string().describe('A brief one-sentence summary of what this question is about.'),
   topicName: z.string().describe('The name of the topic this question belongs to, chosen from the provided topics list.'),
+  diagramDescription: z.string().optional().describe('If this question includes a diagram, graph, figure, or visual element, provide a detailed description optimized for text-to-image generation. Start with "Educational diagram, simple line drawing, black on white:" and describe all shapes, measurements, labels, and relationships clearly. Keep under 250 words. Omit if question is text-only.'),
 });
 
 const ExtractPaperQuestionsOutputSchema = z.object({
@@ -149,6 +150,14 @@ EXTRACTION REQUIREMENTS:
    - questionText: Complete text including all sub-parts
    - summary: Single sentence description
    - topicName: The name of the topic this question belongs to (must match one from the TOPICS list)
+   - diagramDescription (OPTIONAL): If the question includes a diagram, graph, chart, figure, or any visual element:
+     * Provide a detailed description optimized for image generation
+     * Start with: "Educational diagram, simple line drawing, black on white:"
+     * Describe all shapes, objects, measurements, labels, and relationships
+     * Include specific values, angles, dimensions shown in the diagram
+     * Mention arrows, annotations, and any text labels
+     * Example: "Educational diagram, simple line drawing, black on white: Right triangle ABC with vertex B at bottom left forming 90-degree angle. Base AB is horizontal, labeled '3 cm'. Height BC is vertical, labeled '4 cm'. Hypotenuse AC is diagonal from top to bottom right, labeled '5 cm'. Small square symbol at vertex B indicates right angle."
+     * If question is text-only with no visual elements, OMIT this field entirely
 
 VALIDATION REQUIREMENTS:
 
@@ -169,7 +178,8 @@ OUTPUT STRUCTURE:
       "questionNumber": <integer>,
       "questionText": "<complete text>",
       "summary": "<single sentence>",
-      "topicName": "<topic name from TOPICS list>"
+      "topicName": "<topic name from TOPICS list>",
+      "diagramDescription": "<optional: detailed diagram description if visual element present>"
     }
   ]
 }

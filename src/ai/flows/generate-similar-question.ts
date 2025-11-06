@@ -16,6 +16,7 @@ const GenerateSimilarQuestionInputSchema = z.object({
   topicName: z.string().describe('The name of the topic this question covers.'),
   topicDescription: z.string().describe('The description of what this topic covers.'),
   originalObjectives: z.array(z.string()).optional().describe('The marking objectives from the original question markscheme. If not provided, objectives will be manufactured from the question text.'),
+  originalDiagramDescription: z.string().optional().describe('If the original question had a diagram, this contains the description. Should be adapted for the variant question.'),
 });
 export type GenerateSimilarQuestionInput = z.infer<typeof GenerateSimilarQuestionInputSchema>;
 
@@ -23,6 +24,7 @@ const GenerateSimilarQuestionOutputSchema = z.object({
   questionText: z.string().describe('The generated question variant that is similar but not identical to the original.'),
   summary: z.string().describe('A brief one-sentence summary of what this question variant is about.'),
   solutionObjectives: z.array(z.string()).describe('The marking objectives for this specific variant question, adapted from the original objectives to match the new question details.'),
+  diagramDescription: z.string().optional().describe('If the original question had a diagram, provide an adapted diagram description that matches the variant question changes. Must be consistent with variant values.'),
   validationError: z.string().optional().describe('If the generated solution objectives do not logically correspond to the variant question, describe the mismatch here. Otherwise, omit this field.'),
 });
 export type GenerateSimilarQuestionOutput = z.infer<typeof GenerateSimilarQuestionOutputSchema>;
@@ -64,6 +66,11 @@ Topic Description: {{topicDescription}}
 Original Question:
 {{originalQuestionText}}
 
+{{#if originalDiagramDescription}}
+Original Diagram Description:
+{{originalDiagramDescription}}
+{{/if}}
+
 {{#if originalObjectives}}
 Original Marking Objectives (from markscheme):
 {{#each originalObjectives}}
@@ -96,6 +103,21 @@ Examples of proper variations:
 - If the original describes a pendulum experiment → variant describes a similar but different pendulum setup
 - If the original asks to "calculate velocity at 5 seconds" → variant asks to "calculate velocity at 8 seconds"
 
+{{#if originalDiagramDescription}}
+After generating the question, ADAPT the diagram description:
+- Update ALL measurements, values, and labels to match your variant question
+- Keep the same basic structure and style ("Educational diagram, simple line drawing, black on white:")
+- Maintain the same level of detail and clarity
+- If you changed numbers in the question (e.g., 3 cm → 6 cm), update them in the diagram description
+- If you changed the scenario/context, adapt the diagram description accordingly
+- The diagram must visually represent YOUR variant question, not the original
+
+Examples of proper diagram adaptation:
+- Original: "Base AB labeled '3 cm'" → Variant: "Base AB labeled '6 cm'"
+- Original: "Arrow pointing right labeled 'Force = 10 N'" → Variant: "Arrow pointing right labeled 'Force = 15 N'"
+- Original: "Pendulum with length 50 cm" → Variant: "Pendulum with length 75 cm"
+{{/if}}
+
 {{#if originalObjectives}}
 After generating the question, ADAPT the marking objectives:
 - Keep the SAME NUMBER of objectives as the original
@@ -126,14 +148,18 @@ Examples of manufactured objectives for different question types:
 {{/if}}
 
 VALIDATION STEP (MANDATORY):
-After generating both the question and objectives:
+After generating the question, objectives{{#if originalDiagramDescription}}, and diagram description{{/if}}:
 1. Check if your solution objectives logically correspond to your variant question
 2. Verify that any numeric answers in objectives match the numbers/context in your question
 3. Verify that any formulas or calculations in objectives use the correct values from your question
-4. If you detect ANY mismatch or inconsistency, populate the validationError field with a description
-5. If the objectives perfectly correspond to the question, leave validationError empty/omitted
+{{#if originalDiagramDescription}}
+4. Verify that your diagram description matches the values in your variant question (not the original)
+5. Ensure all measurements, labels, and values in the diagram description are consistent with your variant
+{{/if}}
+6. If you detect ANY mismatch or inconsistency, populate the validationError field with a description
+7. If everything perfectly corresponds, leave validationError empty/omitted
 
-Generate the similar question, adapted marking objectives, and perform validation.`,
+Generate the similar question, adapted marking objectives{{#if originalDiagramDescription}}, adapted diagram description{{/if}}, and perform validation.`,
     });
 
     const response = await prompt(flowInput, {
@@ -158,6 +184,7 @@ Generate the similar question, adapted marking objectives, and perform validatio
       questionText: output.questionText,
       summary: output.summary,
       solutionObjectives: output.solutionObjectives,
+      diagramDescription: output.diagramDescription,
     };
   }, input);
 

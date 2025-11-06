@@ -22,7 +22,7 @@ interface AppContextType {
   getSubjectById: (subjectId: string) => Subject | undefined;
   addPastPaperToSubject: (subjectId: string, paperFile: File) => Promise<void>;
   updateExamQuestionScore: (subjectId: string, paperTypeName: string, topicName: string, questionId: string, score: number) => void;
-  generateQuestionVariant: (subjectId: string, paperTypeId: string, topicId: string, questionId: string) => Promise<{ questionText: string; solutionObjectives: string[] }>;
+  generateQuestionVariant: (subjectId: string, paperTypeId: string, topicId: string, questionId: string) => Promise<{ questionText: string; solutionObjectives: string[]; diagramDescription?: string }>;
   isLoading: (key: string) => boolean;
   setLoading: (key: string, value: boolean) => void;
 }
@@ -87,6 +87,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
                   attempts: q.attempts || 0,
                   solutionObjectives: q.solutionObjectives || undefined,
                   completedObjectives: q.completedObjectives || [],
+                  diagramDescription: q.diagram_description || undefined,
                 }))
               }))
             }))
@@ -754,6 +755,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       topicName: topic.name,
       topicDescription: topic.description,
       originalObjectives: question.solutionObjectives,
+      originalDiagramDescription: question.diagramDescription,
     });
 
     console.log(`[Process C] Question variant generated successfully with ${result.solutionObjectives.length} ${hasObjectives ? 'adapted' : 'manufactured'} objectives`);
@@ -761,6 +763,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return {
       questionText: result.questionText,
       solutionObjectives: result.solutionObjectives,
+      diagramDescription: result.diagramDescription,
     };
   }, [subjects]);
 
