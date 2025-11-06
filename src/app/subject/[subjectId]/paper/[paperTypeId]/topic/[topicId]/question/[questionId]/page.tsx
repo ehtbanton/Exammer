@@ -176,6 +176,8 @@ function InterviewPageContent() {
           command: currentInput,
           question: generatedVariant.questionText,
           subsection: examQuestion.summary,
+          solutionObjectives: generatedVariant.solutionObjectives,
+          completedObjectives: completedObjectives,
         });
 
         // Add the generated answer as a user message
@@ -463,7 +465,7 @@ function InterviewPageContent() {
                       {accessLevel === 3 && (
                         <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted/50 px-2 py-1 rounded">
                           <Terminal className="h-3 w-3" />
-                          <span>Dev commands enabled: <code className="bg-background px-1 rounded">fullans</code></span>
+                          <span>Dev commands enabled: <code className="bg-background px-1 rounded">fullans</code>, <code className="bg-background px-1 rounded">objans [N]</code></span>
                         </div>
                       )}
                       <div className="flex items-center gap-2">
