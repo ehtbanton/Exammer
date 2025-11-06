@@ -14,7 +14,7 @@ interface VoiceInterviewLiveProps {
 export function VoiceInterviewLive({ question, solutionObjectives, subsection }: VoiceInterviewLiveProps) {
   const [isConnected, setIsConnected] = useState(false)
   const [isRecording, setIsRecording] = useState(false)
-  const [status, setStatus] = useState('Click Start')
+  const [status, setStatus] = useState('Click Start to begin')
   const [error, setError] = useState<string | null>(null)
   const [logs, setLogs] = useState<string[]>([])
   
@@ -32,15 +32,17 @@ export function VoiceInterviewLive({ question, solutionObjectives, subsection }:
     try {
       setStatus('Connecting...')
       setError(null)
-      log('Importing SDK...')
+      log('Step 1: Importing SDK')
       
       const { GoogleGenAI } = await import('@google/genai')
-      log('Fetching API key...')
+      log('Step 2: Fetching API key')
       
       const res = await fetch('/api/gemini/live-token')
-      if (!res.ok) throw new Error(\)
+      if (!res.ok) {
+        throw new Error('API key fetch failed: ' + res.status)
+      }
       const { apiKey } = await res.json()
-      log('Connecting to Gemini...')
+      log('Step 3: Connecting to Gemini Live')
       
       const genai = new GoogleGenAI({ apiKey })
       
@@ -48,24 +50,24 @@ export function VoiceInterviewLive({ question, solutionObjectives, subsection }:
         model: 'gemini-2.0-flash-exp',
         config: {
           responseModalities: ['AUDIO'],
-          systemInstruction: \
+          systemInstruction: 'You are an AI tutor helping with: ' + question
         },
         callbacks: {
           onopen: () => {
-            log('Connected!')
+            log('Step 4: Connected!')
             setIsConnected(true)
-            setStatus('Connected')
+            setStatus('Connected - requesting mic')
             startMic()
           },
           onmessage: (msg: any) => {
-            log(\)
+            log('Message: ' + JSON.stringify(msg).substring(0, 80))
           },
           onerror: (e: any) => {
-            log(\)
+            log('Error: ' + e.message)
             setError(e.message)
           },
           onclose: () => {
-            log('Closed')
+            log('Session closed')
             setIsConnected(false)
             cleanup()
           }
@@ -73,19 +75,27 @@ export function VoiceInterviewLive({ question, solutionObjectives, subsection }:
       })
       
       sessionRef.current = session
+      log('Session created successfully')
     } catch (err: any) {
-      log(\)
+      log('Connection failed: ' + err.message)
       setError(err.message)
+      setStatus('Failed')
     }
   }
 
   const startMic = async () => {
     try {
-      log('Requesting mic...')
+      log('Step 5: Requesting microphone')
       const stream = await navigator.mediaDevices.getUserMedia({
-        audio: { sampleRate: 16000, channelCount: 1 }
+        audio: { 
+          sampleRate: 16000, 
+          channelCount: 1,
+          echoCancellation: true,
+          noiseSuppression: true
+        }
       })
       
+      log('Step 6: Mic granted, setting up audio')
       mediaStreamRef.current = stream
       audioContextRef.current = new AudioContext({ sampleRate: 16000 })
       
@@ -94,16 +104,29 @@ export function VoiceInterviewLive({ question, solutionObjectives, subsection }:
       
       processor.onaudioprocess = (e) => {
         if (!sessionRef.current) return
+        
         const input = e.inputBuffer.getChannelData(0)
         const pcm = new Int16Array(input.length)
+        
         for (let i = 0; i < input.length; i++) {
           const s = Math.max(-1, Math.min(1, input[i]))
           pcm[i] = s < 0 ? s * 0x8000 : s * 0x7FFF
         }
+        
         const b64 = btoa(String.fromCharCode(...new Uint8Array(pcm.buffer)))
-        sessionRef.current.send({
-          realtimeInput: { mediaChunks: [{ mimeType: 'audio/pcm', data: b64 }] }
-        })
+        
+        try {
+          sessionRef.current.send({
+            realtimeInput: { 
+              mediaChunks: [{ 
+                mimeType: 'audio/pcm', 
+                data: b64 
+              }] 
+            }
+          })
+        } catch (err) {
+          console.error('Send error:', err)
+        }
       }
       
       source.connect(processor)
@@ -111,48 +134,106 @@ export function VoiceInterviewLive({ question, solutionObjectives, subsection }:
       processorRef.current = processor
       
       setIsRecording(true)
-      setStatus('Speak now!')
-      log('Recording started')
+      setStatus('Recording - speak now!')
+      log('Step 7: Recording started!')
     } catch (err: any) {
-      log(\)
-      setError(err.message)
+      log('Mic error: ' + err.message)
+      setError('Microphone: ' + err.message)
     }
   }
 
   const disconnect = () => {
-    sessionRef.current?.close()
+    log('Disconnecting...')
+    if (sessionRef.current) {
+      sessionRef.current.close()
+      sessionRef.current = null
+    }
     cleanup()
   }
 
   const cleanup = () => {
-    mediaStreamRef.current?.getTracks().forEach(t => t.stop())
-    processorRef.current?.disconnect()
-    audioContextRef.current?.close()
+    if (mediaStreamRef.current) {
+      mediaStreamRef.current.getTracks().forEach(t => t.stop())
+      mediaStreamRef.current = null
+    }
+    if (processorRef.current) {
+      processorRef.current.disconnect()
+      processorRef.current = null
+    }
+    if (audioContextRef.current) {
+      audioContextRef.current.close()
+      audioContextRef.current = null
+    }
     setIsRecording(false)
     setStatus('Disconnected')
   }
 
-  useEffect(() => () => cleanup(), [])
+  useEffect(() => {
+    return () => cleanup()
+  }, [])
 
   return (
     <Card>
-      <CardHeader><CardTitle><Phone className="h-5 w-5 inline mr-2" />Voice Interview</CardTitle></CardHeader>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Phone className="h-5 w-5" />
+          Voice Interview (Gemini Live)
+        </CardTitle>
+      </CardHeader>
       <CardContent className="space-y-4">
-        <div className="p-4 bg-muted rounded flex items-center gap-2">
+        <div className="flex items-center gap-2 p-4 bg-muted rounded-lg">
           {isRecording && <Mic className="h-4 w-4 animate-pulse text-destructive" />}
           <span className="text-sm">{status}</span>
         </div>
-        {error && <div className="p-3 bg-destructive/10 border border-destructive rounded text-sm">Error: {error}</div>}
-        <div className="p-4 border rounded"><h3 className="font-semibold mb-2">Question:</h3><p className="text-sm">{question}</p></div>
-        <Button onClick={isConnected ? disconnect : connect} size="lg" variant={isConnected ? 'destructive' : 'default'} className="w-full">
-          {isConnected ? <><PhoneOff className="mr-2 h-4 w-4" />End</> : <><Phone className="mr-2 h-4 w-4" />Start</>}
-        </Button>
-        {logs.length > 0 && (
-          <div className="border rounded p-3 max-h-32 overflow-y-auto">
-            <p className="text-xs font-semibold mb-1">Debug Log:</p>
-            {logs.map((l, i) => <p key={i} className="text-xs text-muted-foreground">{l}</p>)}
+        
+        {error && (
+          <div className="p-3 bg-destructive/10 border border-destructive rounded-lg text-sm">
+            <strong>Error:</strong> {error}
           </div>
         )}
+        
+        <div className="p-4 border rounded-lg">
+          <h3 className="font-semibold mb-2 text-sm">Question:</h3>
+          <p className="text-sm">{question}</p>
+        </div>
+        
+        <div className="flex justify-center">
+          <Button 
+            onClick={isConnected ? disconnect : connect} 
+            size="lg" 
+            variant={isConnected ? 'destructive' : 'default'}
+            className="w-48"
+          >
+            {isConnected ? (
+              <>
+                <PhoneOff className="mr-2 h-4 w-4" />
+                End Interview
+              </>
+            ) : (
+              <>
+                <Phone className="mr-2 h-4 w-4" />
+                Start Interview
+              </>
+            )}
+          </Button>
+        </div>
+        
+        {logs.length > 0 && (
+          <div className="border rounded-lg p-3 max-h-40 overflow-y-auto bg-muted/30">
+            <p className="text-xs font-semibold mb-2">Debug Log:</p>
+            <div className="space-y-1">
+              {logs.map((l, i) => (
+                <p key={i} className="text-xs text-muted-foreground font-mono">{l}</p>
+              ))}
+            </div>
+          </div>
+        )}
+        
+        <div className="text-xs text-muted-foreground border-t pt-3 space-y-1">
+          <p>• Real-time voice conversation with Gemini AI</p>
+          <p>• Speak naturally and the AI will guide you</p>
+          <p>• Check debug log above for troubleshooting</p>
+        </div>
       </CardContent>
     </Card>
   )
