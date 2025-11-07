@@ -67,6 +67,7 @@ class DatabaseMigration {
 
     try {
       await this.migrateToV2();
+      await this.migrateToV3();
 
       console.log('\n=== All Migrations Completed Successfully ===\n');
       this.close();
@@ -129,6 +130,107 @@ class DatabaseMigration {
 
     console.log('✓ Data integrity verified');
     console.log('\nMigration V2 completed successfully!\n');
+  }
+
+  /**
+   * Migration to V3: Add teacher-student class system
+   */
+  private async migrateToV3() {
+    console.log('Migration V3: Adding teacher-student class system...');
+
+    // Check if classes table already exists
+    const tables = await this.all<{ name: string }>(
+      "SELECT name FROM sqlite_master WHERE type='table' AND name='classes'"
+    );
+
+    if (tables.length > 0) {
+      console.log('✓ Classes table already exists - skipping V3 migration');
+      return;
+    }
+
+    // Add class_id column to subjects table
+    console.log('\n1. Adding class_id column to subjects table...');
+    await this.run('ALTER TABLE subjects ADD COLUMN class_id INTEGER DEFAULT NULL');
+    await this.run('CREATE INDEX IF NOT EXISTS idx_subjects_class_id ON subjects(class_id)');
+    console.log('✓ Added class_id column to subjects');
+
+    // Create classes table
+    console.log('\n2. Creating classes table...');
+    await this.run(`
+      CREATE TABLE IF NOT EXISTS classes (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        description TEXT,
+        teacher_id INTEGER NOT NULL,
+        classroom_code TEXT UNIQUE NOT NULL,
+        created_at INTEGER DEFAULT (unixepoch()),
+        updated_at INTEGER DEFAULT (unixepoch()),
+        FOREIGN KEY (teacher_id) REFERENCES users(id) ON DELETE CASCADE
+      )
+    `);
+    await this.run('CREATE INDEX IF NOT EXISTS idx_classes_teacher_id ON classes(teacher_id)');
+    await this.run('CREATE INDEX IF NOT EXISTS idx_classes_classroom_code ON classes(classroom_code)');
+    console.log('✓ Created classes table with indexes');
+
+    // Create class_memberships table
+    console.log('\n3. Creating class_memberships table...');
+    await this.run(`
+      CREATE TABLE IF NOT EXISTS class_memberships (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        class_id INTEGER NOT NULL,
+        user_id INTEGER NOT NULL,
+        role TEXT NOT NULL CHECK(role IN ('teacher', 'student')),
+        status TEXT NOT NULL CHECK(status IN ('pending', 'approved', 'rejected')) DEFAULT 'pending',
+        joined_at INTEGER DEFAULT (unixepoch()),
+        FOREIGN KEY (class_id) REFERENCES classes(id) ON DELETE CASCADE,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+        UNIQUE(class_id, user_id)
+      )
+    `);
+    await this.run('CREATE INDEX IF NOT EXISTS idx_class_memberships_class_id ON class_memberships(class_id)');
+    await this.run('CREATE INDEX IF NOT EXISTS idx_class_memberships_user_id ON class_memberships(user_id)');
+    await this.run('CREATE INDEX IF NOT EXISTS idx_class_memberships_status ON class_memberships(status)');
+    console.log('✓ Created class_memberships table with indexes');
+
+    // Create class_subjects table
+    console.log('\n4. Creating class_subjects table...');
+    await this.run(`
+      CREATE TABLE IF NOT EXISTS class_subjects (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        class_id INTEGER NOT NULL,
+        subject_id INTEGER NOT NULL,
+        added_by_user_id INTEGER NOT NULL,
+        added_at INTEGER DEFAULT (unixepoch()),
+        FOREIGN KEY (class_id) REFERENCES classes(id) ON DELETE CASCADE,
+        FOREIGN KEY (subject_id) REFERENCES subjects(id) ON DELETE CASCADE,
+        FOREIGN KEY (added_by_user_id) REFERENCES users(id) ON DELETE CASCADE,
+        UNIQUE(class_id, subject_id)
+      )
+    `);
+    await this.run('CREATE INDEX IF NOT EXISTS idx_class_subjects_class_id ON class_subjects(class_id)');
+    await this.run('CREATE INDEX IF NOT EXISTS idx_class_subjects_subject_id ON class_subjects(subject_id)');
+    console.log('✓ Created class_subjects table with indexes');
+
+    // Verify all tables were created
+    console.log('\n5. Verifying migration...');
+    const verifyTables = await this.all<{ name: string }>(
+      "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('classes', 'class_memberships', 'class_subjects')"
+    );
+
+    if (verifyTables.length !== 3) {
+      throw new Error('Migration verification failed: not all tables were created');
+    }
+
+    // Verify subjects table has class_id column
+    const subjectColumns = await this.all<ColumnInfo>('PRAGMA table_info(subjects)');
+    const hasClassId = subjectColumns.some(col => col.name === 'class_id');
+
+    if (!hasClassId) {
+      throw new Error('Migration verification failed: class_id column not found in subjects table');
+    }
+
+    console.log('✓ All tables and columns verified');
+    console.log('\nMigration V3 completed successfully!\n');
   }
 
   close() {

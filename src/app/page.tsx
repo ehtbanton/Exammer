@@ -30,7 +30,25 @@ function HomePageContent() {
   const [uploadStage, setUploadStage] = useState<'initial' | 'syllabus'>('initial');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [hasSearched, setHasSearched] = useState<boolean>(false);
+  const [accessLevel, setAccessLevel] = useState<number | null>(null);
   const syllabusInputRef = useRef<HTMLInputElement>(null);
+
+  // Fetch user's access level
+  useEffect(() => {
+    const fetchAccessLevel = async () => {
+      try {
+        const response = await fetch('/api/auth/access-level');
+        if (response.ok) {
+          const data = await response.json();
+          setAccessLevel(data.accessLevel);
+        }
+      } catch (error) {
+        console.error('Error fetching access level:', error);
+      }
+    };
+
+    fetchAccessLevel();
+  }, []);
 
   const handleSyllabusSelect = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -79,10 +97,13 @@ function HomePageContent() {
     <div className="container mx-auto">
       <div className="flex justify-between items-center mb-8">
         <h1 className="text-3xl font-bold font-headline">My Workspace</h1>
-        <Button onClick={() => setUploadStage('syllabus')} disabled={isCreatingSubject || uploadStage !== 'initial'}>
-          {isCreatingSubject ? <LoadingSpinner /> : <Upload />}
-          Create New Subject
-        </Button>
+        {/* Only show Create button for level 2+ users (teachers and admins) */}
+        {(accessLevel === null || accessLevel >= 2) && (
+          <Button onClick={() => setUploadStage('syllabus')} disabled={isCreatingSubject || uploadStage !== 'initial'}>
+            {isCreatingSubject ? <LoadingSpinner /> : <Upload />}
+            Create New Subject
+          </Button>
+        )}
       </div>
       <Input
         type="file"
@@ -178,15 +199,18 @@ function HomePageContent() {
                         </AlertDialogContent>
                       </AlertDialog>
                     )}
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      onClick={() => removeSubjectFromWorkspace(subject.id)}
-                      disabled={isLoading(`remove-workspace-${subject.id}`)}
-                    >
-                      {isLoading(`remove-workspace-${subject.id}`) ? <LoadingSpinner /> : <UserMinus />}
-                      <span className="sr-only">Remove from Workspace</span>
-                    </Button>
+                    {/* Only allow level 2+ users to remove subjects from workspace */}
+                    {(accessLevel === null || accessLevel >= 2) && (
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        onClick={() => removeSubjectFromWorkspace(subject.id)}
+                        disabled={isLoading(`remove-workspace-${subject.id}`)}
+                      >
+                        {isLoading(`remove-workspace-${subject.id}`) ? <LoadingSpinner /> : <UserMinus />}
+                        <span className="sr-only">Remove from Workspace</span>
+                      </Button>
+                    )}
                   </div>
                 </CardFooter>
               </Card>
@@ -204,70 +228,74 @@ function HomePageContent() {
         </div>
       )}
 
-      {/* Search Subjects Section */}
-      <div className="mb-8 mt-12">
-        <h2 className="text-2xl font-bold font-headline mb-4">Find More Subjects</h2>
-        <p className="text-muted-foreground text-sm mb-4">
-          Search for subjects created by others and add them to your workspace
-        </p>
-        <div className="max-w-2xl">
-          <Input
-            type="text"
-            placeholder="Search for subjects... (auto-search as you type)"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full"
-          />
-          {isLoading('search-subjects') && (
-            <div className="mt-2 flex items-center gap-2 text-sm text-muted-foreground">
-              <LoadingSpinner />
-              <span>Searching...</span>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Search Results */}
-      {hasSearched && (
+      {/* Search Subjects Section - Only for level 2+ users (teachers and admins) */}
+      {(accessLevel === null || accessLevel >= 2) && (
         <>
-          {otherSubjects.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {otherSubjects.map((subject) => (
-                <Card key={subject.id} className="flex flex-col hover:shadow-lg transition-shadow">
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2 font-headline">
-                      <BookOpen className="text-primary" />
-                      {subject.name}
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="flex-grow">
-                    <p className="text-sm text-muted-foreground">
-                      {subject.paperTypes.length} paper types identified.
+          <div className="mb-8 mt-12">
+            <h2 className="text-2xl font-bold font-headline mb-4">Find More Subjects</h2>
+            <p className="text-muted-foreground text-sm mb-4">
+              Search for subjects created by others and add them to your workspace
+            </p>
+            <div className="max-w-2xl">
+              <Input
+                type="text"
+                placeholder="Search for subjects... (auto-search as you type)"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full"
+              />
+              {isLoading('search-subjects') && (
+                <div className="mt-2 flex items-center gap-2 text-sm text-muted-foreground">
+                  <LoadingSpinner />
+                  <span>Searching...</span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Search Results */}
+          {hasSearched && (
+            <>
+              {otherSubjects.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {otherSubjects.map((subject) => (
+                    <Card key={subject.id} className="flex flex-col hover:shadow-lg transition-shadow">
+                      <CardHeader>
+                        <CardTitle className="flex items-center gap-2 font-headline">
+                          <BookOpen className="text-primary" />
+                          {subject.name}
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="flex-grow">
+                        <p className="text-sm text-muted-foreground">
+                          {subject.paperTypes.length} paper types identified.
+                        </p>
+                      </CardContent>
+                      <CardFooter className="flex justify-between gap-2">
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => addSubjectToWorkspace(subject.id)}
+                          disabled={isLoading(`add-workspace-${subject.id}`)}
+                          className="flex-1"
+                        >
+                          {isLoading(`add-workspace-${subject.id}`) ? <LoadingSpinner /> : <UserPlus className="mr-2 h-4 w-4" />}
+                          Add to Workspace
+                        </Button>
+                      </CardFooter>
+                    </Card>
+                  ))}
+                </div>
+              ) : (
+                <Card className="text-center py-8">
+                  <CardContent>
+                    <p className="text-muted-foreground">
+                      No subjects found matching "{searchQuery}". Try a different search term.
                     </p>
                   </CardContent>
-                  <CardFooter className="flex justify-between gap-2">
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => addSubjectToWorkspace(subject.id)}
-                      disabled={isLoading(`add-workspace-${subject.id}`)}
-                      className="flex-1"
-                    >
-                      {isLoading(`add-workspace-${subject.id}`) ? <LoadingSpinner /> : <UserPlus className="mr-2 h-4 w-4" />}
-                      Add to Workspace
-                    </Button>
-                  </CardFooter>
                 </Card>
-              ))}
-            </div>
-          ) : (
-            <Card className="text-center py-8">
-              <CardContent>
-                <p className="text-muted-foreground">
-                  No subjects found matching "{searchQuery}". Try a different search term.
-                </p>
-              </CardContent>
-            </Card>
+              )}
+            </>
           )}
         </>
       )}

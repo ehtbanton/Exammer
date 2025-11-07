@@ -88,3 +88,21 @@ export function getDefaultBoxStyle(): React.CSSProperties {
 export function getUnattemptedBoxStyle(): React.CSSProperties {
   return { backgroundColor: 'rgb(243, 244, 246)', borderColor: 'rgb(209, 213, 219)', color: 'rgb(0, 0, 0)' }; // gray-100, gray-300
 }
+
+/**
+ * Generates a random 6-character classroom code
+ * Uses only uppercase letters and numbers, excluding easily confused characters (0, O, I, 1, l)
+ * Example: ABC2D3, XYZ4K8, etc.
+ */
+export function generateClassroomCode(): string {
+  // Exclude easily confused characters: 0, O, I, 1
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let code = '';
+
+  for (let i = 0; i < 6; i++) {
+    const randomIndex = Math.floor(Math.random() * chars.length);
+    code += chars[randomIndex];
+  }
+
+  return code;
+}
