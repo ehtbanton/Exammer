@@ -27,7 +27,7 @@ interface StudentStats {
   user_id: number;
   name: string;
   email: string;
-  averageScore: number;
+  averageScore: number | null;
   questionsAttempted: number;
   totalQuestions: number;
   completionRate: number;
@@ -40,14 +40,14 @@ interface TopicAverage {
   paper_type_name: string;
   topic_id: number;
   topic_name: string;
-  average_score: number;
+  average_score: number | null;
   attempts_count: number;
   total_students: number;
 }
 
 interface OverallStats {
   totalStudents: number;
-  averageScore: number;
+  averageScore: number | null;
   totalQuestions: number;
   completionRate: number;
 }
@@ -143,7 +143,7 @@ export default function ClassAnalyticsPage({ params }: { params: Promise<{ class
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{analytics.overallStats.totalStudents}</div>
+            <div className="text-2xl font-bold text-foreground">{analytics.overallStats.totalStudents}</div>
           </CardContent>
         </Card>
 
@@ -153,8 +153,10 @@ export default function ClassAnalyticsPage({ params }: { params: Promise<{ class
             <Award className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
-              {analytics.overallStats.averageScore.toFixed(1)}%
+            <div className="text-2xl font-bold text-foreground">
+              {analytics.overallStats.averageScore !== null
+                ? `${analytics.overallStats.averageScore.toFixed(1)}%`
+                : '-'}
             </div>
           </CardContent>
         </Card>
@@ -165,7 +167,7 @@ export default function ClassAnalyticsPage({ params }: { params: Promise<{ class
             <Target className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{analytics.overallStats.totalQuestions}</div>
+            <div className="text-2xl font-bold text-foreground">{analytics.overallStats.totalQuestions}</div>
           </CardContent>
         </Card>
 
@@ -175,7 +177,7 @@ export default function ClassAnalyticsPage({ params }: { params: Promise<{ class
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
+            <div className="text-2xl font-bold text-foreground">
               {analytics.overallStats.completionRate.toFixed(1)}%
             </div>
           </CardContent>
@@ -207,7 +209,13 @@ export default function ClassAnalyticsPage({ params }: { params: Promise<{ class
               </TableHeader>
               <TableBody>
                 {analytics.students
-                  .sort((a, b) => b.averageScore - a.averageScore)
+                  .sort((a, b) => {
+                    // Sort: non-null scores first (highest to lowest), then null scores
+                    if (a.averageScore === null && b.averageScore === null) return 0;
+                    if (a.averageScore === null) return 1;
+                    if (b.averageScore === null) return -1;
+                    return b.averageScore - a.averageScore;
+                  })
                   .map((student) => (
                     <TableRow key={student.user_id}>
                       <TableCell className="font-medium">
@@ -215,9 +223,13 @@ export default function ClassAnalyticsPage({ params }: { params: Promise<{ class
                       </TableCell>
                       <TableCell>{student.email}</TableCell>
                       <TableCell className="text-right">
-                        <span className={`inline-block px-2 py-1 rounded text-sm font-semibold ${getScoreColorClass(student.averageScore)}`}>
-                          {student.averageScore.toFixed(1)}%
-                        </span>
+                        {student.averageScore !== null ? (
+                          <span className={`inline-block px-2 py-1 rounded text-sm font-semibold ${getScoreColorClass(student.averageScore)}`}>
+                            {student.averageScore.toFixed(1)}%
+                          </span>
+                        ) : (
+                          <span className="text-sm">-</span>
+                        )}
                       </TableCell>
                       <TableCell className="text-right">{student.questionsAttempted}</TableCell>
                       <TableCell className="text-right">{student.totalQuestions}</TableCell>
@@ -263,15 +275,21 @@ export default function ClassAnalyticsPage({ params }: { params: Promise<{ class
                       <TableRow key={topic.topic_id}>
                         <TableCell className="font-medium">{topic.topic_name}</TableCell>
                         <TableCell className="text-right">
-                          <span className={`inline-block px-2 py-1 rounded text-sm font-semibold ${getScoreColorClass(topic.average_score)}`}>
-                            {topic.average_score.toFixed(1)}%
-                          </span>
+                          {topic.average_score !== null ? (
+                            <span className={`inline-block px-2 py-1 rounded text-sm font-semibold ${getScoreColorClass(topic.average_score)}`}>
+                              {topic.average_score.toFixed(1)}%
+                            </span>
+                          ) : (
+                            <span className="text-sm">-</span>
+                          )}
                         </TableCell>
                         <TableCell className="text-right">
                           {topic.attempts_count} / {topic.total_students}
                         </TableCell>
                         <TableCell className="text-right">
-                          {((topic.attempts_count / topic.total_students) * 100).toFixed(1)}%
+                          {topic.attempts_count > 0
+                            ? `${((topic.attempts_count / topic.total_students) * 100).toFixed(1)}%`
+                            : '-'}
                         </TableCell>
                       </TableRow>
                     ))}
