@@ -24,14 +24,19 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       return NextResponse.json({ error: 'Question not found' }, { status: 404 });
     }
 
-    // Verify subject is in user's workspace
-    const inWorkspace = await db.get(
-      'SELECT id FROM user_workspaces WHERE user_id = ? AND subject_id = ?',
-      [user.id, questionInfo.subject_id]
+    // Verify user has access to the subject (via workspace or class membership)
+    const hasAccess = await db.get(
+      `SELECT 1 FROM user_workspaces
+       WHERE user_id = ? AND subject_id = ?
+       UNION
+       SELECT 1 FROM class_subjects cs
+       JOIN class_memberships cm ON cs.class_id = cm.class_id
+       WHERE cm.user_id = ? AND cs.subject_id = ? AND cm.status = 'approved'`,
+      [user.id, questionInfo.subject_id, user.id, questionInfo.subject_id]
     );
 
-    if (!inWorkspace) {
-      return NextResponse.json({ error: 'Question not found in workspace' }, { status: 404 });
+    if (!hasAccess) {
+      return NextResponse.json({ error: 'Access denied' }, { status: 403 });
     }
 
     const progress = await db.get<UserProgress>(
@@ -80,14 +85,19 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       return NextResponse.json({ error: 'Question not found' }, { status: 404 });
     }
 
-    // Verify subject is in user's workspace
-    const inWorkspace = await db.get(
-      'SELECT id FROM user_workspaces WHERE user_id = ? AND subject_id = ?',
-      [user.id, questionInfo.subject_id]
+    // Verify user has access to the subject (via workspace or class membership)
+    const hasAccess = await db.get(
+      `SELECT 1 FROM user_workspaces
+       WHERE user_id = ? AND subject_id = ?
+       UNION
+       SELECT 1 FROM class_subjects cs
+       JOIN class_memberships cm ON cs.class_id = cm.class_id
+       WHERE cm.user_id = ? AND cs.subject_id = ? AND cm.status = 'approved'`,
+      [user.id, questionInfo.subject_id, user.id, questionInfo.subject_id]
     );
 
-    if (!inWorkspace) {
-      return NextResponse.json({ error: 'Question not found in workspace' }, { status: 404 });
+    if (!hasAccess) {
+      return NextResponse.json({ error: 'Access denied' }, { status: 403 });
     }
 
     // Get current progress
