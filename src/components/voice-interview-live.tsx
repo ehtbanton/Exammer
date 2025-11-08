@@ -10,12 +10,14 @@ interface VoiceInterviewLiveProps {
   solutionObjectives: string[]
   subsection: string
   onAddMessage: (role: 'user' | 'assistant', content: string) => void
+  onEvaluateAnswer: (userAnswer: string) => Promise<void>
 }
 
-export function VoiceInterviewLive({ question, solutionObjectives, subsection, onAddMessage }: VoiceInterviewLiveProps) {
+export function VoiceInterviewLive({ question, solutionObjectives, subsection, onAddMessage, onEvaluateAnswer }: VoiceInterviewLiveProps) {
   const [isConnected, setIsConnected] = useState(false)
   const [isRecording, setIsRecording] = useState(false)
   const [isSpeaking, setIsSpeaking] = useState(false)
+  const [isEvaluating, setIsEvaluating] = useState(false)
   const [status, setStatus] = useState('Click Start to begin')
   const [error, setError] = useState<string | null>(null)
   const [logs, setLogs] = useState<string[]>([])
@@ -183,22 +185,44 @@ export function VoiceInterviewLive({ question, solutionObjectives, subsection, o
             // Check for turn complete
             if (msg.serverContent?.turnComplete) {
               log('Turn complete')
-              // Add user's transcribed speech to chat
-              if (currentUserTextRef.current.trim()) {
-                log('Sending USER message: ' + currentUserTextRef.current.substring(0, 30))
-                onAddMessage('user', currentUserTextRef.current.trim())
-                currentUserTextRef.current = ''
-              }
-              // Add AI response to chat with actual text
+              
+              const userText = currentUserTextRef.current.trim()
               const aiText = currentAITextRef.current.trim()
+              
+              // Add messages to chat immediately (for UI responsiveness)
+              if (userText) {
+                log('Sending USER message: ' + userText.substring(0, 30))
+                onAddMessage('user', userText)
+              }
+              
               if (aiText) {
                 log('Sending AI message: ' + aiText.substring(0, 50))
                 onAddMessage('assistant', aiText)
-                currentAITextRef.current = ''
               } else {
                 log('No AI text captured, using placeholder')
                 onAddMessage('assistant', '[Audio response - no text available]')
               }
+              
+              // NEW: Trigger background evaluation for objective tracking
+              if (userText) {
+                log('Evaluating answer for objectives...')
+                setIsEvaluating(true)
+                onEvaluateAnswer(userText)
+                  .then(() => {
+                    log('Evaluation complete')
+                  })
+                  .catch((err) => {
+                    console.error('Evaluation failed:', err)
+                    log('Evaluation error: ' + err)
+                  })
+                  .finally(() => {
+                    setIsEvaluating(false)
+                  })
+              }
+              
+              // Clear buffers after processing
+              currentUserTextRef.current = ''
+              currentAITextRef.current = ''
             }
           },
           onerror: (e: any) => {
@@ -332,6 +356,7 @@ export function VoiceInterviewLive({ question, solutionObjectives, subsection, o
         <div className="flex items-center gap-2 p-4 bg-muted rounded-lg">
           {isRecording && <Mic className="h-4 w-4 animate-pulse text-destructive" />}
           {isSpeaking && <Volume2 className="h-4 w-4 animate-pulse text-blue-500" />}
+          {isEvaluating && <span className="text-xs text-muted-foreground">Evaluating...</span>}
           <span className="text-sm">{status}</span>
         </div>
         

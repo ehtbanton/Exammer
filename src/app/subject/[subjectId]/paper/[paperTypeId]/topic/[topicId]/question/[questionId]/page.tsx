@@ -162,6 +162,40 @@ function InterviewPageContent() {
     setChatHistory(prev => [...prev, { role, content }]);
   };
 
+  const handleVoiceEvaluation = async (userAnswer: string) => {
+    if (!generatedVariant || !subject || !examQuestion) return;
+
+    try {
+      console.log('Evaluating voice answer against objectives...');
+
+      // Call aiPoweredInterview with the voice transcription
+      // Note: We don't update chatHistory here - VoiceInterviewLive already handles that
+      const res = await aiPoweredInterview({
+        subsection: examQuestion.summary,
+        userAnswer,
+        previousChatHistory: chatHistory,
+        question: generatedVariant.questionText,
+        solutionObjectives: generatedVariant.solutionObjectives,
+        previouslyCompletedObjectives: completedObjectives,
+      });
+
+      // Update objectives (merge with existing)
+      setCompletedObjectives(prevCompleted => {
+        const newSet = new Set([...prevCompleted, ...res.completedObjectives]);
+        const updated = Array.from(newSet).sort((a, b) => a - b);
+        console.log('Objectives updated from voice:', {
+          previous: prevCompleted,
+          new: res.completedObjectives,
+          merged: updated
+        });
+        return updated;
+      });
+    } catch (e) {
+      console.error('Voice evaluation error:', e);
+      // Don't show toast for voice errors - evaluation happens in background
+    }
+  };
+
   const handleSendMessage = async (imageData?: string) => {
     if ((!userInput.trim() && !imageData) || !subject || !examQuestion || isLoading || !generatedVariant) return;
 
@@ -511,6 +545,7 @@ function InterviewPageContent() {
                       solutionObjectives={generatedVariant?.solutionObjectives || []}
                       subsection={examQuestion?.summary || ''}
                       onAddMessage={handleVoiceMessage}
+                      onEvaluateAnswer={handleVoiceEvaluation}
                     />
                   </TabsContent>
                 </Tabs>
