@@ -82,6 +82,8 @@ export default function ClassDashboardPage({ params }: { params: Promise<{ class
   const [subjectToRemove, setSubjectToRemove] = useState<Subject | null>(null);
   const [selectedSubject, setSelectedSubject] = useState<string>('');
   const [addingSubject, setAddingSubject] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     fetchClassData();
@@ -243,6 +245,29 @@ export default function ClassDashboardPage({ params }: { params: Promise<{ class
     }
   };
 
+  const handleDeleteClass = async () => {
+    setDeleting(true);
+    try {
+      const response = await fetch(`/api/classes/${classId}`, {
+        method: 'DELETE',
+      });
+
+      if (response.ok) {
+        toast.success('Class deleted successfully');
+        router.push('/classes');
+      } else {
+        const error = await response.json();
+        toast.error(error.error || 'Failed to delete class');
+      }
+    } catch (error) {
+      console.error('Error deleting class:', error);
+      toast.error('Failed to delete class');
+    } finally {
+      setDeleting(false);
+      setShowDeleteDialog(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="container mx-auto px-4 py-8">
@@ -288,10 +313,19 @@ export default function ClassDashboardPage({ params }: { params: Promise<{ class
             </div>
           </div>
 
-          <Button onClick={() => router.push(`/classes/${classId}/analytics`)}>
-            <BarChart3 className="h-4 w-4 mr-2" />
-            View Analytics
-          </Button>
+          <div className="flex gap-2">
+            <Button onClick={() => router.push(`/classes/${classId}/analytics`)}>
+              <BarChart3 className="h-4 w-4 mr-2" />
+              View Analytics
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => setShowDeleteDialog(true)}
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              Delete Class
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -520,6 +554,29 @@ export default function ClassDashboardPage({ params }: { params: Promise<{ class
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={handleRemoveSubject}>Remove</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete Class Dialog */}
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Class</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete "{classData?.name}"? This action cannot be undone.
+              All members will be removed and students will lose access to class subjects.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteClass}
+              disabled={deleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleting ? 'Deleting...' : 'Delete Class'}
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

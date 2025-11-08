@@ -43,6 +43,16 @@ export default function ClassesPage() {
 
   useEffect(() => {
     fetchClasses();
+
+    // Refetch classes when the page becomes visible (e.g., returning from class detail page)
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        fetchClasses();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, []);
 
   const fetchClasses = async () => {
