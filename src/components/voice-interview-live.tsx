@@ -345,70 +345,34 @@ export function VoiceInterviewLive({ question, solutionObjectives, subsection, o
   }, [])
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Phone className="h-5 w-5" />
-          Voice Interview (Gemini Live)
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="flex items-center gap-2 p-4 bg-muted rounded-lg">
-          {isRecording && <Mic className="h-4 w-4 animate-pulse text-destructive" />}
-          {isSpeaking && <Volume2 className="h-4 w-4 animate-pulse text-blue-500" />}
-          {isEvaluating && <span className="text-xs text-muted-foreground">Evaluating...</span>}
-          <span className="text-sm">{status}</span>
-        </div>
-        
-        {error && (
-          <div className="p-3 bg-destructive/10 border border-destructive rounded-lg text-sm">
-            <strong>Error:</strong> {error}
-          </div>
+    <div className="flex items-center gap-3 p-3 border rounded-lg bg-muted/30">
+      <Button
+        onClick={isConnected ? disconnect : connect}
+        variant={isConnected ? 'destructive' : 'default'}
+      >
+        {isConnected ? (
+          <>
+            <PhoneOff className="mr-2 h-4 w-4" />
+            End Interview
+          </>
+        ) : (
+          <>
+            <Phone className="mr-2 h-4 w-4" />
+            Start Interview
+          </>
         )}
-        
-        <div className="p-4 border rounded-lg">
-          <h3 className="font-semibold mb-2 text-sm">Question:</h3>
-          <p className="text-sm">{question}</p>
-        </div>
-        
-        <div className="flex justify-center">
-          <Button 
-            onClick={isConnected ? disconnect : connect} 
-            size="lg" 
-            variant={isConnected ? 'destructive' : 'default'}
-            className="w-48"
-          >
-            {isConnected ? (
-              <>
-                <PhoneOff className="mr-2 h-4 w-4" />
-                End Interview
-              </>
-            ) : (
-              <>
-                <Phone className="mr-2 h-4 w-4" />
-                Start Interview
-              </>
-            )}
-          </Button>
-        </div>
-        
-        {logs.length > 0 && (
-          <div className="border rounded-lg p-3 max-h-40 overflow-y-auto bg-muted/30">
-            <p className="text-xs font-semibold mb-2">Debug Log:</p>
-            <div className="space-y-1">
-              {logs.map((l, i) => (
-                <p key={i} className="text-xs text-muted-foreground font-mono">{l}</p>
-              ))}
-            </div>
-          </div>
-        )}
-        
-        <div className="text-xs text-muted-foreground border-t pt-3 space-y-1">
-          <p>• Real-time voice conversation with Gemini AI</p>
-          <p>• Speak naturally and the AI will guide you</p>
-          <p>• Check debug log above for troubleshooting</p>
-        </div>
-      </CardContent>
-    </Card>
+      </Button>
+
+      <div className="flex items-center gap-2 flex-1">
+        {isRecording && <Mic className="h-4 w-4 animate-pulse text-destructive" />}
+        {isSpeaking && <Volume2 className="h-4 w-4 animate-pulse text-blue-500" />}
+        <span className="text-sm text-muted-foreground">{status}</span>
+        {isEvaluating && <span className="text-xs text-muted-foreground ml-2">(Evaluating...)</span>}
+      </div>
+
+      {error && (
+        <span className="text-xs text-destructive">{error}</span>
+      )}
+    </div>
   )
 }

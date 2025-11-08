@@ -506,7 +506,7 @@ function InterviewPageContent() {
                     </TabsTrigger>
                     <TabsTrigger value="voice" disabled={isLoading || isCompleted}>
                       <Mic className="h-4 w-4 mr-2" />
-                      Voice
+                      Talk
                     </TabsTrigger>
                   </TabsList>
                   <TabsContent value="text" className="mt-0">
