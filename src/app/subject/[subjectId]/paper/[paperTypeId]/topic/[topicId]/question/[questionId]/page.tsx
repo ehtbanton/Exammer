@@ -158,6 +158,10 @@ function InterviewPageContent() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [subject?.id, examQuestion?.id]);
 
+  const handleVoiceMessage = (role: 'user' | 'assistant', content: string) => {
+    setChatHistory(prev => [...prev, { role, content }]);
+  };
+
   const handleSendMessage = async (imageData?: string) => {
     if ((!userInput.trim() && !imageData) || !subject || !examQuestion || isLoading || !generatedVariant) return;
 
@@ -506,6 +510,7 @@ function InterviewPageContent() {
                       question={generatedVariant?.questionText || ''}
                       solutionObjectives={generatedVariant?.solutionObjectives || []}
                       subsection={examQuestion?.summary || ''}
+                      onAddMessage={handleVoiceMessage}
                     />
                   </TabsContent>
                 </Tabs>

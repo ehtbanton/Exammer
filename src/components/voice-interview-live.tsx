@@ -9,9 +9,10 @@ interface VoiceInterviewLiveProps {
   question: string
   solutionObjectives: string[]
   subsection: string
+  onAddMessage: (role: 'user' | 'assistant', content: string) => void
 }
 
-export function VoiceInterviewLive({ question, solutionObjectives, subsection }: VoiceInterviewLiveProps) {
+export function VoiceInterviewLive({ question, solutionObjectives, subsection, onAddMessage }: VoiceInterviewLiveProps) {
   const [isConnected, setIsConnected] = useState(false)
   const [isRecording, setIsRecording] = useState(false)
   const [isSpeaking, setIsSpeaking] = useState(false)
@@ -26,6 +27,8 @@ export function VoiceInterviewLive({ question, solutionObjectives, subsection }:
   const processorRef = useRef<ScriptProcessorNode | null>(null)
   const audioQueueRef = useRef<string[]>([])
   const isPlayingRef = useRef(false)
+  const currentUserTextRef = useRef('')
+  const currentAITextRef = useRef('')
 
   const log = (msg: string) => {
     console.log(msg)
@@ -42,8 +45,7 @@ export function VoiceInterviewLive({ question, solutionObjectives, subsection }:
 
   const playNextChunk = async () => {
     if (audioQueueRef.current.length === 0) {
-      isPlayingRef.current = false
-      setIsSpeaking(false)
+      // Don't set isPlayingRef to false yet - wait for actual audio to finish
       return
     }
 
@@ -76,11 +78,26 @@ export function VoiceInterviewLive({ question, solutionObjectives, subsection }:
       source.buffer = audioBuffer
       source.connect(playbackContextRef.current.destination)
 
-      source.onended = () => playNextChunk()
+      source.onended = () => {
+        // Check if there are more chunks to play
+        if (audioQueueRef.current.length > 0) {
+          playNextChunk()
+        } else {
+          // No more chunks AND this audio finished - NOW we can set to false
+          isPlayingRef.current = false
+          setIsSpeaking(false)
+        }
+      }
       source.start()
     } catch (err) {
       console.error('Playback error:', err)
-      playNextChunk()
+      // On error, try next chunk or mark as finished
+      if (audioQueueRef.current.length > 0) {
+        playNextChunk()
+      } else {
+        isPlayingRef.current = false
+        setIsSpeaking(false)
+      }
     }
   }
 
@@ -106,6 +123,8 @@ export function VoiceInterviewLive({ question, solutionObjectives, subsection }:
         model: 'gemini-2.0-flash-exp',
         config: {
           responseModalities: ['AUDIO'],
+          inputAudioTranscription: {},
+          outputAudioTranscription: {},
           systemInstruction: 'You are an AI tutor helping with: ' + question
         },
         callbacks: {
@@ -118,7 +137,11 @@ export function VoiceInterviewLive({ question, solutionObjectives, subsection }:
           onmessage: (msg: any) => {
             // Log message structure
             console.log('Full message:', msg)
-            log('Message type: ' + (msg.serverContent ? Object.keys(msg.serverContent).join(',') : 'no serverContent'))
+            // Enhanced logging to see message structure
+            log('Message keys: ' + Object.keys(msg).join(', '))
+            if (msg.serverContent) {
+              log('ServerContent keys: ' + Object.keys(msg.serverContent).join(', '))
+            }
             
             // Check for audio in serverContent.modelTurn
             if (msg.serverContent?.modelTurn?.parts) {
@@ -131,15 +154,51 @@ export function VoiceInterviewLive({ question, solutionObjectives, subsection }:
                     playAudio(part.inlineData.data)
                   }
                 }
-                if (part.text) {
-                  log('Part has text: ' + part.text.substring(0, 50))
-                }
               }
             }
             
-            // Check for audio in other possible locations
+            
+            // Check for top-level transcription fields (JavaScript SDK structure)
+            if (msg.inputTranscription?.text) {
+              log('[INPUT] User said (top-level): ' + msg.inputTranscription.text.substring(0, 50))
+              currentUserTextRef.current += msg.inputTranscription.text
+            }
+            
+            if (msg.outputTranscription?.text) {
+              log('[OUTPUT] AI said (top-level): ' + msg.outputTranscription.text.substring(0, 50))
+              currentAITextRef.current += msg.outputTranscription.text
+            }
+            
+            // Check for nested transcription fields (Python SDK structure)
+            if (msg.serverContent?.inputTranscription?.text) {
+              log('[INPUT] User said (nested): ' + msg.serverContent.inputTranscription.text.substring(0, 50))
+              currentUserTextRef.current += msg.serverContent.inputTranscription.text
+            }
+            
+            if (msg.serverContent?.outputTranscription?.text) {
+              log('[OUTPUT] AI said (nested): ' + msg.serverContent.outputTranscription.text.substring(0, 50))
+              currentAITextRef.current += msg.serverContent.outputTranscription.text
+            }
+            
+            // Check for turn complete
             if (msg.serverContent?.turnComplete) {
               log('Turn complete')
+              // Add user's transcribed speech to chat
+              if (currentUserTextRef.current.trim()) {
+                log('Sending USER message: ' + currentUserTextRef.current.substring(0, 30))
+                onAddMessage('user', currentUserTextRef.current.trim())
+                currentUserTextRef.current = ''
+              }
+              // Add AI response to chat with actual text
+              const aiText = currentAITextRef.current.trim()
+              if (aiText) {
+                log('Sending AI message: ' + aiText.substring(0, 50))
+                onAddMessage('assistant', aiText)
+                currentAITextRef.current = ''
+              } else {
+                log('No AI text captured, using placeholder')
+                onAddMessage('assistant', '[Audio response - no text available]')
+              }
             }
           },
           onerror: (e: any) => {
@@ -250,6 +309,8 @@ export function VoiceInterviewLive({ question, solutionObjectives, subsection }:
     }
     audioQueueRef.current = []
     isPlayingRef.current = false
+    currentUserTextRef.current = ''
+    currentAITextRef.current = ''
     setIsRecording(false)
     setIsSpeaking(false)
     setStatus('Disconnected')
