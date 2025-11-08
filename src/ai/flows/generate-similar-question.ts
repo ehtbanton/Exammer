@@ -90,12 +90,20 @@ Guidelines for generating the similar question:
 6. Keep the same approximate length and complexity
 7. The question should feel like it's from the same exam paper but testing the same knowledge in a slightly different way
 8. FORMAT mathematical expressions using LaTeX - CRITICAL RULES:
-   - Inline: $x^2 + 5$ for math within text (ONLY math inside $, NO text)
-   - Display: $$F = ma$$ on separate line (ONLY equation inside $$, NO text)
-   - NEVER mix text and math inside delimiters
-   - Use standard LaTeX only: ^{} _{} \frac{}{} \sqrt{} \times \div \alpha \beta \pi
-   - Example: "Calculate:\n$$v = \frac{d}{t}$$\nwhere $v$ is velocity."
-   - NOT: "$$Calculate v = d/t$$" or "velocity = 10 m/s" (missing $)
+   Each $...$ must contain ONLY a mathematical expression, NO English words.
+
+   ✅ CORRECT examples:
+   - "The equation $y = y_0 + \epsilon y_1$ represents the solution."
+   - "Calculate:\n$$F = ma$$\nwhere $F$ is force."
+   - "We use $x = 5$ to determine the result."
+
+   ❌ WRONG - DO NOT do this (will produce garbage rendering):
+   - "$y = y_0 + \epsilon y_1 to determine the solution$" (English inside $)
+   - "$$Calculate F = ma where F is force$$" (English inside $$)
+   - "velocity = 10 m/s" (missing $ around numbers)
+
+   Close each $ immediately after the math expression, then continue with regular text.
+   Use only standard LaTeX: ^{} _{} \frac{}{} \sqrt{} \times \div \alpha \beta \pi
 
 Examples of proper variations:
 - If the original asks about photosynthesis in plants → variant asks about photosynthesis in algae
