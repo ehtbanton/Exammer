@@ -89,6 +89,10 @@ Guidelines for generating the similar question:
 5. Ensure the question is realistic and could plausibly appear on an actual exam
 6. Keep the same approximate length and complexity
 7. The question should feel like it's from the same exam paper but testing the same knowledge in a slightly different way
+8. FORMAT mathematical expressions using LaTeX notation:
+   - Inline math: $expression$ (e.g., $x^2 + 5x + 6$)
+   - Display math: $$expression$$ (e.g., $$E = mc^2$$)
+   - Use standard LaTeX syntax for symbols, fractions, etc.
 
 Examples of proper variations:
 - If the original asks about photosynthesis in plants → variant asks about photosynthesis in algae
