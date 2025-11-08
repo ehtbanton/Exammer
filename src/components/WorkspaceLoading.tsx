@@ -6,16 +6,24 @@ export default function WorkspaceLoading() {
   const [progress, setProgress] = useState(0);
 
   useEffect(() => {
-    // Simulate progress from 0 to 90% while loading
-    // We don't go to 100% until data actually loads
-    const timer = setInterval(() => {
-      setProgress((prev) => {
-        if (prev >= 90) return 90; // Cap at 90%
-        return prev + 10;
-      });
-    }, 200);
+    // Asymptotic progress - approaches 100% but never quite reaches it
+    // Speed is proportional to distance remaining (exponential decay)
+    // When twice as close, moves half as fast
+    let animationFrameId: number;
 
-    return () => clearInterval(timer);
+    const animate = () => {
+      setProgress((prev) => {
+        const target = 100;
+        const easingFactor = 0.008; // Slower movement - moves 0.8% of remaining distance each frame
+        const remaining = target - prev;
+        return prev + remaining * easingFactor;
+      });
+      animationFrameId = requestAnimationFrame(animate);
+    };
+
+    animationFrameId = requestAnimationFrame(animate);
+
+    return () => cancelAnimationFrame(animationFrameId);
   }, []);
 
   return (
