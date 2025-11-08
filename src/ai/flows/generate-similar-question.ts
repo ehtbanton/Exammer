@@ -59,19 +59,43 @@ CRITICAL LATEX RULES TO CHECK:
 2. Each $$...$$ must contain ONLY equations, NO English words
 3. All mathematical notation MUST be inside $ or $$ delimiters
 4. No text should be mixed with math inside delimiters
+5. Tables must be in LaTeX array format, NOT pipe-separated plain text
 
 COMMON ERRORS TO FIX:
-❌ "$y = y_0 + \epsilon y_1 to determine the solution$"
-   → Fix: "The equation $y = y_0 + \epsilon y_1$ is used to determine the solution"
+
+Math formatting:
+❌ "$y = y_0 + \\epsilon y_1 to determine the solution$"
+   → Fix: "The equation $y = y_0 + \\epsilon y_1$ is used to determine the solution"
 
 ❌ "$$Calculate the force F = ma$$"
-   → Fix: "Calculate the force:\n$$F = ma$$"
+   → Fix: "Calculate the force:\\n$$F = ma$$"
 
 ❌ "velocity = 10 m/s"
    → Fix: "velocity = $10$ m/s" or "velocity $= 10$ m/s"
 
 ❌ "$x = 5 where x is the value$"
    → Fix: "where $x = 5$ is the value" or "$x = 5$, where $x$ is the value"
+
+Table formatting:
+❌ Plain text tables with pipes:
+   "| x | y |
+    | 1 | 2 |
+    | 3 | 4 |"
+   → Fix: Convert to LaTeX array format:
+   "$$\\begin{array}{|c|c|}
+    \\hline
+    x & y \\\\
+    \\hline
+    1 & 2 \\\\
+    3 & 4 \\\\
+    \\hline
+    \\end{array}$$"
+
+❌ Tables without proper formatting:
+   "x  y
+    1  2
+    3  4"
+   → Fix: Convert to LaTeX array with proper alignment and separators
 
 If you find ANY errors:
 - Set needsCorrection = true
@@ -186,6 +210,27 @@ Guidelines for generating the similar question:
 
    Close each $ immediately after the math expression, then continue with regular text.
    Use only standard LaTeX: ^{} _{} \frac{}{} \sqrt{} \times \div \alpha \beta \pi
+
+9. FORMAT tables using LaTeX array syntax - CRITICAL:
+   DO NOT use pipe-separated plain text tables. Use LaTeX array format instead.
+
+   ✅ CORRECT table format:
+   "$$\\begin{array}{|c|c|c|}
+   \\hline
+   x & y & z \\\\
+   \\hline
+   1 & 2 & 3 \\\\
+   4 & 5 & 6 \\\\
+   \\hline
+   \\end{array}$$"
+
+   ❌ WRONG - DO NOT use pipe-separated text:
+   "| x | y | z |
+    | 1 | 2 | 3 |
+    | 4 | 5 | 6 |"
+
+   Array syntax: {|c|c|c|} means 3 centered columns with vertical lines
+   Use \\hline for horizontal lines, & to separate columns, \\\\ for new rows
 
 Examples of proper variations:
 - If the original asks about photosynthesis in plants → variant asks about photosynthesis in algae
