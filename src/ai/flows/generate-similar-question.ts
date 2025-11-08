@@ -122,7 +122,7 @@ Validate and correct the text now.`,
 
   if (output.needsCorrection && output.errorsFound && output.errorsFound.length > 0) {
     console.log('[LaTeX Validation] Errors found and corrected:');
-    output.errorsFound.forEach((error, idx) => {
+    output.errorsFound.forEach((error: string, idx: number) => {
       console.log(`  ${idx + 1}. ${error}`);
     });
   }
