@@ -24,16 +24,14 @@ class Database {
       if (!dbExists) {
         // If database doesn't exist, let migrations handle creation
         console.log('Database does not exist, migrations will create it...');
-      } else {
-        // Database exists, ensure schema is applied (handles any IF NOT EXISTS clauses)
-        await this.applyBaseSchema();
       }
 
-      // Run versioned migrations (will create database if needed)
+      // Run versioned migrations FIRST (will create database if needed, or migrate existing)
+      // This must happen before any schema application to ensure columns exist
       await this.runVersionedMigrations();
 
-      // If database was created by migrations, we need to open a connection
-      if (!dbExists && !this.db) {
+      // Open database connection after migrations
+      if (!this.db) {
         await new Promise<void>((resolve, reject) => {
           this.db = new sqlite3.Database(DB_PATH, (err) => {
             if (err) {
