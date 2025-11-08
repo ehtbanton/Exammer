@@ -25,6 +25,7 @@ import { Whiteboard } from '@/components/whiteboard';
 import { VoiceInterviewLive } from '@/components/voice-interview-live';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useSession } from 'next-auth/react';
+import { LatexRenderer } from '@/components/latex-renderer';
 
 export default function InterviewPage() {
   return (
@@ -404,9 +405,9 @@ function InterviewPageContent() {
                     <>
                       <ScrollArea className="flex-1 p-6 overflow-auto">
                         <div className="prose prose-base max-w-none dark:prose-invert">
-                          <div className="text-base leading-relaxed whitespace-pre-wrap break-words font-normal">
+                          <LatexRenderer className="text-base leading-relaxed whitespace-pre-wrap break-words font-normal">
                             {formatQuestionText(generatedVariant.questionText)}
-                          </div>
+                          </LatexRenderer>
                         </div>
                         {accessLevel !== null && accessLevel >= 3 && (
                           <div className="mt-6 p-4 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg">
