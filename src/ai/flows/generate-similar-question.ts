@@ -27,6 +27,88 @@ const GenerateSimilarQuestionOutputSchema = z.object({
 });
 export type GenerateSimilarQuestionOutput = z.infer<typeof GenerateSimilarQuestionOutputSchema>;
 
+const ValidateLatexFormattingInputSchema = z.object({
+  questionText: z.string().describe('The question text to validate for LaTeX formatting errors.'),
+});
+
+const ValidateLatexFormattingOutputSchema = z.object({
+  needsCorrection: z.boolean().describe('True if LaTeX formatting errors were found and corrected, false if the text was already correct.'),
+  correctedText: z.string().describe('The corrected question text with proper LaTeX formatting. If needsCorrection is false, this should be identical to the input.'),
+  errorsFound: z.array(z.string()).optional().describe('List of errors that were found and corrected (empty if needsCorrection is false).'),
+});
+
+/**
+ * Validates and corrects LaTeX formatting in generated question text.
+ * This acts as a self-correction mechanism to catch common LaTeX errors.
+ */
+async function validateAndCorrectLatex(
+  ai: any,
+  questionText: string
+): Promise<{ correctedText: string; hadErrors: boolean }> {
+  const validationPrompt = ai.definePrompt({
+    name: 'validateLatexFormatting',
+    input: { schema: ValidateLatexFormattingInputSchema },
+    output: { schema: ValidateLatexFormattingOutputSchema },
+    prompt: `You are a LaTeX formatting validator. Check if the question text has correct LaTeX formatting.
+
+Question Text:
+{{questionText}}
+
+CRITICAL LATEX RULES TO CHECK:
+1. Each $...$ must contain ONLY mathematical expressions, NO English words
+2. Each $$...$$ must contain ONLY equations, NO English words
+3. All mathematical notation MUST be inside $ or $$ delimiters
+4. No text should be mixed with math inside delimiters
+
+COMMON ERRORS TO FIX:
+❌ "$y = y_0 + \epsilon y_1 to determine the solution$"
+   → Fix: "The equation $y = y_0 + \epsilon y_1$ is used to determine the solution"
+
+❌ "$$Calculate the force F = ma$$"
+   → Fix: "Calculate the force:\n$$F = ma$$"
+
+❌ "velocity = 10 m/s"
+   → Fix: "velocity = $10$ m/s" or "velocity $= 10$ m/s"
+
+❌ "$x = 5 where x is the value$"
+   → Fix: "where $x = 5$ is the value" or "$x = 5$, where $x$ is the value"
+
+If you find ANY errors:
+- Set needsCorrection = true
+- Provide the corrected text in correctedText
+- List what errors you found in errorsFound
+
+If the text is ALREADY correctly formatted:
+- Set needsCorrection = false
+- Return the original text unchanged in correctedText
+- Leave errorsFound empty
+
+Validate and correct the text now.`,
+  });
+
+  const response = await validationPrompt({ questionText }, {
+    model: 'googleai/gemini-2.5-flash-lite',
+  });
+
+  const output = response.output;
+  if (!output) {
+    // If validation fails, return original text
+    return { correctedText: questionText, hadErrors: false };
+  }
+
+  if (output.needsCorrection && output.errorsFound && output.errorsFound.length > 0) {
+    console.log('[LaTeX Validation] Errors found and corrected:');
+    output.errorsFound.forEach((error, idx) => {
+      console.log(`  ${idx + 1}. ${error}`);
+    });
+  }
+
+  return {
+    correctedText: output.correctedText,
+    hadErrors: output.needsCorrection,
+  };
+}
+
 export async function generateSimilarQuestion(
   input: GenerateSimilarQuestionInput
 ): Promise<GenerateSimilarQuestionOutput> {
@@ -169,8 +251,18 @@ Generate the similar question, adapted marking objectives, and perform validatio
       );
     }
 
+    // Validate and correct LaTeX formatting
+    console.log('[Process C] Validating LaTeX formatting...');
+    const latexValidation = await validateAndCorrectLatex(ai, output.questionText);
+
+    if (latexValidation.hadErrors) {
+      console.log('[Process C] LaTeX formatting was corrected automatically');
+    } else {
+      console.log('[Process C] LaTeX formatting is correct');
+    }
+
     return {
-      questionText: output.questionText,
+      questionText: latexValidation.correctedText,
       summary: output.summary,
       solutionObjectives: output.solutionObjectives,
     };
