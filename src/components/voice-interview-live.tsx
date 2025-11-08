@@ -307,6 +307,7 @@ export function VoiceInterviewLive({ question, solutionObjectives, subsection, o
 
   const disconnect = () => {
     log('Disconnecting...')
+    setIsConnected(false)
     if (sessionRef.current) {
       sessionRef.current.close()
       sessionRef.current = null
@@ -353,12 +354,12 @@ export function VoiceInterviewLive({ question, solutionObjectives, subsection, o
         {isConnected ? (
           <>
             <PhoneOff className="mr-2 h-4 w-4" />
-            End Interview
+            Stop talking
           </>
         ) : (
           <>
             <Phone className="mr-2 h-4 w-4" />
-            Start Interview
+            Start talking
           </>
         )}
       </Button>
