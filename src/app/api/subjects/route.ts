@@ -13,48 +13,91 @@ export async function GET(req: NextRequest) {
     const filter = searchParams.get('filter'); // 'workspace', 'created', 'other', or null (all workspace)
     const search = searchParams.get('search'); // optional search query
 
+    // Get user's access level
+    const fullUser = await db.get<{ access_level: number }>(
+      'SELECT access_level FROM users WHERE id = ?',
+      [user.id]
+    );
+
+    const accessLevel = fullUser?.access_level || 0;
     let subjects: Subject[];
 
-    if (filter === 'other') {
-      // Get subjects NOT in user's workspace, with optional search
-      if (search && search.trim()) {
-        subjects = await db.all<Subject>(
-          `SELECT s.*, 0 as is_creator FROM subjects s
-           WHERE s.id NOT IN (
-             SELECT subject_id FROM user_workspaces WHERE user_id = ?
-           )
-           AND s.name LIKE ?
-           ORDER BY s.created_at DESC`,
-          [user.id, `%${search.trim()}%`]
-        );
-      } else {
-        subjects = await db.all<Subject>(
-          `SELECT s.*, 0 as is_creator FROM subjects s
-           WHERE s.id NOT IN (
-             SELECT subject_id FROM user_workspaces WHERE user_id = ?
-           )
-           ORDER BY s.created_at DESC`,
-          [user.id]
-        );
+    // Level 1 users (students) can only access subjects from their approved classes
+    if (accessLevel === 1) {
+      // Students cannot search for other subjects
+      if (filter === 'other') {
+        return NextResponse.json([]);
       }
-    } else if (filter === 'created') {
-      // Get subjects created by user
+
+      // Get subjects from user's approved classes
       subjects = await db.all<Subject>(
-        `SELECT s.*, uw.is_creator FROM subjects s
-         INNER JOIN user_workspaces uw ON s.id = uw.subject_id
-         WHERE uw.user_id = ? AND uw.is_creator = 1
+        `SELECT DISTINCT s.*, 0 as is_creator
+         FROM subjects s
+         INNER JOIN class_subjects cs ON s.id = cs.subject_id
+         INNER JOIN class_memberships cm ON cs.class_id = cm.class_id
+         WHERE cm.user_id = ? AND cm.status = 'approved' AND cm.role = 'student'
          ORDER BY s.created_at DESC`,
         [user.id]
       );
     } else {
-      // Default: Get all subjects in user's workspace
-      subjects = await db.all<Subject>(
-        `SELECT s.*, uw.is_creator FROM subjects s
-         INNER JOIN user_workspaces uw ON s.id = uw.subject_id
-         WHERE uw.user_id = ?
-         ORDER BY s.created_at DESC`,
-        [user.id]
-      );
+      // Level 2+ users (teachers and admins) can access workspace and search
+      if (filter === 'other') {
+        // Get subjects NOT in user's workspace, with optional search
+        if (search && search.trim()) {
+          subjects = await db.all<Subject>(
+            `SELECT s.*, 0 as is_creator FROM subjects s
+             WHERE s.id NOT IN (
+               SELECT subject_id FROM user_workspaces WHERE user_id = ?
+             )
+             AND s.name LIKE ?
+             ORDER BY s.created_at DESC`,
+            [user.id, `%${search.trim()}%`]
+          );
+        } else {
+          subjects = await db.all<Subject>(
+            `SELECT s.*, 0 as is_creator FROM subjects s
+             WHERE s.id NOT IN (
+               SELECT subject_id FROM user_workspaces WHERE user_id = ?
+             )
+             ORDER BY s.created_at DESC`,
+            [user.id]
+          );
+        }
+      } else if (filter === 'created') {
+        // Get subjects created by user
+        subjects = await db.all<Subject>(
+          `SELECT s.*, uw.is_creator FROM subjects s
+           INNER JOIN user_workspaces uw ON s.id = uw.subject_id
+           WHERE uw.user_id = ? AND uw.is_creator = 1
+           ORDER BY s.created_at DESC`,
+          [user.id]
+        );
+      } else {
+        // Default: Get all subjects in user's workspace + subjects from approved classes
+        const workspaceSubjects = await db.all<Subject>(
+          `SELECT s.*, uw.is_creator FROM subjects s
+           INNER JOIN user_workspaces uw ON s.id = uw.subject_id
+           WHERE uw.user_id = ?
+           ORDER BY s.created_at DESC`,
+          [user.id]
+        );
+
+        const classSubjects = await db.all<Subject>(
+          `SELECT DISTINCT s.*, 0 as is_creator
+           FROM subjects s
+           INNER JOIN class_subjects cs ON s.id = cs.subject_id
+           INNER JOIN class_memberships cm ON cs.class_id = cm.class_id
+           WHERE cm.user_id = ? AND cm.status = 'approved'
+           AND s.id NOT IN (
+             SELECT subject_id FROM user_workspaces WHERE user_id = ?
+           )
+           ORDER BY s.created_at DESC`,
+          [user.id, user.id]
+        );
+
+        // Merge workspace and class subjects
+        subjects = [...workspaceSubjects, ...classSubjects];
+      }
     }
 
     // If no subjects, return empty array early
@@ -84,7 +127,7 @@ export async function GET(req: NextRequest) {
         q.question_text,
         q.summary,
         q.solution_objectives,
-        q.diagram_description,
+        q.diagram_mermaid,
         q.created_at as question_created_at,
         COALESCE(up.score, 0) as score,
         COALESCE(up.attempts, 0) as attempts,
@@ -165,7 +208,7 @@ export async function GET(req: NextRequest) {
               completedObjectives,
               score: row.score,
               attempts: row.attempts,
-              diagram_description: row.diagram_description,
+              diagram_mermaid: row.diagram_mermaid,
             });
           }
         });
@@ -198,16 +241,46 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const user = await requireAuth();
-    const { name, syllabusContent } = await req.json();
+
+    // Check user's access level - students (level 1) cannot create subjects
+    const fullUser = await db.get<{ access_level: number }>(
+      'SELECT access_level FROM users WHERE id = ?',
+      [user.id]
+    );
+
+    if (!fullUser || fullUser.access_level < 2) {
+      return NextResponse.json(
+        { error: 'Students cannot create subjects. Only teachers (level 2+) can create subjects.' },
+        { status: 403 }
+      );
+    }
+
+    const { name, syllabusContent, classId } = await req.json();
 
     if (!name) {
       return NextResponse.json({ error: 'Subject name is required' }, { status: 400 });
     }
 
+    // If classId is provided, verify the user is a teacher of that class
+    if (classId) {
+      const isTeacher = await db.get<{ role: string; status: string }>(
+        `SELECT role, status FROM class_memberships
+         WHERE class_id = ? AND user_id = ? AND role = 'teacher' AND status = 'approved'`,
+        [classId, user.id]
+      );
+
+      if (!isTeacher) {
+        return NextResponse.json(
+          { error: 'You must be a teacher of the class to create class-specific subjects' },
+          { status: 403 }
+        );
+      }
+    }
+
     // Create the subject
     const result = await db.run(
-      'INSERT INTO subjects (name, syllabus_content) VALUES (?, ?)',
-      [name, syllabusContent || null]
+      'INSERT INTO subjects (name, syllabus_content, class_id) VALUES (?, ?, ?)',
+      [name, syllabusContent || null, classId || null]
     );
 
     const subjectId = result.lastID;
@@ -217,6 +290,14 @@ export async function POST(req: NextRequest) {
       'INSERT INTO user_workspaces (user_id, subject_id, is_creator) VALUES (?, ?, 1)',
       [user.id, subjectId]
     );
+
+    // If classId is provided, also add to class_subjects
+    if (classId) {
+      await db.run(
+        'INSERT INTO class_subjects (class_id, subject_id, added_by_user_id) VALUES (?, ?, ?)',
+        [classId, subjectId, user.id]
+      );
+    }
 
     const subject = await db.get<Subject>('SELECT * FROM subjects WHERE id = ?', [subjectId]);
 

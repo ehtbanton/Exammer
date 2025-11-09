@@ -15,7 +15,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { LogOut, User, Terminal, ArrowLeft } from 'lucide-react';
+import { LogOut, User, Terminal, ArrowLeft, Users, Home } from 'lucide-react';
 import { ThemeToggle } from './theme-toggle';
 
 export default function Header() {
@@ -58,15 +58,37 @@ export default function Header() {
   };
 
   const isDebugPage = pathname === '/t';
+  const isClassesPage = pathname.startsWith('/classes');
 
   return (
     <header className="bg-card border-b sticky top-0 z-10">
       <div className="container mx-auto px-4 sm:px-6 md:px-8">
         <div className="flex justify-between items-center h-16">
-          <Link href="/" className="flex items-center gap-3 text-2xl font-bold font-headline text-primary">
-            <Image src="/exammer.png" alt="Exammer" width={40} height={40} className="h-10 w-10" />
-            <span>Exammer</span>
-          </Link>
+          <div className="flex items-center gap-3">
+            <Link href="/" className="flex items-center gap-3 text-2xl font-bold font-headline text-primary">
+              <Image src="/exammer.png" alt="Exammer" width={40} height={40} className="h-10 w-10" />
+              <span>Exammer</span>
+            </Link>
+
+            {/* Debug/Back button for level 3 users - moved to left */}
+            {status === 'authenticated' && accessLevel === 3 && (
+              isDebugPage ? (
+                <Button variant="ghost" size="sm" asChild>
+                  <Link href="/">
+                    <ArrowLeft className="h-4 w-4 mr-2" />
+                    Back
+                  </Link>
+                </Button>
+              ) : (
+                <Button variant="ghost" size="sm" asChild>
+                  <Link href="/t">
+                    <Terminal className="h-4 w-4 mr-2" />
+                    Logs
+                  </Link>
+                </Button>
+              )
+            )}
+          </div>
 
           <div className="flex items-center gap-4">
             <ThemeToggle />
@@ -74,20 +96,20 @@ export default function Header() {
               <div className="h-8 w-8 rounded-full bg-gray-200 animate-pulse" />
             ) : session ? (
               <>
-                {/* Debug/Back button for level 3 users */}
-                {accessLevel === 3 && (
-                  isDebugPage ? (
+                {/* Classes/Workspace button for students, teachers, and admins (level 1-3) */}
+                {accessLevel !== null && accessLevel >= 1 && (
+                  isClassesPage ? (
                     <Button variant="outline" size="sm" asChild>
                       <Link href="/">
-                        <ArrowLeft className="h-4 w-4 mr-2" />
-                        Back
+                        <Home className="h-4 w-4 mr-2" />
+                        Workspace
                       </Link>
                     </Button>
                   ) : (
                     <Button variant="outline" size="sm" asChild>
-                      <Link href="/t">
-                        <Terminal className="h-4 w-4 mr-2" />
-                        Logs
+                      <Link href={accessLevel === 1 ? "/classes/join" : "/classes"}>
+                        <Users className="h-4 w-4 mr-2" />
+                        Classes
                       </Link>
                     </Button>
                   )

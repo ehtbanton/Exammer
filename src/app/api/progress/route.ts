@@ -13,19 +13,33 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Question ID is required' }, { status: 400 });
     }
 
-    // Verify user owns the subject that this question belongs to
-    const ownership = await db.get<{ user_id: number }>(
-      `SELECT s.user_id
+    // Verify user has access to the subject (via workspace or class membership)
+    const access = await db.get<{ subject_id: number }>(
+      `SELECT pt.subject_id
        FROM questions q
        JOIN topics t ON q.topic_id = t.id
        JOIN paper_types pt ON t.paper_type_id = pt.id
-       JOIN subjects s ON pt.subject_id = s.id
        WHERE q.id = ?`,
       [questionId]
     );
 
-    if (!ownership || ownership.user_id.toString() !== user.id) {
+    if (!access) {
       return NextResponse.json({ error: 'Question not found' }, { status: 404 });
+    }
+
+    // Check if user has access via workspace or class
+    const hasAccess = await db.get(
+      `SELECT 1 FROM user_workspaces
+       WHERE user_id = ? AND subject_id = ?
+       UNION
+       SELECT 1 FROM class_subjects cs
+       JOIN class_memberships cm ON cs.class_id = cm.class_id
+       WHERE cm.user_id = ? AND cs.subject_id = ? AND cm.status = 'approved'`,
+      [user.id, access.subject_id, user.id, access.subject_id]
+    );
+
+    if (!hasAccess) {
+      return NextResponse.json({ error: 'Access denied' }, { status: 403 });
     }
 
     const progress = await db.get<UserProgress>(
@@ -57,19 +71,33 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Question ID and score are required' }, { status: 400 });
     }
 
-    // Verify user owns the subject that this question belongs to
-    const ownership = await db.get<{ user_id: number }>(
-      `SELECT s.user_id
+    // Verify user has access to the subject (via workspace or class membership)
+    const access = await db.get<{ subject_id: number }>(
+      `SELECT pt.subject_id
        FROM questions q
        JOIN topics t ON q.topic_id = t.id
        JOIN paper_types pt ON t.paper_type_id = pt.id
-       JOIN subjects s ON pt.subject_id = s.id
        WHERE q.id = ?`,
       [questionId]
     );
 
-    if (!ownership || ownership.user_id.toString() !== user.id) {
+    if (!access) {
       return NextResponse.json({ error: 'Question not found' }, { status: 404 });
+    }
+
+    // Check if user has access via workspace or class
+    const hasAccess = await db.get(
+      `SELECT 1 FROM user_workspaces
+       WHERE user_id = ? AND subject_id = ?
+       UNION
+       SELECT 1 FROM class_subjects cs
+       JOIN class_memberships cm ON cs.class_id = cm.class_id
+       WHERE cm.user_id = ? AND cs.subject_id = ? AND cm.status = 'approved'`,
+      [user.id, access.subject_id, user.id, access.subject_id]
+    );
+
+    if (!hasAccess) {
+      return NextResponse.json({ error: 'Access denied' }, { status: 403 });
     }
 
     // Check if progress already exists

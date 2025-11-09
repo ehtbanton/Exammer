@@ -14,7 +14,7 @@ import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import LoadingSpinner from '@/components/LoadingSpinner';
-import { Send, User, Bot, ArrowLeft, MessageSquare, PenTool, Terminal, Check } from 'lucide-react';
+import { Send, User, Bot, ArrowLeft, MessageSquare, PenTool, Terminal, Check, Mic } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
@@ -22,8 +22,10 @@ import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import PageSpinner from '@/components/PageSpinner';
 import { Whiteboard } from '@/components/whiteboard';
+import { VoiceInterviewLive } from '@/components/voice-interview-live';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useSession } from 'next-auth/react';
+import { LatexRenderer } from '@/components/latex-renderer';
 import mermaid from 'mermaid';
 
 // Initialize mermaid
@@ -110,7 +112,7 @@ function InterviewPageContent() {
   const [userInput, setUserInput] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [generatedVariant, setGeneratedVariant] = useState<{questionText: string; solutionObjectives: string[]; diagramMermaid?: string} | null>(null);
-  const [inputMode, setInputMode] = useState<'text' | 'whiteboard'>('text');
+  const [inputMode, setInputMode] = useState<'text' | 'whiteboard' | 'voice'>('text');
   const [accessLevel, setAccessLevel] = useState<number | null>(null);
   const [completedObjectives, setCompletedObjectives] = useState<number[]>([]);
   const [showExitDialog, setShowExitDialog] = useState(false);
@@ -212,6 +214,44 @@ function InterviewPageContent() {
     startInterview();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [subject?.id, examQuestion?.id]);
+
+  const handleVoiceMessage = (role: 'user' | 'assistant', content: string) => {
+    setChatHistory(prev => [...prev, { role, content }]);
+  };
+
+  const handleVoiceEvaluation = async (userAnswer: string) => {
+    if (!generatedVariant || !subject || !examQuestion) return;
+
+    try {
+      console.log('Evaluating voice answer against objectives...');
+
+      // Call aiPoweredInterview with the voice transcription
+      // Note: We don't update chatHistory here - VoiceInterviewLive already handles that
+      const res = await aiPoweredInterview({
+        subsection: examQuestion.summary,
+        userAnswer,
+        previousChatHistory: chatHistory,
+        question: generatedVariant.questionText,
+        solutionObjectives: generatedVariant.solutionObjectives,
+        previouslyCompletedObjectives: completedObjectives,
+      });
+
+      // Update objectives (merge with existing)
+      setCompletedObjectives(prevCompleted => {
+        const newSet = new Set([...prevCompleted, ...res.completedObjectives]);
+        const updated = Array.from(newSet).sort((a, b) => a - b);
+        console.log('Objectives updated from voice:', {
+          previous: prevCompleted,
+          new: res.completedObjectives,
+          merged: updated
+        });
+        return updated;
+      });
+    } catch (e) {
+      console.error('Voice evaluation error:', e);
+      // Don't show toast for voice errors - evaluation happens in background
+    }
+  };
 
   const handleSendMessage = async (imageData?: string) => {
     if ((!userInput.trim() && !imageData) || !subject || !examQuestion || isLoading || !generatedVariant) return;
@@ -421,9 +461,9 @@ function InterviewPageContent() {
                     <>
                       <ScrollArea className="flex-1 p-6 overflow-auto">
                         <div className="prose prose-base max-w-none dark:prose-invert">
-                          <div className="text-base leading-relaxed whitespace-pre-wrap break-words font-normal">
+                          <LatexRenderer className="text-base leading-relaxed whitespace-pre-wrap break-words font-normal">
                             {formatQuestionText(generatedVariant.questionText)}
-                          </div>
+                          </LatexRenderer>
                           {/* Mermaid diagram display */}
                           {generatedVariant.diagramMermaid && (
                             <div className="mt-6">
@@ -517,8 +557,8 @@ function InterviewPageContent() {
                 </div>
               </ScrollArea>
               <div className="p-4 border-t shrink-0">
-                <Tabs value={inputMode} onValueChange={(v) => setInputMode(v as 'text' | 'whiteboard')}>
-                  <TabsList className="grid w-full grid-cols-2 mb-3">
+                <Tabs value={inputMode} onValueChange={(v) => setInputMode(v as 'text' | 'whiteboard' | 'voice')}>
+                  <TabsList className="grid w-full grid-cols-3 mb-3">
                     <TabsTrigger value="text" disabled={isLoading || isCompleted}>
                       <MessageSquare className="h-4 w-4 mr-2" />
                       Text
@@ -526,6 +566,10 @@ function InterviewPageContent() {
                     <TabsTrigger value="whiteboard" disabled={isLoading || isCompleted}>
                       <PenTool className="h-4 w-4 mr-2" />
                       Whiteboard
+                    </TabsTrigger>
+                    <TabsTrigger value="voice" disabled={isLoading || isCompleted}>
+                      <Mic className="h-4 w-4 mr-2" />
+                      Talk
                     </TabsTrigger>
                   </TabsList>
                   <TabsContent value="text" className="mt-0">
@@ -556,6 +600,15 @@ function InterviewPageContent() {
                     <Whiteboard
                       onSubmit={handleSendMessage}
                       disabled={isLoading || isCompleted}
+                    />
+                  </TabsContent>
+                  <TabsContent value="voice" className="mt-0">
+                    <VoiceInterviewLive
+                      question={generatedVariant?.questionText || ''}
+                      solutionObjectives={generatedVariant?.solutionObjectives || []}
+                      subsection={examQuestion?.summary || ''}
+                      onAddMessage={handleVoiceMessage}
+                      onEvaluateAnswer={handleVoiceEvaluation}
                     />
                   </TabsContent>
                 </Tabs>

@@ -5,7 +5,7 @@ import type { Subject, PastPaper, PaperType } from '@/lib/db';
 
 export const dynamic = 'force-dynamic'; // Prevent caching to always get fresh data
 
-// GET /api/subjects/[id] - Get a specific subject (must be in user's workspace)
+// GET /api/subjects/[id] - Get a specific subject (must be in user's workspace or class)
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const user = await requireAuth();
@@ -17,8 +17,22 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       [user.id, subjectId]
     );
 
+    // If not in workspace, check if user has access via class membership
     if (!workspace) {
-      return NextResponse.json({ error: 'Subject not found in workspace' }, { status: 404 });
+      const classAccess = await db.get(
+        `SELECT cs.id
+         FROM class_subjects cs
+         INNER JOIN class_memberships cm ON cs.class_id = cm.class_id
+         WHERE cs.subject_id = ? AND cm.user_id = ? AND cm.status = 'approved'`,
+        [subjectId, user.id]
+      );
+
+      if (!classAccess) {
+        return NextResponse.json(
+          { error: 'Subject not found in workspace or classes' },
+          { status: 404 }
+        );
+      }
     }
 
     // Get the subject
@@ -49,7 +63,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         q.question_text,
         q.summary,
         q.solution_objectives,
-        q.diagram_description,
+        q.diagram_mermaid,
         q.paper_date,
         q.question_number,
         q.created_at as question_created_at,
@@ -128,7 +142,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
           attempts: row.attempts,
           paperDate: row.paper_date,
           questionNumber: row.question_number,
-          diagram_description: row.diagram_description,
+          diagram_mermaid: row.diagram_mermaid,
         });
       }
     });
