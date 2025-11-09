@@ -16,7 +16,7 @@ const GenerateSimilarQuestionInputSchema = z.object({
   topicName: z.string().describe('The name of the topic this question covers.'),
   topicDescription: z.string().describe('The description of what this topic covers.'),
   originalObjectives: z.array(z.string()).optional().describe('The marking objectives from the original question markscheme. If not provided, objectives will be manufactured from the question text.'),
-  originalDiagramDescription: z.string().optional().describe('If the original question had a diagram, this contains the description. Should be adapted for the variant question.'),
+  originalDiagramMermaid: z.string().optional().describe('If the original question had a diagram, this contains the mermaid syntax. Should be adapted for the variant question.'),
 });
 export type GenerateSimilarQuestionInput = z.infer<typeof GenerateSimilarQuestionInputSchema>;
 
@@ -24,7 +24,7 @@ const GenerateSimilarQuestionOutputSchema = z.object({
   questionText: z.string().describe('The generated question variant that is similar but not identical to the original.'),
   summary: z.string().describe('A brief one-sentence summary of what this question variant is about.'),
   solutionObjectives: z.array(z.string()).describe('The marking objectives for this specific variant question, adapted from the original objectives to match the new question details.'),
-  diagramDescription: z.string().optional().describe('If the original question had a diagram, provide an adapted diagram description that matches the variant question changes. Must be consistent with variant values.'),
+  diagramMermaid: z.string().optional().describe('If the original question had a diagram, provide an adapted mermaid diagram syntax that matches the variant question changes. Must be consistent with variant values.'),
   validationError: z.string().optional().describe('If the generated solution objectives do not logically correspond to the variant question, describe the mismatch here. Otherwise, omit this field.'),
 });
 export type GenerateSimilarQuestionOutput = z.infer<typeof GenerateSimilarQuestionOutputSchema>;
@@ -66,9 +66,9 @@ Topic Description: {{topicDescription}}
 Original Question:
 {{originalQuestionText}}
 
-{{#if originalDiagramDescription}}
-Original Diagram Description:
-{{originalDiagramDescription}}
+{{#if originalDiagramMermaid}}
+Original Diagram (Mermaid Syntax):
+{{originalDiagramMermaid}}
 {{/if}}
 
 {{#if originalObjectives}}
@@ -103,19 +103,22 @@ Examples of proper variations:
 - If the original describes a pendulum experiment → variant describes a similar but different pendulum setup
 - If the original asks to "calculate velocity at 5 seconds" → variant asks to "calculate velocity at 8 seconds"
 
-{{#if originalDiagramDescription}}
-After generating the question, ADAPT the diagram description:
-- Update ALL measurements, values, and labels to match your variant question
-- Keep the same basic structure and style ("Educational diagram, simple line drawing, black on white:")
+{{#if originalDiagramMermaid}}
+After generating the question, ADAPT the mermaid diagram syntax:
+- Update ALL measurements, values, and labels in the mermaid code to match your variant question
+- Keep the same diagram type and structure (e.g., if it's a flowchart, keep it as a flowchart)
 - Maintain the same level of detail and clarity
-- If you changed numbers in the question (e.g., 3 cm → 6 cm), update them in the diagram description
-- If you changed the scenario/context, adapt the diagram description accordingly
-- The diagram must visually represent YOUR variant question, not the original
+- If you changed numbers in the question (e.g., 3 cm → 6 cm), update them in the mermaid syntax
+- If you changed the scenario/context, adapt the mermaid diagram accordingly
+- The diagram must represent YOUR variant question, not the original
+- Use proper mermaid syntax (graph, flowchart, sequenceDiagram, classDiagram, etc.)
 
-Examples of proper diagram adaptation:
-- Original: "Base AB labeled '3 cm'" → Variant: "Base AB labeled '6 cm'"
-- Original: "Arrow pointing right labeled 'Force = 10 N'" → Variant: "Arrow pointing right labeled 'Force = 15 N'"
-- Original: "Pendulum with length 50 cm" → Variant: "Pendulum with length 75 cm"
+Examples of proper mermaid diagram adaptation:
+- Original: graph LR; A[3 cm] --> B → Variant: graph LR; A[6 cm] --> B
+- Original: graph TD; Force["Force = 10 N"] → Variant: graph TD; Force["Force = 15 N"]
+- For geometric diagrams, consider using flowchart with styled nodes
+- For process flows, use flowchart or sequenceDiagram
+- For relationships, use graph or classDiagram
 {{/if}}
 
 {{#if originalObjectives}}
@@ -148,18 +151,18 @@ Examples of manufactured objectives for different question types:
 {{/if}}
 
 VALIDATION STEP (MANDATORY):
-After generating the question, objectives{{#if originalDiagramDescription}}, and diagram description{{/if}}:
+After generating the question, objectives{{#if originalDiagramMermaid}}, and mermaid diagram{{/if}}:
 1. Check if your solution objectives logically correspond to your variant question
 2. Verify that any numeric answers in objectives match the numbers/context in your question
 3. Verify that any formulas or calculations in objectives use the correct values from your question
-{{#if originalDiagramDescription}}
-4. Verify that your diagram description matches the values in your variant question (not the original)
-5. Ensure all measurements, labels, and values in the diagram description are consistent with your variant
+{{#if originalDiagramMermaid}}
+4. Verify that your mermaid diagram syntax is valid and matches the values in your variant question (not the original)
+5. Ensure all measurements, labels, and values in the mermaid diagram are consistent with your variant
 {{/if}}
 6. If you detect ANY mismatch or inconsistency, populate the validationError field with a description
 7. If everything perfectly corresponds, leave validationError empty/omitted
 
-Generate the similar question, adapted marking objectives{{#if originalDiagramDescription}}, adapted diagram description{{/if}}, and perform validation.`,
+Generate the similar question, adapted marking objectives{{#if originalDiagramMermaid}}, adapted mermaid diagram{{/if}}, and perform validation.`,
     });
 
     const response = await prompt(flowInput, {
@@ -184,7 +187,7 @@ Generate the similar question, adapted marking objectives{{#if originalDiagramDe
       questionText: output.questionText,
       summary: output.summary,
       solutionObjectives: output.solutionObjectives,
-      diagramDescription: output.diagramDescription,
+      diagramMermaid: output.diagramMermaid,
     };
   }, input);
 

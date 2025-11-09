@@ -227,7 +227,7 @@ export async function POST(req: NextRequest) {
       questionText: string;
       summary: string;
       solutionObjectives?: string[]; // Optional - may be null if no markscheme
-      diagramDescription?: string; // Optional - diagram description for image generation
+      diagramMermaid?: string; // Optional - mermaid diagram syntax for rendering
       paperDate: string; // e.g., "2022-06"
       questionNumber: string; // e.g., "1-3-5"
     }
@@ -358,7 +358,7 @@ export async function POST(req: NextRequest) {
           questionText: question.questionText,
           summary: question.summary,
           solutionObjectives,
-          diagramDescription: question.diagramDescription,
+          diagramMermaid: question.diagramMermaid,
           paperDate,
           questionNumber: questionNumberStr
         });
@@ -411,11 +411,11 @@ export async function POST(req: NextRequest) {
 
         const topicId = topic.id;
         const solutionObjectivesJson = question.solutionObjectives ? JSON.stringify(question.solutionObjectives) : null;
-        const diagramDescription = question.diagramDescription || null;
+        const diagramMermaid = question.diagramMermaid || null;
 
         await db.run(
-          'INSERT INTO questions (topic_id, question_text, summary, solution_objectives, paper_date, question_number, diagram_description) VALUES (?, ?, ?, ?, ?, ?, ?)',
-          [topicId, question.questionText, question.summary, solutionObjectivesJson, question.paperDate, question.questionNumber, diagramDescription]
+          'INSERT INTO questions (topic_id, question_text, summary, solution_objectives, paper_date, question_number, diagram_mermaid) VALUES (?, ?, ?, ?, ?, ?, ?)',
+          [topicId, question.questionText, question.summary, solutionObjectivesJson, question.paperDate, question.questionNumber, diagramMermaid]
         );
 
         totalQuestionsSaved++;

@@ -8,7 +8,6 @@ import { AuthGuard } from '@/components/AuthGuard';
 import { aiPoweredInterview, generateQuestion } from '@/ai/flows/ai-powered-interview';
 import { executeDevCommand } from '@/ai/flows/dev-commands';
 import { isDevCommand } from '@/lib/dev-commands-helpers';
-import { generateDiagramImage } from '@/ai/flows/generate-diagram-image';
 import type { ChatHistory } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -25,6 +24,62 @@ import PageSpinner from '@/components/PageSpinner';
 import { Whiteboard } from '@/components/whiteboard';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useSession } from 'next-auth/react';
+import mermaid from 'mermaid';
+
+// Initialize mermaid
+if (typeof window !== 'undefined') {
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: 'default',
+    securityLevel: 'loose',
+  });
+}
+
+// Mermaid diagram component
+function MermaidDiagram({ chart }: { chart: string }) {
+  const mermaidRef = useRef<HTMLDivElement>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const renderDiagram = async () => {
+      if (!mermaidRef.current) return;
+
+      try {
+        setError(null);
+        // Generate a unique ID for this diagram
+        const id = `mermaid-${Math.random().toString(36).substr(2, 9)}`;
+
+        // Clear previous content
+        mermaidRef.current.innerHTML = '';
+
+        // Render the diagram
+        const { svg } = await mermaid.render(id, chart);
+        mermaidRef.current.innerHTML = svg;
+      } catch (err: any) {
+        console.error('Mermaid rendering error:', err);
+        setError(err?.message || 'Failed to render diagram');
+      }
+    };
+
+    renderDiagram();
+  }, [chart]);
+
+  if (error) {
+    return (
+      <div className="p-4 bg-destructive/10 border border-destructive/20 rounded-lg">
+        <p className="text-sm font-semibold text-destructive mb-2">⚠️ Diagram rendering failed</p>
+        <p className="text-xs text-muted-foreground">{error}</p>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      ref={mermaidRef}
+      className="flex justify-center items-center p-4 bg-muted/30 rounded-lg border"
+    />
+  );
+}
 
 export default function InterviewPage() {
   return (
@@ -54,10 +109,7 @@ function InterviewPageContent() {
   const [chatHistory, setChatHistory] = useState<ChatHistory>([]);
   const [userInput, setUserInput] = useState('');
   const [isLoading, setIsLoading] = useState(true);
-  const [generatedVariant, setGeneratedVariant] = useState<{questionText: string; solutionObjectives: string[]; diagramDescription?: string} | null>(null);
-  const [diagramImage, setDiagramImage] = useState<string | null>(null);
-  const [diagramLoading, setDiagramLoading] = useState(false);
-  const [diagramError, setDiagramError] = useState<string | null>(null);
+  const [generatedVariant, setGeneratedVariant] = useState<{questionText: string; solutionObjectives: string[]; diagramMermaid?: string} | null>(null);
   const [inputMode, setInputMode] = useState<'text' | 'whiteboard'>('text');
   const [accessLevel, setAccessLevel] = useState<number | null>(null);
   const [completedObjectives, setCompletedObjectives] = useState<number[]>([]);
@@ -131,35 +183,6 @@ function InterviewPageContent() {
         const variantData = await generateQuestionVariant(subject.id, paperType.id, topic.id, examQuestion.id);
         setGeneratedVariant(variantData);
         console.log('Question variant generated successfully with', variantData.solutionObjectives.length, 'objectives');
-
-        // Generate diagram image if the variant has a diagram description
-        if (variantData.diagramDescription) {
-          console.log('[Diagram] Description detected, generating image...');
-          console.log('[Diagram] Description:', variantData.diagramDescription);
-          setDiagramLoading(true);
-          setDiagramError(null);
-          try {
-            const imageResult = await generateDiagramImage({
-              description: variantData.diagramDescription,
-              aspectRatio: '1:1',
-            });
-            setDiagramImage(imageResult.imageDataUri);
-            console.log('[Diagram] Image generated successfully');
-          } catch (imageError: any) {
-            const errorMsg = imageError?.message || 'Unknown error';
-            console.error('[Diagram] Failed to generate image:', errorMsg);
-            setDiagramError(errorMsg);
-            toast({
-              variant: 'destructive',
-              title: 'Diagram Generation Failed',
-              description: `Could not generate diagram: ${errorMsg}`
-            });
-          } finally {
-            setDiagramLoading(false);
-          }
-        } else {
-          console.log('[Diagram] No diagram description found in variant');
-        }
 
         // Start the interview with the generated variant and objectives
         console.log('Calling aiPoweredInterview with generated variant and objectives...');
@@ -401,29 +424,10 @@ function InterviewPageContent() {
                           <div className="text-base leading-relaxed whitespace-pre-wrap break-words font-normal">
                             {formatQuestionText(generatedVariant.questionText)}
                           </div>
-                          {/* Diagram display */}
-                          {diagramLoading && (
-                            <div className="mt-6 p-4 bg-muted rounded-lg flex items-center justify-center">
-                              <LoadingSpinner className="w-5 h-5 mr-2" />
-                              <span className="text-sm text-muted-foreground">Generating diagram...</span>
-                            </div>
-                          )}
-                          {diagramImage && !diagramLoading && (
+                          {/* Mermaid diagram display */}
+                          {generatedVariant.diagramMermaid && (
                             <div className="mt-6">
-                              <img
-                                src={diagramImage}
-                                alt="Question diagram"
-                                className="max-w-full h-auto rounded-lg border shadow-sm"
-                              />
-                            </div>
-                          )}
-                          {diagramError && !diagramLoading && generatedVariant.diagramDescription && (
-                            <div className="mt-6 p-4 bg-destructive/10 border border-destructive/20 rounded-lg">
-                              <p className="text-sm font-semibold text-destructive mb-2">⚠️ Diagram generation failed</p>
-                              <p className="text-xs text-muted-foreground mb-3">Description: {diagramError}</p>
-                              <div className="text-sm text-foreground/80 italic">
-                                {generatedVariant.diagramDescription}
-                              </div>
+                              <MermaidDiagram chart={generatedVariant.diagramMermaid} />
                             </div>
                           )}
                         </div>
