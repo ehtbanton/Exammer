@@ -12,6 +12,7 @@ import { ArrowLeft, AlertCircle } from 'lucide-react';
 import PageSpinner from '@/components/PageSpinner';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { getScoreColorStyle, getUnattemptedBoxStyle } from '@/lib/utils';
+import { UnderstandingIndicator } from '@/components/ui/understanding-indicator';
 
 export default function TopicPage() {
   return (
@@ -105,26 +106,25 @@ function TopicPageContent() {
                 onClick={() => handleNavigate(question.id)}
               >
                 <CardHeader>
-                  <CardTitle className="text-lg text-black flex items-center gap-2">
-                    {question.summary}
-                    {!hasMarkscheme && (
-                      <span className="inline-flex items-center text-xs font-normal px-2 py-1 bg-amber-100 dark:bg-amber-900 text-amber-800 dark:text-amber-200 rounded">
-                        No MS
-                      </span>
-                    )}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex items-center justify-between">
-                    {hasAttempts ? (
-                      <>
-                        <p className="text-sm text-black">{question.attempts} attempt{question.attempts !== 1 ? 's' : ''}</p>
-                        <p className="text-sm font-bold text-black">{question.score.toFixed(1)}%</p>
-                      </>
-                    ) : (
-                      <p className="text-sm text-gray-600">Not attempted</p>
+                  <div className="flex items-start justify-between gap-4">
+                    <CardTitle className="text-lg text-black flex items-center gap-2 flex-1">
+                      {question.summary}
+                      {!hasMarkscheme && (
+                        <span className="inline-flex items-center text-xs font-normal px-2 py-1 bg-amber-100 dark:bg-amber-900 text-amber-800 dark:text-amber-200 rounded">
+                          No MS
+                        </span>
+                      )}
+                    </CardTitle>
+                    {hasAttempts && (
+                      <UnderstandingIndicator percentage={question.score} size="sm" />
                     )}
                   </div>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-black">{question.attempts} attempt{question.attempts !== 1 ? 's' : ''}</p>
+                  {!hasAttempts && (
+                    <p className="text-sm text-gray-600">Not attempted</p>
+                  )}
                 </CardContent>
               </Card>
             );

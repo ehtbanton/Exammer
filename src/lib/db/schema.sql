@@ -112,7 +112,7 @@ CREATE TABLE IF NOT EXISTS user_workspaces (
 CREATE TABLE IF NOT EXISTS past_papers (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   subject_id INTEGER NOT NULL,
-  paper_type_id INTEGER NOT NULL,
+  paper_type_id INTEGER,
   name TEXT NOT NULL,
   content TEXT NOT NULL,
   created_at INTEGER DEFAULT (unixepoch()),
@@ -124,7 +124,7 @@ CREATE TABLE IF NOT EXISTS past_papers (
 CREATE TABLE IF NOT EXISTS markschemes (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   subject_id INTEGER NOT NULL,
-  paper_type_id INTEGER NOT NULL,
+  paper_type_id INTEGER,
   name TEXT NOT NULL,
   content TEXT NOT NULL,
   created_at INTEGER DEFAULT (unixepoch()),

@@ -127,7 +127,7 @@ export function VoiceInterviewLive({ question, solutionObjectives, subsection, o
           responseModalities: ['AUDIO'],
           inputAudioTranscription: {},
           outputAudioTranscription: {},
-          systemInstruction: 'You are an AI tutor helping with: ' + question
+          systemInstruction: 'You are Xam, a friendly AI tutor helping with: ' + question
         },
         callbacks: {
           onopen: () => {

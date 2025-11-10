@@ -1,5 +1,5 @@
 {
-  "currentVersion": 7,
+  "currentVersion": 8,
   "versions": {
     "0": {
       "description": "Initial schema - subjects owned by users",
@@ -286,6 +286,53 @@
             "action": "add_column",
             "table": "questions",
             "sql": "ALTER TABLE questions ADD COLUMN categorization_reasoning TEXT"
+          }
+        ]
+      }
+    },
+    "8": {
+      "description": "Paper type architecture update - add description to subjects, paper_type_id to past_papers and markschemes for compartmentalized uploads",
+      "schema": {
+        "subjects": {
+          "columns": ["id", "name", "description", "syllabus_content", "class_id", "created_at", "updated_at"],
+          "note": "Added description field for subject descriptions"
+        },
+        "past_papers": {
+          "columns": ["id", "subject_id", "paper_type_id", "name", "content", "created_at"],
+          "note": "Added paper_type_id to pre-assign papers to specific paper types"
+        },
+        "markschemes": {
+          "columns": ["id", "subject_id", "paper_type_id", "name", "content", "created_at"],
+          "note": "Added paper_type_id to pre-assign markschemes to specific paper types"
+        }
+      },
+      "migration": {
+        "from": 7,
+        "steps": [
+          {
+            "action": "add_column",
+            "table": "subjects",
+            "sql": "ALTER TABLE subjects ADD COLUMN description TEXT"
+          },
+          {
+            "action": "add_column",
+            "table": "past_papers",
+            "sql": "ALTER TABLE past_papers ADD COLUMN paper_type_id INTEGER"
+          },
+          {
+            "action": "create_index",
+            "table": "past_papers",
+            "sql": "CREATE INDEX IF NOT EXISTS idx_past_papers_paper_type_id ON past_papers(paper_type_id)"
+          },
+          {
+            "action": "add_column",
+            "table": "markschemes",
+            "sql": "ALTER TABLE markschemes ADD COLUMN paper_type_id INTEGER"
+          },
+          {
+            "action": "create_index",
+            "table": "markschemes",
+            "sql": "CREATE INDEX IF NOT EXISTS idx_markschemes_paper_type_id ON markschemes(paper_type_id)"
           }
         ]
       }

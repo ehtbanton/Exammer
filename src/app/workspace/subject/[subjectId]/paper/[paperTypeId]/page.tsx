@@ -14,6 +14,7 @@ import { Topic } from '@/lib/types';
 import { getScoreColorStyle, getDefaultBoxStyle, getUnattemptedBoxStyle } from '@/lib/utils';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
+import { UnderstandingIndicator } from '@/components/ui/understanding-indicator';
 
 export default function PaperTypePage() {
   return (
@@ -139,15 +140,15 @@ function PaperTypePageContent() {
                     style={boxStyle}
                   >
                     <CardHeader>
-                      <CardTitle className="text-lg text-black">{topic.name}</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <p className="text-sm text-black">{totalQuestions > 0 ? `${attemptedQuestions}/${totalQuestions} attempted` : 'No questions yet'}</p>
+                      <div className="flex items-start justify-between gap-4">
+                        <CardTitle className="text-lg text-black flex-1">{topic.name}</CardTitle>
                         {hasScore && (
-                          <p className="text-sm font-bold text-black">{avgScore.toFixed(1)}%</p>
+                          <UnderstandingIndicator percentage={avgScore} size="sm" />
                         )}
                       </div>
+                    </CardHeader>
+                    <CardContent className="space-y-2">
+                      <p className="text-sm text-black">{totalQuestions > 0 ? `${attemptedQuestions}/${totalQuestions} attempted` : 'No questions yet'}</p>
                       {totalQuestions > 0 && (
                         <Progress value={progressPercentage} className="h-2" />
                       )}

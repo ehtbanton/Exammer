@@ -17,6 +17,7 @@ import { Label } from '@/components/ui/label';
 import { SubjectNameDescriptionModal } from '@/components/SubjectNameDescriptionModal';
 import { PaperUploadSections } from '@/components/PaperUploadSections';
 import { MarkschemeUploadSections } from '@/components/MarkschemeUploadSections';
+import { UnderstandingIndicator } from '@/components/ui/understanding-indicator';
 
 export default function SubjectPage() {
   return (
@@ -230,15 +231,15 @@ function SubjectPageContent() {
                   onClick={() => handleNavigate(paperType.id)}
                 >
                   <CardHeader>
-                    <CardTitle className="text-lg text-black">{paperType.name}</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <p className="text-sm text-black">{totalQuestions > 0 ? `${attemptedQuestions}/${totalQuestions} attempted` : `${paperType.topics.length} topics`}</p>
+                    <div className="flex items-start justify-between gap-4">
+                      <CardTitle className="text-lg text-black flex-1">{paperType.name}</CardTitle>
                       {hasScore && (
-                        <p className="text-sm font-bold text-black">{avgScore.toFixed(1)}%</p>
+                        <UnderstandingIndicator percentage={avgScore} size="sm" />
                       )}
                     </div>
+                  </CardHeader>
+                  <CardContent className="space-y-2">
+                    <p className="text-sm text-black">{totalQuestions > 0 ? `${attemptedQuestions}/${totalQuestions} attempted` : `${paperType.topics.length} topics`}</p>
                     {totalQuestions > 0 && (
                       <Progress value={progressPercentage} className="h-2" />
                     )}
