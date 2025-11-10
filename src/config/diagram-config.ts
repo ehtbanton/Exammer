@@ -3,34 +3,42 @@
  *
  * This file controls how diagrams are rendered throughout the application.
  *
- * IMPROVED DIAGRAM SYSTEM:
- * The system now extracts detailed structured data (measurements, angles, elements, connections)
- * during PDF processing. This ensures mathematical accuracy when regenerating diagrams.
+ * TIERED RENDERING SYSTEM:
+ * The system uses a tiered approach to ensure accurate diagram rendering.
+ *
+ * Tier 1: Original PDF Images (100% accurate) - Not yet implemented
+ * Tier 2: SVG Programmatic Rendering (Perfect text, exact measurements)
+ *   - For geometric shapes: triangles, rectangles, circles, etc.
+ *   - Text is rendered by browser - always crisp and legible
+ *   - Measurements are guaranteed accurate
+ *   - SOLVES IMAGEN'S TEXT PROBLEM
+ *
+ * Tier 3: Mermaid (Good for flowcharts/graphs)
+ *   - Best for flowcharts, concept maps, network diagrams
+ *
+ * Tier 4: Imagen AI Generation (Last resort - poor text rendering)
+ *   - WARNING: Imagen is terrible at rendering text
+ *   - It misspells labels and gets numbers wrong
+ *   - Only used when other methods aren't suitable
  *
  * How it works:
- * 1. PDF Extraction: Gemini analyzes diagrams and extracts ALL exact measurements, labels, and values
- * 2. Structured Storage: Data is stored as JSON with precise values (e.g., "side AB = 5 cm", "angle = 60°")
- * 3. Accurate Generation: When regenerating, Imagen receives detailed prompts with all exact values
- *
- * This eliminates the previous issues where:
- * - Mermaid misinterpreted diagram types (e.g., triangle → graph)
- * - Imagen guessed values incorrectly (e.g., "5 cm" became "6 cm")
+ * 1. PDF Extraction: Gemini extracts ALL exact measurements and structure
+ * 2. Storage: Data stored as JSON with precise values
+ * 3. Rendering: System tries SVG first, then falls back to Mermaid or Imagen
  */
 
 export const DIAGRAM_CONFIG = {
   /**
-   * Force Imagen-only mode
+   * Force Imagen mode (NOT RECOMMENDED - Imagen has poor text rendering)
    *
-   * When true: All diagrams will be rendered using Google Imagen 3 AI image generation
-   *            Uses detailed structured data when available for maximum accuracy
-   * When false: Diagrams will use Mermaid by default, with Imagen as fallback
+   * When true: Skips SVG and Mermaid, goes straight to Imagen
+   * When false: Uses tiered system (SVG → Mermaid → Imagen)
    *
-   * Recommendation: Keep true for math/science diagrams with precise measurements
-   *                 Set to false for flowcharts, concept maps, and simple graphs
+   * Recommendation: Set to FALSE to enable SVG rendering for accurate text
    *
-   * Current: true (Imagen-only mode with detailed data support)
+   * Current: false (Tiered system enabled - SVG for geometric diagrams)
    */
-  FORCE_IMAGEN: true,
+  FORCE_IMAGEN: false,
 
   /**
    * Enable fallback to Imagen when Mermaid fails

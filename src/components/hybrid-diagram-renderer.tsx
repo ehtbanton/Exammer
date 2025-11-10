@@ -6,6 +6,7 @@ import type { DiagramType, DiagramStyle, DiagramDetailedData } from '@/lib/types
 import { Button } from '@/components/ui/button';
 import { AlertCircle, RefreshCw } from 'lucide-react';
 import { generateDiagramImage } from '@/ai/flows/generate-diagram-image';
+import { canRenderAsSVG, renderDiagramAsSVG, svgToDataUri } from '@/lib/diagram-renderer-svg';
 
 interface HybridDiagramRendererProps {
   // Mermaid diagram
@@ -51,12 +52,38 @@ export function HybridDiagramRenderer({
   const [error, setError] = useState<string | null>(null);
   const [isGeneratingFallback, setIsGeneratingFallback] = useState(false);
   const [fallbackImageUri, setFallbackImageUri] = useState<string | null>(null);
+  const [svgDiagramUri, setSvgDiagramUri] = useState<string | null>(null);
   const [renderAttempt, setRenderAttempt] = useState(0);
 
+  // TIERED RENDERING SYSTEM:
+  // Tier 1: Original image from PDF (imageUri) - 100% accurate
+  // Tier 2: SVG programmatic rendering (detailedData) - Perfect text, mathematically accurate
+  // Tier 3: Mermaid (for flowcharts/graphs)
+  // Tier 4: Imagen (last resort - poor text rendering)
+
+  // Try SVG rendering first if we have detailed data
+  useEffect(() => {
+    if (detailedData && canRenderAsSVG(detailedData) && !svgDiagramUri) {
+      try {
+        console.log('[HybridDiagram] Attempting SVG rendering (Tier 2)...');
+        const svg = renderDiagramAsSVG(detailedData);
+        if (svg) {
+          const dataUri = svgToDataUri(svg);
+          setSvgDiagramUri(dataUri);
+          setError(null);
+          console.log('[HybridDiagram] ✓ SVG rendering successful');
+        }
+      } catch (err: any) {
+        console.error('[HybridDiagram] SVG rendering failed:', err);
+        // Will fall through to other methods
+      }
+    }
+  }, [detailedData, svgDiagramUri]);
+
   // Determine which diagram to render
-  // If forceImagen is true, always prefer Imagen
-  const shouldRenderMermaid = !forceImagen && (diagramType === 'mermaid' || (!diagramType && mermaidCode));
-  const shouldRenderImagen = forceImagen || diagramType === 'imagen' || imageUri || fallbackImageUri;
+  const shouldRenderSVG = !!svgDiagramUri;
+  const shouldRenderMermaid = !shouldRenderSVG && !forceImagen && (diagramType === 'mermaid' || (!diagramType && mermaidCode));
+  const shouldRenderImagen = !shouldRenderSVG && (forceImagen || diagramType === 'imagen' || imageUri || fallbackImageUri);
 
   // Render Mermaid diagram
   useEffect(() => {
@@ -133,6 +160,7 @@ export function HybridDiagramRenderer({
   const handleRetry = () => {
     setError(null);
     setFallbackImageUri(null);
+    setSvgDiagramUri(null);
     setRenderAttempt(prev => prev + 1);
   };
 
@@ -176,7 +204,21 @@ export function HybridDiagramRenderer({
     );
   }
 
-  // Render Imagen diagram
+  // Render SVG diagram (Tier 2 - Perfect text rendering)
+  if (shouldRenderSVG && svgDiagramUri) {
+    return (
+      <div className={`relative flex justify-center items-center p-4 bg-muted/30 rounded-lg border ${className}`}>
+        <img
+          src={svgDiagramUri}
+          alt="Question diagram"
+          className="max-w-full h-auto rounded"
+          style={{ maxHeight: '500px' }}
+        />
+      </div>
+    );
+  }
+
+  // Render Imagen diagram (Tier 4 - Last resort, poor text)
   if (shouldRenderImagen && (imageUri || fallbackImageUri)) {
     const src = fallbackImageUri || imageUri;
     return (
@@ -191,7 +233,7 @@ export function HybridDiagramRenderer({
     );
   }
 
-  // Render Mermaid diagram
+  // Render Mermaid diagram (Tier 3 - Good for flowcharts)
   if (shouldRenderMermaid && mermaidCode) {
     return (
       <div
