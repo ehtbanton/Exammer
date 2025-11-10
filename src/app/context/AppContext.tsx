@@ -50,6 +50,23 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }
 
       setLoadingStates(prev => ({ ...prev, 'fetch-subjects': true }));
+
+      // Set timeout to auto-clear loading state after 10 seconds
+      const timeoutId = setTimeout(() => {
+        console.warn('fetch-subjects timeout after 10 seconds');
+        setLoadingStates(prev => ({ ...prev, 'fetch-subjects': false }));
+        toast({
+          variant: "destructive",
+          title: "Request Timeout",
+          description: "Loading subjects took too long. Please try refreshing the page."
+        });
+      }, 10000);
+
+      // Set warning after 5 seconds
+      const warningTimeoutId = setTimeout(() => {
+        console.warn('fetch-subjects taking longer than expected (5s)');
+      }, 5000);
+
       try {
         // Fetch user's access level
         const accessLevelResponse = await fetch('/api/auth/access-level');
@@ -99,6 +116,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
         console.error("Failed to fetch subjects:", error);
         toast({ variant: "destructive", title: "Error", description: "Failed to load subjects" });
       } finally {
+        // Clear both timeouts
+        clearTimeout(timeoutId);
+        clearTimeout(warningTimeoutId);
         setLoadingStates(prev => ({ ...prev, 'fetch-subjects': false }));
       }
     };

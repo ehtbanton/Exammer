@@ -22,20 +22,20 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="h-full">
+    <html lang="en" className="h-full overflow-hidden">
       <head>
         <link rel="icon" href="/exammer.png" type="image/png" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link href="https://fonts.googleapis.com/css2?family=PT+Sans:ital,wght@0,400;0,700;1,400;1,700&family=Source+Code+Pro:wght@400;700&display=swap" rel="stylesheet" />
       </head>
-      <body className={cn('font-body antialiased h-full')}>
+      <body className={cn('font-body antialiased h-full overflow-hidden')}>
         <ThemeProvider>
           <SessionProvider>
             <AppProvider>
               <div className="flex flex-col h-full">
                 <Header />
-                <main className="flex-1 overflow-hidden p-4 sm:p-6 md:p-8">
+                <main className="flex-1 overflow-y-auto p-4 sm:p-6 md:p-8">
                   {children}
                 </main>
               </div>

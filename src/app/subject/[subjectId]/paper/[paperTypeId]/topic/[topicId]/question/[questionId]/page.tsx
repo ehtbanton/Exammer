@@ -41,6 +41,7 @@ if (typeof window !== 'undefined') {
 function MermaidDiagram({ chart }: { chart: string }) {
   const mermaidRef = useRef<HTMLDivElement>(null);
   const [error, setError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
 
   useEffect(() => {
     const renderDiagram = async () => {
@@ -58,19 +59,32 @@ function MermaidDiagram({ chart }: { chart: string }) {
         const { svg } = await mermaid.render(id, chart);
         mermaidRef.current.innerHTML = svg;
       } catch (err: any) {
-        console.error('Mermaid rendering error:', err);
+        // Log error for debugging but with less noise
+        if (process.env.NODE_ENV === 'development') {
+          console.warn('Mermaid diagram failed to render:', err?.message || 'Unknown error');
+        }
         setError(err?.message || 'Failed to render diagram');
       }
     };
 
     renderDiagram();
-  }, [chart]);
+  }, [chart, retryCount]);
 
   if (error) {
     return (
       <div className="p-4 bg-destructive/10 border border-destructive/20 rounded-lg">
-        <p className="text-sm font-semibold text-destructive mb-2">⚠️ Diagram rendering failed</p>
-        <p className="text-xs text-muted-foreground">{error}</p>
+        <p className="text-sm font-semibold text-destructive mb-2">⚠️ Diagram unavailable</p>
+        <p className="text-xs text-muted-foreground mb-3">
+          The diagram syntax could not be processed. This won't affect your ability to answer the question.
+        </p>
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() => setRetryCount(prev => prev + 1)}
+          className="text-xs"
+        >
+          Retry rendering
+        </Button>
       </div>
     );
   }
@@ -179,6 +193,20 @@ function InterviewPageContent() {
       isInitializing.current = true;
       hasInitialized.current = questionKey;
       setIsLoading(true);
+
+      // Set a timeout to auto-reset if initialization hangs
+      const initTimeoutId = setTimeout(() => {
+        console.error('Interview initialization timeout after 30 seconds');
+        isInitializing.current = false;
+        hasInitialized.current = false;
+        setIsLoading(false);
+        toast({
+          variant: 'destructive',
+          title: 'Initialization Timeout',
+          description: 'Question loading took too long. Please try again.'
+        });
+      }, 30000);
+
       try {
         // Generate a fresh variant EVERY time
         console.log('Generating question variant with adapted objectives...');
@@ -197,7 +225,13 @@ function InterviewPageContent() {
         console.log('Interview started, chat history:', res.chatHistory);
         setChatHistory(res.chatHistory);
         setCompletedObjectives(res.completedObjectives || []);
+
+        // Clear timeout on success
+        clearTimeout(initTimeoutId);
       } catch (e: any) {
+        // Clear timeout on error
+        clearTimeout(initTimeoutId);
+
         if (e.message?.includes('no solution objectives')) {
           setNoMarkscheme(true);
           toast({ variant: 'destructive', title: 'No Markscheme', description: 'This question has no markscheme objectives.' });
@@ -392,7 +426,7 @@ function InterviewPageContent() {
   };
 
   return (
-    <div className="container mx-auto h-full flex flex-col p-4">
+    <div className="container mx-auto h-full flex flex-col p-4 overflow-hidden">
       {/* Header with Back Button and Topic */}
       <div className="flex items-center justify-between mb-4 pb-3 border-b shrink-0">
         <Button variant="ghost" onClick={handleBackClick}>
