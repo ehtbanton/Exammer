@@ -286,6 +286,13 @@ export interface Question {
   topic_id: number;
   question_text: string;
   summary: string;
+  solution_objectives?: string; // JSON array of marking criteria
+  markscheme_id?: number;
+  paper_date?: string; // e.g., "2022-06"
+  question_number?: string; // e.g., "1-3-5"
+  diagram_mermaid?: string; // Mermaid diagram syntax
+  categorization_confidence?: number; // 0-100
+  categorization_reasoning?: string; // Brief explanation of categorization
   created_at: number;
 }
 

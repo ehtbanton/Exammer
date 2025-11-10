@@ -1,5 +1,5 @@
 {
-  "currentVersion": 6,
+  "currentVersion": 7,
   "versions": {
     "0": {
       "description": "Initial schema - subjects owned by users",
@@ -262,6 +262,30 @@
             "action": "add_column",
             "table": "questions",
             "sql": "ALTER TABLE questions ADD COLUMN diagram_mermaid TEXT"
+          }
+        ]
+      }
+    },
+    "7": {
+      "description": "Add categorization confidence and reasoning for improved paper categorization accuracy",
+      "schema": {
+        "questions": {
+          "columns": ["id", "topic_id", "question_text", "summary", "solution_objectives", "markscheme_id", "paper_date", "question_number", "diagram_mermaid", "categorization_confidence", "categorization_reasoning", "created_at"],
+          "note": "categorization_confidence stores confidence score (0-100) for AI categorization decisions, categorization_reasoning stores brief explanation"
+        }
+      },
+      "migration": {
+        "from": 6,
+        "steps": [
+          {
+            "action": "add_column",
+            "table": "questions",
+            "sql": "ALTER TABLE questions ADD COLUMN categorization_confidence INTEGER DEFAULT 100"
+          },
+          {
+            "action": "add_column",
+            "table": "questions",
+            "sql": "ALTER TABLE questions ADD COLUMN categorization_reasoning TEXT"
           }
         ]
       }

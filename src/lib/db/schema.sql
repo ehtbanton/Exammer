@@ -157,6 +157,8 @@ CREATE TABLE IF NOT EXISTS questions (
   paper_date TEXT,
   question_number TEXT,
   diagram_mermaid TEXT,
+  categorization_confidence INTEGER DEFAULT 100,
+  categorization_reasoning TEXT,
   created_at INTEGER DEFAULT (unixepoch()),
   FOREIGN KEY (topic_id) REFERENCES topics(id) ON DELETE CASCADE,
   FOREIGN KEY (markscheme_id) REFERENCES markschemes(id) ON DELETE SET NULL
