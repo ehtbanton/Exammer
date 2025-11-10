@@ -14,6 +14,9 @@ export interface Markscheme {
   content: string;
 }
 
+export type DiagramType = 'mermaid' | 'imagen';
+export type DiagramStyle = 'technical' | 'hand-drawn' | 'minimalist' | 'detailed';
+
 export interface ExamQuestion {
   id: string;
   questionText: string; // The ORIGINAL exam question from past papers (kept for reference, not displayed)
@@ -26,6 +29,10 @@ export interface ExamQuestion {
   paperDate?: string | null; // Exam date (e.g., '2022-06')
   questionNumber?: string | null; // Question identifier (e.g., '1-3-5')
   diagramMermaid?: string; // Optional mermaid diagram syntax for rendering diagrams
+  diagramType?: DiagramType | null; // Type of diagram rendering: 'mermaid' or 'imagen'
+  diagramImageUri?: string | null; // Base64 data URI for Imagen-generated images
+  diagramAspectRatio?: string; // Aspect ratio for image generation (e.g., '1:1', '16:9', '3:4')
+  diagramStyle?: DiagramStyle; // Style preference for image generation
 }
 
 export interface Topic {

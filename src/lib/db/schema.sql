@@ -157,6 +157,10 @@ CREATE TABLE IF NOT EXISTS questions (
   paper_date TEXT,
   question_number TEXT,
   diagram_mermaid TEXT,
+  diagram_type TEXT CHECK(diagram_type IN ('mermaid', 'imagen')) DEFAULT NULL,
+  diagram_image_uri TEXT,
+  diagram_aspect_ratio TEXT DEFAULT '1:1',
+  diagram_style TEXT DEFAULT 'technical',
   created_at INTEGER DEFAULT (unixepoch()),
   FOREIGN KEY (topic_id) REFERENCES topics(id) ON DELETE CASCADE,
   FOREIGN KEY (markscheme_id) REFERENCES markschemes(id) ON DELETE SET NULL

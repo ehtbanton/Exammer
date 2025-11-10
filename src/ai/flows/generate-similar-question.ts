@@ -10,6 +10,10 @@
 
 import {z} from 'genkit';
 import {executeWithManagedKey} from '@/ai/genkit';
+import {
+  validateMermaidSyntax,
+  normalizeMermaidCode,
+} from '@/lib/diagram-utils';
 
 const GenerateSimilarQuestionInputSchema = z.object({
   originalQuestionText: z.string().describe('The original exam question to base the variant on.'),
@@ -335,11 +339,27 @@ Generate the similar question, adapted marking objectives{{#if originalDiagramMe
       console.log('[Process C] LaTeX formatting is correct');
     }
 
+    // Validate and normalize Mermaid diagram if present
+    let validatedDiagram: string | undefined = undefined;
+    if (output.diagramMermaid) {
+      console.log('[Process C] Validating Mermaid diagram syntax...');
+      const normalized = normalizeMermaidCode(output.diagramMermaid);
+      const validation = validateMermaidSyntax(normalized);
+
+      if (!validation.isValid) {
+        console.warn(`[Process C] Generated Mermaid diagram has invalid syntax: ${validation.error}`);
+        console.warn('[Process C] Diagram will be omitted from variant question');
+      } else {
+        console.log('[Process C] Mermaid diagram syntax is valid');
+        validatedDiagram = normalized;
+      }
+    }
+
     return {
       questionText: latexValidation.correctedText,
       summary: output.summary,
       solutionObjectives: output.solutionObjectives,
-      diagramMermaid: output.diagramMermaid,
+      diagramMermaid: validatedDiagram,
     };
   }, input);
 

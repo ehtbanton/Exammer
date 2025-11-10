@@ -222,7 +222,43 @@ export class DatabaseMigrator {
   }
 
   /**
-   * Apply a migration step
+   * Check if a table exists
+   */
+  private async tableExists(tableName: string): Promise<boolean> {
+    const result = await this.all<{ name: string }>(
+      "SELECT name FROM sqlite_master WHERE type='table' AND name=?",
+      [tableName]
+    );
+    return result.length > 0;
+  }
+
+  /**
+   * Check if a column exists in a table
+   */
+  private async columnExists(tableName: string, columnName: string): Promise<boolean> {
+    try {
+      const columns = await this.all<{ name: string }>(
+        `PRAGMA table_info(${tableName})`
+      );
+      return columns.some(col => col.name === columnName);
+    } catch (error) {
+      return false;
+    }
+  }
+
+  /**
+   * Check if an index exists
+   */
+  private async indexExists(indexName: string): Promise<boolean> {
+    const result = await this.all<{ name: string }>(
+      "SELECT name FROM sqlite_master WHERE type='index' AND name=?",
+      [indexName]
+    );
+    return result.length > 0;
+  }
+
+  /**
+   * Apply a migration step with idempotent checks
    */
   private async applyMigrationStep(step: any, stepIndex: number): Promise<void> {
     console.log(`  [Step ${stepIndex + 1}] ${step.action}: ${step.description || step.table || ''}`);
@@ -230,10 +266,60 @@ export class DatabaseMigrator {
     try {
       switch (step.action) {
         case 'create_table':
+          if (step.sql) {
+            // Check if table already exists
+            const match = step.sql.match(/CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?(\w+)/i);
+            if (match) {
+              const tableName = match[1];
+              const exists = await this.tableExists(tableName);
+              if (exists && !step.sql.includes('IF NOT EXISTS')) {
+                console.log(`    ℹ Table '${tableName}' already exists, skipping`);
+                return;
+              }
+            }
+            await this.run(step.sql);
+            console.log(`    ✓ Executed SQL`);
+          }
+          break;
+
         case 'create_index':
+          if (step.sql) {
+            // Check if index already exists
+            const match = step.sql.match(/CREATE\s+INDEX\s+(?:IF\s+NOT\s+EXISTS\s+)?(\w+)/i);
+            if (match) {
+              const indexName = match[1];
+              const exists = await this.indexExists(indexName);
+              if (exists && !step.sql.includes('IF NOT EXISTS')) {
+                console.log(`    ℹ Index '${indexName}' already exists, skipping`);
+                return;
+              }
+            }
+            await this.run(step.sql);
+            console.log(`    ✓ Executed SQL`);
+          }
+          break;
+
+        case 'add_column':
+          if (step.sql && step.table) {
+            // Check if column already exists
+            const match = step.sql.match(/ADD\s+COLUMN\s+(\w+)/i);
+            if (match) {
+              const columnName = match[1];
+              const exists = await this.columnExists(step.table, columnName);
+              if (exists) {
+                console.log(`    ℹ Column '${columnName}' already exists in '${step.table}', skipping`);
+                return;
+              }
+            }
+          }
+          if (step.sql) {
+            await this.run(step.sql);
+            console.log(`    ✓ Executed SQL`);
+          }
+          break;
+
         case 'migrate_data':
         case 'recreate_indexes':
-        case 'add_column':
           if (step.sql) {
             await this.run(step.sql);
             console.log(`    ✓ Executed SQL`);
@@ -254,7 +340,12 @@ export class DatabaseMigrator {
         default:
           console.warn(`    ⚠ Unknown action: ${step.action}`);
       }
-    } catch (error) {
+    } catch (error: any) {
+      // More descriptive error messages
+      if (error.code === 'SQLITE_ERROR' && error.message && error.message.includes('duplicate column')) {
+        console.log(`    ℹ Column already exists (SQLITE_ERROR), treating as success`);
+        return; // Don't fail on duplicate column
+      }
       console.error(`    ✗ Failed to execute step:`, error);
       throw error;
     }
@@ -496,7 +587,9 @@ export async function runMigrations(): Promise<void> {
 }
 
 // Allow running this file directly
-if (require.main === module) {
+// Check if this file is being run directly (works in both CommonJS and ES modules)
+const isMainModule = process.argv[1]?.includes('migrate.ts') || process.argv[1]?.includes('migrate.js');
+if (isMainModule) {
   runMigrations()
     .then(() => {
       console.log('Migration completed successfully');

@@ -9,14 +9,21 @@
 
 import { GoogleGenAI } from "@google/genai";
 import { geminiApiKeyManager } from '@root/gemini-api-key-manager';
+import { getOptimalAspectRatio, suggestDiagramStyle } from '@/lib/diagram-utils';
+import type { DiagramStyle } from '@/lib/types';
 
 export interface GenerateDiagramImageInput {
   description: string;
   aspectRatio?: '1:1' | '3:4' | '4:3' | '9:16' | '16:9';
+  style?: DiagramStyle;
+  diagramType?: string; // e.g., 'flowchart', 'circuit', 'geometric'
+  subject?: string; // Subject context for better style suggestions
 }
 
 export interface GenerateDiagramImageOutput {
   imageDataUri: string; // Base64 data URI
+  aspectRatio: string; // The aspect ratio that was used
+  style: DiagramStyle; // The style that was applied
 }
 
 /**
@@ -30,6 +37,19 @@ export async function generateDiagramImage(
   console.log('[Imagen] Starting diagram generation...');
   console.log(`[Imagen] Description: ${input.description.substring(0, 100)}...`);
 
+  // Determine optimal aspect ratio if not provided
+  const aspectRatio = input.aspectRatio ||
+    getOptimalAspectRatio(input.description, input.diagramType) as '1:1' | '3:4' | '4:3' | '9:16' | '16:9';
+
+  // Determine optimal style if not provided
+  const style = input.style || suggestDiagramStyle(input.description, input.subject);
+
+  console.log(`[Imagen] Using aspect ratio: ${aspectRatio}, style: ${style}`);
+
+  // Enhance the prompt with style instructions
+  const styleInstructions = getStyleInstructions(style);
+  const enhancedPrompt = `${input.description}\n\nStyle: ${styleInstructions}`;
+
   // Use the global API key manager
   const result = await geminiApiKeyManager.withKey(async (apiKey) => {
     const ai = new GoogleGenAI({ apiKey });
@@ -37,10 +57,10 @@ export async function generateDiagramImage(
     try {
       const response = await ai.models.generateImages({
         model: 'imagen-3.0-generate-002',
-        prompt: input.description,
+        prompt: enhancedPrompt,
         config: {
           numberOfImages: 1,
-          aspectRatio: input.aspectRatio || '1:1',
+          aspectRatio: aspectRatio,
           personGeneration: 'dont_allow', // Educational diagrams shouldn't need people
         },
       });
@@ -61,7 +81,11 @@ export async function generateDiagramImage(
       const duration = ((endTime - startTime) / 1000).toFixed(2);
       console.log(`[Imagen] Diagram generated successfully in ${duration}s`);
 
-      return { imageDataUri };
+      return {
+        imageDataUri,
+        aspectRatio,
+        style,
+      };
     } catch (error: any) {
       console.error('[Imagen] Error generating diagram:', error);
       throw new Error(`Failed to generate diagram: ${error.message}`);
@@ -69,4 +93,26 @@ export async function generateDiagramImage(
   });
 
   return result;
+}
+
+/**
+ * Get style instructions to append to the image generation prompt
+ */
+function getStyleInstructions(style: DiagramStyle): string {
+  switch (style) {
+    case 'technical':
+      return 'Clean, precise technical diagram with clear labels, sharp lines, and professional appearance. Use a white background with black lines and minimal colors for clarity.';
+
+    case 'hand-drawn':
+      return 'Hand-drawn sketch style with slightly irregular lines, giving an informal, educational whiteboard appearance. Use simple, clear strokes.';
+
+    case 'minimalist':
+      return 'Minimalist design with only essential elements, clean lines, plenty of white space, and simple geometric shapes. Focus on clarity over detail.';
+
+    case 'detailed':
+      return 'Highly detailed scientific illustration with accurate representations, proper shading, texture, and comprehensive labeling. Include all relevant anatomical or structural details.';
+
+    default:
+      return 'Clear educational diagram with appropriate detail level.';
+  }
 }

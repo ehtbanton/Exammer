@@ -26,14 +26,67 @@ import { VoiceInterviewLive } from '@/components/voice-interview-live';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useSession } from 'next-auth/react';
 import { LatexRenderer } from '@/components/latex-renderer';
+import { HybridDiagramRenderer } from '@/components/hybrid-diagram-renderer';
 import mermaid from 'mermaid';
 
-// Initialize mermaid
+// Initialize mermaid with enhanced configuration
 if (typeof window !== 'undefined') {
   mermaid.initialize({
     startOnLoad: true,
-    theme: 'default',
+    theme: 'base',
     securityLevel: 'loose',
+    themeVariables: {
+      // Custom theme for educational diagrams
+      primaryColor: '#3b82f6',
+      primaryTextColor: '#1e293b',
+      primaryBorderColor: '#2563eb',
+      lineColor: '#475569',
+      secondaryColor: '#8b5cf6',
+      tertiaryColor: '#10b981',
+      background: '#ffffff',
+      mainBkg: '#f8fafc',
+      secondBkg: '#f1f5f9',
+      tertiaryBkg: '#e2e8f0',
+      fontFamily: 'ui-sans-serif, system-ui, sans-serif',
+      fontSize: '14px',
+    },
+    flowchart: {
+      useMaxWidth: true,
+      htmlLabels: true,
+      curve: 'basis',
+      padding: 15,
+    },
+    sequence: {
+      useMaxWidth: true,
+      diagramMarginX: 50,
+      diagramMarginY: 10,
+      boxMargin: 10,
+      boxTextMargin: 5,
+      noteMargin: 10,
+      messageMargin: 35,
+    },
+    gantt: {
+      useMaxWidth: true,
+      titleTopMargin: 25,
+      barHeight: 20,
+      barGap: 4,
+      topPadding: 50,
+      leftPadding: 75,
+      gridLineStartPadding: 35,
+      fontSize: 11,
+    },
+    pie: {
+      useMaxWidth: true,
+    },
+    quadrantChart: {
+      useMaxWidth: true,
+    },
+    requirementDiagram: {
+      useMaxWidth: true,
+    },
+    gitGraph: {
+      useMaxWidth: true,
+    },
   });
 }
 
@@ -464,10 +517,15 @@ function InterviewPageContent() {
                           <LatexRenderer className="text-base leading-relaxed whitespace-pre-wrap break-words font-normal">
                             {formatQuestionText(generatedVariant.questionText)}
                           </LatexRenderer>
-                          {/* Mermaid diagram display */}
+                          {/* Diagram display - supports both Mermaid and Imagen */}
                           {generatedVariant.diagramMermaid && (
                             <div className="mt-6">
-                              <MermaidDiagram chart={generatedVariant.diagramMermaid} />
+                              <HybridDiagramRenderer
+                                mermaidCode={generatedVariant.diagramMermaid}
+                                enableFallback={true}
+                                diagramDescription={generatedVariant.questionText}
+                                subject={subject?.name}
+                              />
                             </div>
                           )}
                         </div>

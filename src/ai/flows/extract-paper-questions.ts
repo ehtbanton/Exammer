@@ -17,6 +17,13 @@ import {
   getPaperIdentifierPromptRules,
   getPaperQuestionIdPromptRules
 } from './paper-identifier-validation';
+import {
+  validateMermaidSyntax,
+  detectDiagramType,
+  getOptimalAspectRatio,
+  suggestDiagramStyle,
+  normalizeMermaidCode,
+} from '@/lib/diagram-utils';
 
 const PaperTypeInfoSchema = z.object({
   name: z.string().describe('The name of the paper type.'),
@@ -49,6 +56,7 @@ const PaperQuestionSchema = z.object({
   summary: z.string().describe('A brief one-sentence summary of what this question is about.'),
   topicName: z.string().describe('The name of the topic this question belongs to, chosen from the provided topics list.'),
   diagramMermaid: z.string().optional().describe('If this question includes a diagram, graph, figure, or visual element, provide mermaid diagram syntax to represent it. Use appropriate mermaid diagram types (graph, flowchart, sequenceDiagram, etc.). Include all measurements, labels, and relationships from the original. Omit if question is text-only.'),
+  diagramDescription: z.string().optional().describe('If diagram is present, provide a text description of the diagram to help determine optimal rendering method and settings.'),
 });
 
 const ExtractPaperQuestionsOutputSchema = z.object({
@@ -288,6 +296,28 @@ CRITICAL:
                 // Validate topicName is provided
                 if (!q.topicName || typeof q.topicName !== 'string' || q.topicName.trim() === '') {
                   console.warn(`[Paper Extraction] Question ${q.questionNumber} missing topic name`);
+                }
+
+                // Validate and process diagram if present
+                if (q.diagramMermaid) {
+                  const normalized = normalizeMermaidCode(q.diagramMermaid);
+                  const validation = validateMermaidSyntax(normalized);
+
+                  if (!validation.isValid) {
+                    console.warn(`[Paper Extraction] Question ${q.questionNumber} has invalid Mermaid syntax: ${validation.error}`);
+                    console.warn(`[Paper Extraction] Removing invalid diagram from question ${q.questionNumber}`);
+                    return {
+                      ...q,
+                      diagramMermaid: undefined,
+                      diagramDescription: undefined,
+                    };
+                  }
+
+                  // Diagram is valid, normalize it
+                  return {
+                    ...q,
+                    diagramMermaid: normalized,
+                  };
                 }
 
                 return q;
