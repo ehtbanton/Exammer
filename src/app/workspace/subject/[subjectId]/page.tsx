@@ -62,7 +62,7 @@ function SubjectPageContent() {
     if (searchParams.get('openPapers') === 'true') {
       setPaperDialogOpen(true);
       // Clean up the URL parameter
-      router.replace(`/subject/${subjectId}`);
+      router.replace(`/workspace/subject/${subjectId}`);
     }
   }, [searchParams, subjectId, router]);
 
@@ -113,7 +113,7 @@ function SubjectPageContent() {
   const handleNavigate = (paperTypeId: string) => {
     setLoading(`navigate-paper-${paperTypeId}`, true);
     setNavigatingTo(paperTypeId);
-    router.push(`/subject/${subjectId}/paper/${paperTypeId}`);
+    router.push(`/workspace/subject/${subjectId}/paper/${paperTypeId}`);
   };
   
   if (navigatingTo && isLoading(`navigate-paper-${navigatingTo}`)) {

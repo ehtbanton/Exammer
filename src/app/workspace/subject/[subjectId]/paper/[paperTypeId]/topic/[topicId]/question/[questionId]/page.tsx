@@ -346,7 +346,7 @@ function InterviewPageContent() {
       <div className="text-center">
         <h1 className="text-2xl font-bold">Question not found</h1>
         <Button asChild variant="link" className="mt-4">
-          <Link href={`/subject/${subjectId}/paper/${encodeURIComponent(paperTypeId)}/topic/${encodeURIComponent(topicId)}`}>Go back to topic</Link>
+          <Link href={`/workspace/subject/${subjectId}/paper/${encodeURIComponent(paperTypeId)}/topic/${encodeURIComponent(topicId)}`}>Go back to topic</Link>
         </Button>
       </div>
     );
@@ -369,7 +369,7 @@ function InterviewPageContent() {
     if (chatHistory.length > 1) { // Has started answering
       setShowExitDialog(true);
     } else {
-      router.push(`/subject/${subjectId}/paper/${encodeURIComponent(paperTypeId)}/topic/${encodeURIComponent(topicId)}`);
+      router.push(`/workspace/subject/${subjectId}/paper/${encodeURIComponent(paperTypeId)}/topic/${encodeURIComponent(topicId)}`);
     }
   };
 

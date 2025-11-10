@@ -100,14 +100,14 @@ export default function Header() {
                 {accessLevel !== null && accessLevel >= 1 && (
                   isClassesPage ? (
                     <Button variant="outline" size="sm" asChild>
-                      <Link href="/">
+                      <Link href="/workspace">
                         <Home className="h-4 w-4 mr-2" />
                         Workspace
                       </Link>
                     </Button>
                   ) : (
                     <Button variant="outline" size="sm" asChild>
-                      <Link href={accessLevel === 1 ? "/classes/join" : "/classes"}>
+                      <Link href={accessLevel === 1 ? "/workspace/classes/join" : "/workspace/classes"}>
                         <Users className="h-4 w-4 mr-2" />
                         Classes
                       </Link>

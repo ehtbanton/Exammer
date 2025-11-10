@@ -48,7 +48,7 @@ function TopicPageContent() {
     const loadingKey = `navigate-question-${questionId}`;
     setLoading(loadingKey, true);
     setNavigatingTo(questionId);
-    router.push(`/subject/${subjectId}/paper/${encodeURIComponent(paperTypeId)}/topic/${encodeURIComponent(topicId)}/question/${encodeURIComponent(questionId)}`);
+    router.push(`/workspace/subject/${subjectId}/paper/${encodeURIComponent(paperTypeId)}/topic/${encodeURIComponent(topicId)}/question/${encodeURIComponent(questionId)}`);
   };
 
   if (navigatingTo && isLoading(`navigate-question-${navigatingTo}`)) {
@@ -65,7 +65,7 @@ function TopicPageContent() {
       <div className="text-center">
         <h1 className="text-2xl font-bold">Topic not found</h1>
         <Button asChild variant="link" className="mt-4">
-          <Link href={`/subject/${subjectId}/paper/${encodeURIComponent(paperTypeId)}`}>Go back to paper</Link>
+          <Link href={`/workspace/subject/${subjectId}/paper/${encodeURIComponent(paperTypeId)}`}>Go back to paper</Link>
         </Button>
       </div>
     );
@@ -73,7 +73,7 @@ function TopicPageContent() {
 
   return (
     <div className="container mx-auto">
-      <Button variant="ghost" onClick={() => router.push(`/subject/${subjectId}/paper/${encodeURIComponent(paperTypeId)}`)} className="mb-4">
+      <Button variant="ghost" onClick={() => router.push(`/workspace/subject/${subjectId}/paper/${encodeURIComponent(paperTypeId)}`)} className="mb-4">
         <ArrowLeft />
         Back to Topics
       </Button>

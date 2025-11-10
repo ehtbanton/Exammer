@@ -99,7 +99,7 @@ export default function ClassAnalyticsPage({ params }: { params: Promise<{ class
       <div className="container mx-auto px-4 py-8">
         <div className="text-center">
           <h1 className="text-2xl font-bold">Analytics not available</h1>
-          <Button className="mt-4" onClick={() => router.push(`/classes/${classId}`)}>
+          <Button className="mt-4" onClick={() => router.push(`/workspace/classes/${classId}`)}>
             Back to Class
           </Button>
         </div>
@@ -124,7 +124,7 @@ export default function ClassAnalyticsPage({ params }: { params: Promise<{ class
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="mb-6">
-        <Button variant="ghost" onClick={() => router.push(`/classes/${classId}`)} className="mb-4">
+        <Button variant="ghost" onClick={() => router.push(`/workspace/classes/${classId}`)} className="mb-4">
           <ArrowLeft className="h-4 w-4 mr-2" />
           Back to Class
         </Button>

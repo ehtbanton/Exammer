@@ -314,7 +314,7 @@ export default function ClassDashboardPage({ params }: { params: Promise<{ class
           </div>
 
           <div className="flex gap-2">
-            <Button onClick={() => router.push(`/classes/${classId}/analytics`)}>
+            <Button onClick={() => router.push(`/workspace/classes/${classId}/analytics`)}>
               <BarChart3 className="h-4 w-4 mr-2" />
               View Analytics
             </Button>
