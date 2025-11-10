@@ -173,7 +173,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
   try {
     const user = await requireAuth();
     const { id: subjectId } = await params;
-    const { name, syllabusContent } = await req.json();
+    const { name, description, syllabusContent } = await req.json();
 
     // Verify user is the creator
     const workspace = await db.get<{ is_creator: number }>(
@@ -192,8 +192,13 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     }
 
     await db.run(
-      'UPDATE subjects SET name = ?, syllabus_content = ?, updated_at = unixepoch() WHERE id = ?',
-      [name || subject.name, syllabusContent !== undefined ? syllabusContent : subject.syllabus_content, subjectId]
+      'UPDATE subjects SET name = ?, description = ?, syllabus_content = ?, updated_at = unixepoch() WHERE id = ?',
+      [
+        name || subject.name,
+        description !== undefined ? description : subject.description,
+        syllabusContent !== undefined ? syllabusContent : subject.syllabus_content,
+        subjectId
+      ]
     );
 
     const updatedSubject = await db.get<Subject>('SELECT * FROM subjects WHERE id = ?', [subjectId]);

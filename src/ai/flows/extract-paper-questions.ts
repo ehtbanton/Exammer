@@ -1,27 +1,17 @@
 'use server';
 
 /**
- * @fileOverview Extracts questions from a single exam paper with index-based categorization.
+ * @fileOverview Extracts questions from a single exam paper with index-based topic categorization.
  *
- * This flow uses content analysis to determine the paper type and categorize questions
- * by topic. Instead of string matching, the AI analyzes question content against topic
- * descriptions and returns indices, eliminating fuzzy matching failures.
+ * This flow extracts the date from the filename and categorizes questions by topic using
+ * content analysis. The AI analyzes question content against topic descriptions and returns
+ * indices, eliminating fuzzy matching failures.
  */
 
 import {genkit} from 'genkit';
 import {googleAI} from '@genkit-ai/google-genai';
 import {z} from 'genkit';
 import {geminiApiKeyManager} from '@root/gemini-api-key-manager';
-
-const PaperTypeInfoSchema = z.object({
-  index: z.number().describe('The 0-based index of this paper type in the provided array.'),
-  name: z.string().describe('The name of the paper type.'),
-  topics: z.array(z.object({
-    index: z.number().describe('The 0-based index of this topic in the global topics array.'),
-    name: z.string().describe('The name of the topic.'),
-    description: z.string().describe('The description of what this topic covers.'),
-  })).describe('Topics covered in this paper type.'),
-});
 
 const TopicInfoSchema = z.object({
   index: z.number().describe('The 0-based index of this topic in the provided array.'),
@@ -35,12 +25,12 @@ const ExtractPaperQuestionsInputSchema = z.object({
     .describe(
       "A single exam paper in PDF format, as a data URI. Expected format: 'data:<mimetype>;base64,<encoded_data>'"
     ),
-  paperTypes: z
-    .array(PaperTypeInfoSchema)
-    .describe('The list of paper types from the syllabus (ordered array with indices).'),
+  filename: z
+    .string()
+    .describe('The filename of the exam paper, used for extracting the paper date.'),
   topics: z
     .array(TopicInfoSchema)
-    .describe('The list of all topics from the syllabus (ordered array with indices).'),
+    .describe('The list of all topics from the current paper type (ordered array with indices).'),
 });
 export type ExtractPaperQuestionsInput = z.infer<typeof ExtractPaperQuestionsInputSchema>;
 
@@ -55,11 +45,9 @@ const PaperQuestionSchema = z.object({
 });
 
 const ExtractPaperQuestionsOutputSchema = z.object({
-  paperTypeIndex: z.number().describe('The 0-based index of the paper type (from the paperTypes array) determined by analyzing which topics best match ALL questions in the paper.'),
-  paperTypeConfidence: z.number().min(0).max(100).describe('Your confidence score (0-100) that you correctly identified the paper type. Use 100 for obvious matches, 70-90 for good matches, 50-70 for uncertain matches, below 50 for very uncertain matches.'),
-  paperTypeReasoning: z.string().describe('A brief 1-2 sentence explanation of why you chose this paper type based on analyzing all questions in the paper.'),
-  year: z.number().describe('The year from the exam paper (4 digits, e.g., 2022).'),
-  month: z.number().describe('The month from the exam paper (1-12, e.g., 6 for June).'),
+  year: z.number().nullable().describe('The year from the filename (4 digits, e.g., 2024). Extract from filename using patterns like "2024", "2024-06", "2024-06-15". Required - if not found, use null.'),
+  month: z.number().nullable().describe('The month from the filename (1-12, e.g., 6). Extract from filename using patterns like "2024-06", "06-2024", "June-2024", etc. Optional - use null if not found.'),
+  day: z.number().nullable().describe('The day from the filename (1-31, e.g., 15). Extract from filename using patterns like "2024-06-15". Optional - use null if not found.'),
   questions: z.array(PaperQuestionSchema).describe('All questions extracted from this exam paper.'),
 });
 export type ExtractPaperQuestionsOutput = z.infer<typeof ExtractPaperQuestionsOutputSchema>;
@@ -67,7 +55,7 @@ export type ExtractPaperQuestionsOutput = z.infer<typeof ExtractPaperQuestionsOu
 export async function extractPaperQuestions(
   input: ExtractPaperQuestionsInput
 ): Promise<ExtractPaperQuestionsOutput> {
-  const { examPaperDataUri, paperTypes, topics } = input;
+  const { examPaperDataUri, filename, topics } = input;
 
   console.log(`[Paper Extraction] Processing exam paper...`);
 
@@ -84,19 +72,11 @@ export async function extractPaperQuestions(
         name: 'extractPaperQuestionsPrompt',
         input: {schema: ExtractPaperQuestionsInputSchema},
         output: {schema: ExtractPaperQuestionsOutputSchema},
-        prompt: `TASK: Extract questions from exam paper using CONTENT-BASED ANALYSIS (not header matching).
+        prompt: `TASK: Extract questions from exam paper and categorize them into topics.
 
-PAPER TYPES (WITH INDICES AND TOPICS):
-{{#each paperTypes}}
-[Paper Type {{index}}] {{name}}
-  Topics:
-  {{#each topics}}
-  - [Topic {{index}}] {{name}}: {{description}}
-  {{/each}}
+FILENAME: {{filename}}
 
-{{/each}}
-
-ALL TOPICS (FOR REFERENCE):
+TOPICS:
 {{#each topics}}
 [{{index}}] {{name}}: {{description}}
 {{/each}}
@@ -106,23 +86,31 @@ DOCUMENT:
 
 CRITICAL INSTRUCTIONS - READ CAREFULLY:
 
-1. PAPER TYPE DETERMINATION (CONTENT-BASED, NOT HEADER-BASED)
+1. DATE EXTRACTION FROM FILENAME
 
-   DO NOT rely on paper header text like "Paper 1", "Paper 2", etc.
-   Instead, follow this procedure:
+   Extract the date from the filename "{{filename}}":
 
-   a) First, extract ALL questions from the document
-   b) For EACH question, identify which topics it relates to (based on content)
-   c) Count which paper type has the MOST topic matches
-   d) Return the INDEX (0-based) of that paper type
-   e) Provide a confidence score (0-100):
-      - 100: All questions clearly match one paper type
-      - 70-90: Most questions match, some ambiguous
-      - 50-70: Moderate uncertainty, questions could fit multiple paper types
-      - <50: Very uncertain, questions don't clearly match any paper type
-   f) Explain your reasoning in 1-2 sentences
+   a) Look for year patterns (required):
+      - 4-digit year: "2024", "2023", etc.
+      - Must be present in filename
+      - If not found, set year to null
 
-   Example: If most questions relate to topics under Paper Type 0, return paperTypeIndex: 0
+   b) Look for month patterns (optional):
+      - Numeric: "06", "6", "12", etc. (1-12)
+      - ISO format: "2024-06", "2024-06-15"
+      - Month names: "June", "Jun", "June-2024", "2024-June"
+      - If not found, set month to null
+
+   c) Look for day patterns (optional):
+      - Numeric: "15", "01", etc. (1-31)
+      - ISO format: "2024-06-15"
+      - If not found, set day to null
+
+   Example extractions:
+   - "2024-06-15-physics.pdf" → year: 2024, month: 6, day: 15
+   - "physics-2024-06.pdf" → year: 2024, month: 6, day: null
+   - "June-2024-exam.pdf" → year: 2024, month: 6, day: null
+   - "2024-physics.pdf" → year: 2024, month: null, day: null
 
 2. TOPIC CATEGORIZATION (CONTENT-BASED MATCHING)
 
@@ -185,19 +173,11 @@ CRITICAL INSTRUCTIONS - READ CAREFULLY:
      * Example for a triangle: "graph TD\\n    A[\\"Point A\\"] ---|[\\"3 cm\\"]| B[\\"Point B\\"]\\n    B ---|[\\"4 cm\\"]| C[\\"Point C\\"]\\n    C ---|[\\"5 cm\\"]| A"
      * If question is text-only with no visual elements, OMIT this field entirely
 
-5. YEAR AND MONTH EXTRACTION
-
-   - Locate the exam date in the document (usually at the top)
-   - Extract year as 4-digit number (e.g., 2022)
-   - Extract month as number 1-12 (e.g., 6 for June)
-
 OUTPUT STRUCTURE:
 {
-  "paperTypeIndex": <0-based index>,
-  "paperTypeConfidence": <0-100>,
-  "paperTypeReasoning": "<1-2 sentence explanation>",
-  "year": <4-digit year>,
-  "month": <1-12>,
+  "year": <4-digit year or null>,
+  "month": <1-12 or null>,
+  "day": <1-31 or null>,
   "questions": [
     {
       "questionNumber": <integer>,
@@ -214,7 +194,9 @@ OUTPUT STRUCTURE:
 VALIDATION REQUIREMENTS:
 
 Before generating output, verify the following:
-- Paper type index is within valid range (0 to {{paperTypes.length}} - 1)
+- Year must be extracted from filename (null if not found)
+- Month must be 1-12 or null
+- Day must be 1-31 or null
 - All topic indices are within valid range (0 to {{topics.length}} - 1)
 - Question numbers are sequential without gaps (1, 2, 3, 4...)
 - Total question count is within expected range (typically 5-15 questions)
@@ -223,7 +205,7 @@ Before generating output, verify the following:
 - All confidence scores are between 0 and 100
 - Categorization reasoning explains the content match, not just restates the topic name
 
-REMEMBER: Use CONTENT ANALYSIS, not string matching or header text matching!`,
+REMEMBER: Use CONTENT ANALYSIS for topic categorization, and extract dates from the FILENAME!`,
       });
 
       const flow = aiInstance.defineFlow(
@@ -245,38 +227,10 @@ REMEMBER: Use CONTENT ANALYSIS, not string matching or header text matching!`,
                 throw new Error('No output received from AI model');
               }
 
-              // Validate paper type index
-              const paperTypeIndex = output.paperTypeIndex ?? -1;
-              if (paperTypeIndex < 0 || paperTypeIndex >= paperTypes.length) {
-                lastError = `Invalid paper type index: ${paperTypeIndex}. Must be between 0 and ${paperTypes.length - 1}.`;
-                console.warn(`[Paper Extraction] Attempt ${attempt}/${MAX_RETRIES} - ${lastError}`);
-
-                if (attempt < MAX_RETRIES) {
-                  console.log(`[Paper Extraction] Retrying with paper type validation...`);
-                  continue;
-                }
-
-                throw new Error(`Paper type determination failed after ${MAX_RETRIES} attempts. ${lastError}`);
-              }
-
-              // Validate paper type confidence
-              const paperTypeConfidence = output.paperTypeConfidence ?? 0;
-              if (paperTypeConfidence < 0 || paperTypeConfidence > 100) {
-                lastError = `Invalid paper type confidence: ${paperTypeConfidence}. Must be between 0 and 100.`;
-                console.warn(`[Paper Extraction] Attempt ${attempt}/${MAX_RETRIES} - ${lastError}`);
-
-                if (attempt < MAX_RETRIES) {
-                  console.log(`[Paper Extraction] Retrying with confidence validation...`);
-                  continue;
-                }
-
-                throw new Error(`Paper type confidence validation failed after ${MAX_RETRIES} attempts. ${lastError}`);
-              }
-
-              // Validate year
-              const year = output.year ?? 0;
-              if (year < 1900 || year > 2100) {
-                lastError = `Invalid year: ${year}. Must be between 1900 and 2100.`;
+              // Validate year (nullable)
+              const year = output.year ?? null;
+              if (year !== null && (year < 1900 || year > 2100)) {
+                lastError = `Invalid year: ${year}. Must be between 1900 and 2100 or null.`;
                 console.warn(`[Paper Extraction] Attempt ${attempt}/${MAX_RETRIES} - ${lastError}`);
 
                 if (attempt < MAX_RETRIES) {
@@ -287,10 +241,10 @@ REMEMBER: Use CONTENT ANALYSIS, not string matching or header text matching!`,
                 throw new Error(`Year validation failed after ${MAX_RETRIES} attempts. ${lastError}`);
               }
 
-              // Validate month
-              const month = output.month ?? 0;
-              if (month < 1 || month > 12) {
-                lastError = `Invalid month: ${month}. Must be between 1 and 12.`;
+              // Validate month (nullable)
+              const month = output.month ?? null;
+              if (month !== null && (month < 1 || month > 12)) {
+                lastError = `Invalid month: ${month}. Must be between 1 and 12 or null.`;
                 console.warn(`[Paper Extraction] Attempt ${attempt}/${MAX_RETRIES} - ${lastError}`);
 
                 if (attempt < MAX_RETRIES) {
@@ -299,6 +253,25 @@ REMEMBER: Use CONTENT ANALYSIS, not string matching or header text matching!`,
                 }
 
                 throw new Error(`Month validation failed after ${MAX_RETRIES} attempts. ${lastError}`);
+              }
+
+              // Validate day (nullable)
+              const day = output.day ?? null;
+              if (day !== null && (day < 1 || day > 31)) {
+                lastError = `Invalid day: ${day}. Must be between 1 and 31 or null.`;
+                console.warn(`[Paper Extraction] Attempt ${attempt}/${MAX_RETRIES} - ${lastError}`);
+
+                if (attempt < MAX_RETRIES) {
+                  console.log(`[Paper Extraction] Retrying with day correction...`);
+                  continue;
+                }
+
+                throw new Error(`Day validation failed after ${MAX_RETRIES} attempts. ${lastError}`);
+              }
+
+              // Warn if year is null
+              if (year === null) {
+                console.warn(`[Paper Extraction] Year not found in filename: ${filename}`);
               }
 
               // Validate questions array
@@ -357,11 +330,9 @@ REMEMBER: Use CONTENT ANALYSIS, not string matching or header text matching!`,
               console.log(`[Paper Extraction] ✓ Validation passed on attempt ${attempt}`);
 
               return {
-                paperTypeIndex,
-                paperTypeConfidence,
-                paperTypeReasoning: output.paperTypeReasoning || 'No reasoning provided',
                 year,
                 month,
+                day,
                 questions: validatedQuestions
               };
 
@@ -379,21 +350,29 @@ REMEMBER: Use CONTENT ANALYSIS, not string matching or header text matching!`,
 
       return await flow({
         examPaperDataUri,
-        paperTypes,
+        filename,
         topics,
       });
     });
 
     const endTime = Date.now();
     const duration = ((endTime - startTime) / 1000).toFixed(2);
-    const monthPadded = result.month.toString().padStart(2, '0');
-    const paperTypeName = paperTypes[result.paperTypeIndex]?.name || `Type ${result.paperTypeIndex}`;
-    console.log(`[Paper Extraction] Completed in ${duration}s - Paper: ${result.year}-${monthPadded} "${paperTypeName}" (confidence: ${result.paperTypeConfidence}%), Questions: ${result.questions.length}`);
 
-    // Log low confidence warnings
-    if (result.paperTypeConfidence < 70) {
-      console.warn(`[Paper Extraction] ⚠ Low paper type confidence (${result.paperTypeConfidence}%): ${result.paperTypeReasoning}`);
+    // Format date string for logging
+    let dateStr = 'No date';
+    if (result.year !== null) {
+      dateStr = result.year.toString();
+      if (result.month !== null) {
+        const monthPadded = result.month.toString().padStart(2, '0');
+        dateStr += `-${monthPadded}`;
+        if (result.day !== null) {
+          const dayPadded = result.day.toString().padStart(2, '0');
+          dateStr += `-${dayPadded}`;
+        }
+      }
     }
+
+    console.log(`[Paper Extraction] Completed in ${duration}s - File: "${filename}", Date: ${dateStr}, Questions: ${result.questions.length}`);
 
     const lowConfidenceQuestions = result.questions.filter(q => q.categorizationConfidence < 70);
     if (lowConfidenceQuestions.length > 0) {

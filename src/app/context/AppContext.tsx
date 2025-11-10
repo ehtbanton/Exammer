@@ -13,8 +13,8 @@ interface AppContextType {
   otherSubjects: Subject[];
   isLevel3User: boolean;
   createSubjectFromSyllabus: (syllabusFile: File) => Promise<void>;
-  processExamPapers: (subjectId: string, examPapers: File[]) => Promise<void>;
-  processMarkschemes: (subjectId: string, markschemes: File[]) => Promise<void>;
+  processExamPapers: (subjectId: string, paperTypeId: string, examPapers: File[]) => Promise<void>;
+  processMarkschemes: (subjectId: string, paperTypeId: string, markschemes: File[]) => Promise<void>;
   deleteSubject: (subjectId: string) => Promise<void>;
   addSubjectToWorkspace: (subjectId: string) => Promise<void>;
   removeSubjectFromWorkspace: (subjectId: string) => Promise<void>;
@@ -25,6 +25,7 @@ interface AppContextType {
   generateQuestionVariant: (subjectId: string, paperTypeId: string, topicId: string, questionId: string) => Promise<{ questionText: string; solutionObjectives: string[]; diagramMermaid?: string }>;
   isLoading: (key: string) => boolean;
   setLoading: (key: string, value: boolean) => void;
+  updateSubjectNameDescription: (subjectId: string, name: string, description: string) => Promise<void>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -259,8 +260,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, [toast, setLoading]);
 
-  const processExamPapers = useCallback(async (subjectId: string, examPapers: File[]) => {
-    const loadingKey = `process-papers-${subjectId}`;
+  const processExamPapers = useCallback(async (subjectId: string, paperTypeId: string, examPapers: File[]) => {
+    const loadingKey = `process-papers-${subjectId}-${paperTypeId}`;
     setLoading(loadingKey, true);
 
     try {
@@ -270,21 +271,32 @@ export function AppProvider({ children }: { children: ReactNode }) {
         throw new Error('Subject not found');
       }
 
-      // Pre-process exam papers for storage
-      const examPapersDataUris = await Promise.all(examPapers.map(file => fileToDataURI(file)));
+      // Verify paper type exists
+      const paperType = currentSubject.paperTypes.find(pt => pt.id === paperTypeId);
+      if (!paperType) {
+        throw new Error('Paper type not found');
+      }
+
+      // Pre-process exam papers with paper_type_id
+      const papersWithMetadata = await Promise.all(examPapers.map(async (file) => ({
+        dataUri: await fileToDataURI(file),
+        filename: file.name,
+        paper_type_id: paperTypeId
+      })));
 
       // Persist past papers to database
       const pastPapers: PastPaper[] = [];
       for (const paperFile of examPapers) {
         const paperContent = await fileToString(paperFile);
 
-        // Save to database via API
+        // Save to database via API with paper_type_id
         const response = await fetch(`/api/subjects/${subjectId}/papers`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             name: paperFile.name,
-            content: paperContent
+            content: paperContent,
+            paper_type_id: paperTypeId
           })
         });
 
@@ -353,15 +365,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
           }
 
           // Use batch API endpoint for parallel processing on server
-          console.log(`[Process B] Calling batch API to extract ${examPapersDataUris.length} papers (no markschemes)`);
+          console.log(`[Process B] Calling batch API to extract ${papersWithMetadata.length} papers (no markschemes)`);
 
           const batchResponse = await fetch('/api/extract-questions-batch', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               subjectId,
-              examPapersDataUris,
-              markschemesDataUris: [], // No markschemes in Process B
+              papers: papersWithMetadata,
+              markschemes: [], // No markschemes in Process B
               paperTypes
             })
           });
@@ -437,8 +449,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, [subjects, toast, setLoading]);
 
-  const processMarkschemes = useCallback(async (subjectId: string, markschemes: File[]) => {
-    const loadingKey = `process-markschemes-${subjectId}`;
+  const processMarkschemes = useCallback(async (subjectId: string, paperTypeId: string, markschemes: File[]) => {
+    const loadingKey = `process-markschemes-${subjectId}-${paperTypeId}`;
     setLoading(loadingKey, true);
 
     try {
@@ -448,21 +460,32 @@ export function AppProvider({ children }: { children: ReactNode }) {
         throw new Error('Subject not found');
       }
 
-      // Pre-process markschemes for storage
-      const markschemesDataUris = await Promise.all(markschemes.map(file => fileToDataURI(file)));
+      // Verify paper type exists
+      const paperType = currentSubject.paperTypes.find(pt => pt.id === paperTypeId);
+      if (!paperType) {
+        throw new Error('Paper type not found');
+      }
+
+      // Pre-process markschemes with paper_type_id
+      const markschemesWithMetadata = await Promise.all(markschemes.map(async (file) => ({
+        dataUri: await fileToDataURI(file),
+        filename: file.name,
+        paper_type_id: paperTypeId
+      })));
 
       // Persist markschemes to database
       const dbMarkschemes: Markscheme[] = [];
       for (const markschemeFile of markschemes) {
         const markschemeContent = await fileToString(markschemeFile);
 
-        // Save to database via API
+        // Save to database via API with paper_type_id
         const response = await fetch(`/api/subjects/${subjectId}/markschemes`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             name: markschemeFile.name,
-            content: markschemeContent
+            content: markschemeContent,
+            paper_type_id: paperTypeId
           })
         });
 
@@ -516,15 +539,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
             }))
           }));
 
-          // Call markscheme matching API endpoint
-          console.log(`[Process M] Calling match-markschemes API with ${markschemesDataUris.length} markschemes`);
+          // Call markscheme matching API endpoint (or use batch extraction directly)
+          console.log(`[Process M] Calling batch extraction API with ${markschemesWithMetadata.length} markschemes to match with existing questions`);
 
-          const matchResponse = await fetch('/api/match-markschemes', {
+          // Note: We use the batch extraction endpoint which handles both papers and markschemes
+          // For markscheme-only processing, we pass empty papers array
+          const matchResponse = await fetch('/api/extract-questions-batch', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               subjectId,
-              markschemesDataUris,
+              papers: [], // No new papers, just matching markschemes
+              markschemes: markschemesWithMetadata,
               paperTypes
             })
           });
@@ -872,8 +898,44 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, [toast, setLoading]);
 
+  const updateSubjectNameDescription = useCallback(async (subjectId: string, name: string, description: string) => {
+    const loadingKey = `update-subject-${subjectId}`;
+    setLoading(loadingKey, true);
+
+    try {
+      const response = await fetch(`/api/subjects/${subjectId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, description })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to update subject');
+      }
+
+      const updatedSubject = await response.json();
+
+      // Update local state
+      setSubjects(prev => prev.map(s =>
+        s.id === subjectId ? { ...s, name: updatedSubject.name, description: updatedSubject.description } : s
+      ));
+
+      toast({
+        title: "Subject Updated",
+        description: "Subject name and description updated successfully."
+      });
+    } catch (error: any) {
+      console.error(error);
+      toast({ variant: "destructive", title: "Error", description: error.message || "Failed to update subject." });
+      throw error;
+    } finally {
+      setLoading(loadingKey, false);
+    }
+  }, [toast, setLoading]);
+
   return (
-    <AppContext.Provider value={{ subjects, otherSubjects, isLevel3User, createSubjectFromSyllabus, processExamPapers, processMarkschemes, deleteSubject, addSubjectToWorkspace, removeSubjectFromWorkspace, searchSubjects, getSubjectById, addPastPaperToSubject, updateExamQuestionScore, generateQuestionVariant, isLoading, setLoading }}>
+    <AppContext.Provider value={{ subjects, otherSubjects, isLevel3User, createSubjectFromSyllabus, processExamPapers, processMarkschemes, deleteSubject, addSubjectToWorkspace, removeSubjectFromWorkspace, searchSubjects, getSubjectById, addPastPaperToSubject, updateExamQuestionScore, generateQuestionVariant, isLoading, setLoading, updateSubjectNameDescription }}>
       {children}
     </AppContext.Provider>
   );

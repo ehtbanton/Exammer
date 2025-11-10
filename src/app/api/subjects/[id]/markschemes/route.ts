@@ -5,6 +5,7 @@ import { requireAuth } from '@/lib/auth-helpers';
 export interface Markscheme {
   id: number;
   subject_id: number;
+  paper_type_id: number;
   name: string;
   content: string;
   created_at: number;
@@ -15,10 +16,20 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   try {
     const user = await requireAuth();
     const { id: subjectId } = await params;
-    const { name, content } = await req.json();
+    const { name, content, paper_type_id } = await req.json();
 
-    if (!name || !content) {
-      return NextResponse.json({ error: 'Name and content are required' }, { status: 400 });
+    if (!name || !content || !paper_type_id) {
+      return NextResponse.json({ error: 'Name, content, and paper_type_id are required' }, { status: 400 });
+    }
+
+    // Verify paper type exists and belongs to this subject
+    const paperType = await db.get(
+      'SELECT id FROM paper_types WHERE id = ? AND subject_id = ?',
+      [paper_type_id, subjectId]
+    );
+
+    if (!paperType) {
+      return NextResponse.json({ error: 'Invalid paper type for this subject' }, { status: 400 });
     }
 
     // Verify ownership via user_workspaces
@@ -36,8 +47,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     }
 
     const result = await db.run(
-      'INSERT INTO markschemes (subject_id, name, content) VALUES (?, ?, ?)',
-      [subjectId, name, content]
+      'INSERT INTO markschemes (subject_id, paper_type_id, name, content) VALUES (?, ?, ?, ?)',
+      [subjectId, paper_type_id, name, content]
     );
 
     const markscheme = await db.get<Markscheme>('SELECT * FROM markschemes WHERE id = ?', [result.lastID]);

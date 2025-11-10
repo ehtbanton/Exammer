@@ -60,7 +60,7 @@ function HomePageContent() {
       setUploadStage('initial');
       setSyllabusFile(null);
       if (subjectId) {
-        router.push(`/workspace/subject/${subjectId}?openPapers=true`);
+        router.push(`/workspace/subject/${subjectId}`);
       }
     }
   };

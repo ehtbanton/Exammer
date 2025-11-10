@@ -18,19 +18,15 @@ import {
   getSolutionIdPromptRules
 } from './paper-identifier-validation';
 
-const PaperTypeInfoSchema = z.object({
-  name: z.string().describe('The name of the paper type.'),
-});
-
 const ExtractMarkschemesSolutionsInputSchema = z.object({
   markschemeDataUri: z
     .string()
     .describe(
       "A single markscheme in PDF format, as a data URI. Expected format: 'data:<mimetype>;base64,<encoded_data>'"
     ),
-  paperTypes: z
-    .array(PaperTypeInfoSchema)
-    .describe('The list of paper types from the syllabus (ordered array).'),
+  filename: z
+    .string()
+    .describe('The filename of the markscheme, used for extracting the paper date.'),
 });
 export type ExtractMarkschemesSolutionsInput = z.infer<typeof ExtractMarkschemesSolutionsInputSchema>;
 
@@ -40,9 +36,9 @@ const MarkschemesSolutionSchema = z.object({
 });
 
 const ExtractMarkschemesSolutionsOutputSchema = z.object({
-  paperTypeName: z.string().describe('The name of the paper type identified from the markscheme header/title (e.g., "Paper 1", "Paper 2"). Must match one from the provided paperTypes list.'),
-  year: z.number().describe('The year from the markscheme (4 digits, e.g., 2022).'),
-  month: z.number().describe('The month from the markscheme (1-12, e.g., 6 for June).'),
+  year: z.number().nullable().describe('The year from the filename (4 digits, e.g., 2024). Extract from filename using patterns like "2024", "2024-06", "2024-06-15". Required - if not found, use null.'),
+  month: z.number().nullable().describe('The month from the filename (1-12, e.g., 6). Extract from filename using patterns like "2024-06", "06-2024", "June-2024", etc. Optional - use null if not found.'),
+  day: z.number().nullable().describe('The day from the filename (1-31, e.g., 15). Extract from filename using patterns like "2024-06-15". Optional - use null if not found.'),
   solutions: z.array(MarkschemesSolutionSchema).describe('All solutions with marking objectives extracted from this markscheme.'),
 });
 export type ExtractMarkschemesSolutionsOutput = z.infer<typeof ExtractMarkschemesSolutionsOutputSchema>;
@@ -50,7 +46,7 @@ export type ExtractMarkschemesSolutionsOutput = z.infer<typeof ExtractMarkscheme
 export async function extractMarkschemesSolutions(
   input: ExtractMarkschemesSolutionsInput
 ): Promise<ExtractMarkschemesSolutionsOutput> {
-  const { markschemeDataUri, paperTypes } = input;
+  const { markschemeDataUri, filename } = input;
 
   console.log(`[Markscheme Extraction] Processing markscheme...`);
 
@@ -67,27 +63,40 @@ export async function extractMarkschemesSolutions(
         name: 'extractMarkschemesSolutionsPrompt',
         input: {schema: ExtractMarkschemesSolutionsInputSchema},
         output: {schema: ExtractMarkschemesSolutionsOutputSchema},
-        prompt: `TASK: Extract solutions from dated markscheme.
+        prompt: `TASK: Extract solutions from markscheme.
 
-PAPER TYPES:
-{{#each paperTypes}}
-- {{name}}
-{{/each}}
+FILENAME: {{filename}}
 
 DOCUMENT:
 {{media url=markschemeDataUri}}
 
 EXTRACTION REQUIREMENTS:
 
-1. PAPER IDENTIFICATION
-   Steps:
-   - Locate year in document (4 digits, e.g., 2022)
-   - Locate month in document (as number 1-12, e.g., 6 for June)
-   - Identify paper type name from header (must match one from PAPER TYPES list above)
+1. DATE EXTRACTION FROM FILENAME
 
-   Example: Document shows "June 2022" and "Paper 2" → year: 2022, month: 6, paperTypeName: "Paper 2"
+   Extract the date from the filename "{{filename}}":
 
-   CRITICAL: paperTypeName must match one from the PAPER TYPES list exactly.
+   a) Look for year patterns (required):
+      - 4-digit year: "2024", "2023", etc.
+      - Must be present in filename
+      - If not found, set year to null
+
+   b) Look for month patterns (optional):
+      - Numeric: "06", "6", "12", etc. (1-12)
+      - ISO format: "2024-06", "2024-06-15"
+      - Month names: "June", "Jun", "June-2024", "2024-June"
+      - If not found, set month to null
+
+   c) Look for day patterns (optional):
+      - Numeric: "15", "01", etc. (1-31)
+      - ISO format: "2024-06-15"
+      - If not found, set day to null
+
+   Example extractions:
+   - "2024-06-15-physics-ms.pdf" → year: 2024, month: 6, day: 15
+   - "physics-2024-06-ms.pdf" → year: 2024, month: 6, day: null
+   - "June-2024-markscheme.pdf" → year: 2024, month: 6, day: null
+   - "2024-physics-ms.pdf" → year: 2024, month: null, day: null
 
 2. SOLUTION IDENTIFICATION
 
@@ -158,9 +167,9 @@ Before generating output, verify the following:
 
 OUTPUT STRUCTURE:
 {
-  "paperTypeName": "<name from PAPER TYPES list>",
-  "year": <4-digit year>,
-  "month": <1-12>,
+  "year": <4-digit year or null>,
+  "month": <1-12 or null>,
+  "day": <1-31 or null>,
   "solutions": [
     {
       "questionNumber": <integer>,
@@ -169,7 +178,7 @@ OUTPUT STRUCTURE:
   ]
 }
 
-CRITICAL: paperTypeName must match one from the PAPER TYPES list provided above.`,
+IMPORTANT: Extract date from FILENAME, not from the document content!`,
       });
 
       const flow = aiInstance.defineFlow(
@@ -191,24 +200,10 @@ CRITICAL: paperTypeName must match one from the PAPER TYPES list provided above.
                 throw new Error('No output received from AI model');
               }
 
-              // Validate paper type name
-              const paperTypeName = output.paperTypeName || '';
-              if (!paperTypeName.trim()) {
-                lastError = 'Missing paper type name.';
-                console.warn(`[Markscheme Extraction] Attempt ${attempt}/${MAX_RETRIES} - ${lastError}`);
-
-                if (attempt < MAX_RETRIES) {
-                  console.log(`[Markscheme Extraction] Retrying with paper type identification...`);
-                  continue;
-                }
-
-                throw new Error(`Paper type identification failed after ${MAX_RETRIES} attempts. ${lastError}`);
-              }
-
-              // Validate year
-              const year = output.year ?? 0;
-              if (year < 1900 || year > 2100) {
-                lastError = `Invalid year: ${year}. Must be between 1900 and 2100.`;
+              // Validate year (nullable)
+              const year = output.year ?? null;
+              if (year !== null && (year < 1900 || year > 2100)) {
+                lastError = `Invalid year: ${year}. Must be between 1900 and 2100 or null.`;
                 console.warn(`[Markscheme Extraction] Attempt ${attempt}/${MAX_RETRIES} - ${lastError}`);
 
                 if (attempt < MAX_RETRIES) {
@@ -219,10 +214,10 @@ CRITICAL: paperTypeName must match one from the PAPER TYPES list provided above.
                 throw new Error(`Year validation failed after ${MAX_RETRIES} attempts. ${lastError}`);
               }
 
-              // Validate month
-              const month = output.month ?? 0;
-              if (month < 1 || month > 12) {
-                lastError = `Invalid month: ${month}. Must be between 1 and 12.`;
+              // Validate month (nullable)
+              const month = output.month ?? null;
+              if (month !== null && (month < 1 || month > 12)) {
+                lastError = `Invalid month: ${month}. Must be between 1 and 12 or null.`;
                 console.warn(`[Markscheme Extraction] Attempt ${attempt}/${MAX_RETRIES} - ${lastError}`);
 
                 if (attempt < MAX_RETRIES) {
@@ -231,6 +226,25 @@ CRITICAL: paperTypeName must match one from the PAPER TYPES list provided above.
                 }
 
                 throw new Error(`Month validation failed after ${MAX_RETRIES} attempts. ${lastError}`);
+              }
+
+              // Validate day (nullable)
+              const day = output.day ?? null;
+              if (day !== null && (day < 1 || day > 31)) {
+                lastError = `Invalid day: ${day}. Must be between 1 and 31 or null.`;
+                console.warn(`[Markscheme Extraction] Attempt ${attempt}/${MAX_RETRIES} - ${lastError}`);
+
+                if (attempt < MAX_RETRIES) {
+                  console.log(`[Markscheme Extraction] Retrying with day correction...`);
+                  continue;
+                }
+
+                throw new Error(`Day validation failed after ${MAX_RETRIES} attempts. ${lastError}`);
+              }
+
+              // Warn if year is null
+              if (year === null) {
+                console.warn(`[Markscheme Extraction] Year not found in filename: ${filename}`);
               }
 
               // Validate solutions array
@@ -273,9 +287,9 @@ CRITICAL: paperTypeName must match one from the PAPER TYPES list provided above.
               console.log(`[Markscheme Extraction] ✓ Validation passed on attempt ${attempt}`);
 
               return {
-                paperTypeName,
                 year,
                 month,
+                day,
                 solutions: validatedSolutions
               };
 
@@ -293,14 +307,28 @@ CRITICAL: paperTypeName must match one from the PAPER TYPES list provided above.
 
       return await flow({
         markschemeDataUri,
-        paperTypes,
+        filename,
       });
     });
 
     const endTime = Date.now();
     const duration = ((endTime - startTime) / 1000).toFixed(2);
-    const monthPadded = result.month.toString().padStart(2, '0');
-    console.log(`[Markscheme Extraction] Completed in ${duration}s - Paper: ${result.year}-${monthPadded} "${result.paperTypeName}", Solutions: ${result.solutions.length}`);
+
+    // Format date string for logging
+    let dateStr = 'No date';
+    if (result.year !== null) {
+      dateStr = result.year.toString();
+      if (result.month !== null) {
+        const monthPadded = result.month.toString().padStart(2, '0');
+        dateStr += `-${monthPadded}`;
+        if (result.day !== null) {
+          const dayPadded = result.day.toString().padStart(2, '0');
+          dateStr += `-${dayPadded}`;
+        }
+      }
+    }
+
+    console.log(`[Markscheme Extraction] Completed in ${duration}s - File: "${filename}", Date: ${dateStr}, Solutions: ${result.solutions.length}`);
 
     return result;
   } catch (error) {

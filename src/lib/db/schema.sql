@@ -88,6 +88,7 @@ CREATE TABLE IF NOT EXISTS class_subjects (
 CREATE TABLE IF NOT EXISTS subjects (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   name TEXT NOT NULL,
+  description TEXT,
   syllabus_content TEXT,
   class_id INTEGER DEFAULT NULL,
   created_at INTEGER DEFAULT (unixepoch()),
@@ -111,20 +112,24 @@ CREATE TABLE IF NOT EXISTS user_workspaces (
 CREATE TABLE IF NOT EXISTS past_papers (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   subject_id INTEGER NOT NULL,
+  paper_type_id INTEGER NOT NULL,
   name TEXT NOT NULL,
   content TEXT NOT NULL,
   created_at INTEGER DEFAULT (unixepoch()),
-  FOREIGN KEY (subject_id) REFERENCES subjects(id) ON DELETE CASCADE
+  FOREIGN KEY (subject_id) REFERENCES subjects(id) ON DELETE CASCADE,
+  FOREIGN KEY (paper_type_id) REFERENCES paper_types(id) ON DELETE CASCADE
 );
 
 -- Markschemes table
 CREATE TABLE IF NOT EXISTS markschemes (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   subject_id INTEGER NOT NULL,
+  paper_type_id INTEGER NOT NULL,
   name TEXT NOT NULL,
   content TEXT NOT NULL,
   created_at INTEGER DEFAULT (unixepoch()),
-  FOREIGN KEY (subject_id) REFERENCES subjects(id) ON DELETE CASCADE
+  FOREIGN KEY (subject_id) REFERENCES subjects(id) ON DELETE CASCADE,
+  FOREIGN KEY (paper_type_id) REFERENCES paper_types(id) ON DELETE CASCADE
 );
 
 -- Paper types table
@@ -195,7 +200,9 @@ CREATE INDEX IF NOT EXISTS idx_subjects_class_id ON subjects(class_id);
 CREATE INDEX IF NOT EXISTS idx_user_workspaces_user_id ON user_workspaces(user_id);
 CREATE INDEX IF NOT EXISTS idx_user_workspaces_subject_id ON user_workspaces(subject_id);
 CREATE INDEX IF NOT EXISTS idx_past_papers_subject_id ON past_papers(subject_id);
+CREATE INDEX IF NOT EXISTS idx_past_papers_paper_type_id ON past_papers(paper_type_id);
 CREATE INDEX IF NOT EXISTS idx_markschemes_subject_id ON markschemes(subject_id);
+CREATE INDEX IF NOT EXISTS idx_markschemes_paper_type_id ON markschemes(paper_type_id);
 CREATE INDEX IF NOT EXISTS idx_paper_types_subject_id ON paper_types(subject_id);
 CREATE INDEX IF NOT EXISTS idx_topics_paper_type_id ON topics(paper_type_id);
 CREATE INDEX IF NOT EXISTS idx_questions_topic_id ON questions(topic_id);

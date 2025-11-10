@@ -7,27 +7,40 @@ import { db } from '@/lib/db';
 export const maxDuration = 300; // 5 minutes max for batch processing
 export const dynamic = 'force-dynamic';
 
+interface PaperInfo {
+  dataUri: string;
+  filename: string;
+  paper_type_id: string;
+}
+
+interface MarkschemeInfo {
+  dataUri: string;
+  filename: string;
+  paper_type_id: string;
+}
+
 interface ExtractQuestionsRequest {
   subjectId: string;
-  examPapersDataUris: string[];
-  markschemesDataUris: string[];
+  papers: PaperInfo[];
+  markschemes: MarkschemeInfo[];
   paperTypes: Array<{ id: string; name: string; topics: Array<{ id: string; name: string; description: string }> }>;
 }
 
 /**
  * POST /api/extract-questions-batch
  *
- * Processes multiple exam papers in parallel using index-based categorization:
- * 1. Papers and markschemes are processed separately in parallel
- * 2. AI returns indices (not names) for paper types and topics - NO fuzzy matching needed
- * 3. Results are matched mechanically based on structured data
- * 4. Questions are saved with confidence scores and reasoning
- * 5. Each question stores paper_date and question_number for future matching
+ * Processes multiple exam papers in parallel:
+ * 1. Papers are pre-assigned to paper types (no classification needed)
+ * 2. Dates are extracted from filenames
+ * 3. Papers and markschemes are processed separately in parallel
+ * 4. AI returns topic indices - NO fuzzy matching needed
+ * 5. Markschemes are matched by paper_type_id + year + question_number
+ * 6. Questions are saved with confidence scores and reasoning
  */
 export async function POST(req: NextRequest) {
   try {
     const user = await requireAuth();
-    const { subjectId, examPapersDataUris, markschemesDataUris = [], paperTypes } = await req.json() as ExtractQuestionsRequest;
+    const { subjectId, papers = [], markschemes = [], paperTypes } = await req.json() as ExtractQuestionsRequest;
 
     // Verify user has access to this subject
     const workspace = await db.get<{ is_creator: number }>(
@@ -43,68 +56,49 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Only creators can add questions' }, { status: 403 });
     }
 
-    console.log(`[Batch Extraction] Processing ${examPapersDataUris.length} papers with ${markschemesDataUris.length} markschemes for subject ${subjectId}`);
+    console.log(`[Batch Extraction] Processing ${papers.length} papers with ${markschemes.length} markschemes for subject ${subjectId}`);
 
-    // Get paper and markscheme names from database for logging
-    const dbPapers = await db.all<{ name: string }>(
-      'SELECT name FROM past_papers WHERE subject_id = ? ORDER BY id',
-      [subjectId]
-    );
-    const dbMarkschemes = await db.all<{ name: string }>(
-      'SELECT name FROM markschemes WHERE subject_id = ? ORDER BY id',
-      [subjectId]
-    );
-
-    // Prepare data for AI flows - add indices to paper types and topics
-    const paperTypesWithIndices = paperTypes.map((pt, ptIndex) => ({
-      index: ptIndex,
-      name: pt.name,
-      topics: pt.topics.map((t, tIndex) => {
-        // Calculate global topic index by counting all topics before this paper type
-        const topicsBeforeThisPaperType = paperTypes.slice(0, ptIndex).reduce((acc, prevPt) => acc + prevPt.topics.length, 0);
-        const globalTopicIndex = topicsBeforeThisPaperType + tIndex;
-        return {
-          index: globalTopicIndex,
-          name: t.name,
-          description: t.description
-        };
-      })
-    }));
-
-    // Create a flat array of all topics with global indices
-    const allTopicsFlat = paperTypes.flatMap((pt, ptIndex) => {
-      const topicsBeforeThisPaperType = paperTypes.slice(0, ptIndex).reduce((acc, prevPt) => acc + prevPt.topics.length, 0);
-      return pt.topics.map((t, tIndex) => ({
-        index: topicsBeforeThisPaperType + tIndex,
-        id: t.id,
-        name: t.name,
-        description: t.description
-      }));
-    });
+    // Create a map of paper types for easy lookup
+    const paperTypeMap = new Map(paperTypes.map(pt => [pt.id, pt]));
 
     // Step 1: Process papers and markschemes in parallel
     console.log(`[Batch Extraction] Step 1: Starting parallel extraction...`);
-    console.log(`[Batch Extraction]   - Papers stream: ${examPapersDataUris.length} papers`);
-    console.log(`[Batch Extraction]   - Markschemes stream: ${markschemesDataUris.length} markschemes`);
+    console.log(`[Batch Extraction]   - Papers stream: ${papers.length} papers`);
+    console.log(`[Batch Extraction]   - Markschemes stream: ${markschemes.length} markschemes`);
 
     // 1.1: Extract questions from papers (parallel)
-    const paperExtractionPromises = examPapersDataUris.map(async (examPaperDataUri, index) => {
-      const paperName = dbPapers[index]?.name || `paper-${index + 1}`;
-      console.log(`[Paper Stream] Processing paper ${index + 1}/${examPapersDataUris.length}: "${paperName}"`);
+    const paperExtractionPromises = papers.map(async (paper, index) => {
+      const paperName = paper.filename;
+      console.log(`[Paper Stream] Processing paper ${index + 1}/${papers.length}: "${paperName}"`);
 
       try {
+        // Get topics for this specific paper type
+        const paperType = paperTypeMap.get(paper.paper_type_id);
+        if (!paperType) {
+          throw new Error(`Paper type ${paper.paper_type_id} not found`);
+        }
+
+        // Add indices to topics for this paper type
+        const topicsWithIndices = paperType.topics.map((t, tIndex) => ({
+          index: tIndex,
+          id: t.id,
+          name: t.name,
+          description: t.description
+        }));
+
         const result = await extractPaperQuestions({
-          examPaperDataUri,
-          paperTypes: paperTypesWithIndices,
-          topics: allTopicsFlat,
+          examPaperDataUri: paper.dataUri,
+          filename: paper.filename,
+          topics: topicsWithIndices,
         });
 
-        console.log(`[Paper Stream] ✓ Paper ${index + 1} extracted: "${paperName}" → Type: ${result.paperTypeIndex}, Confidence: ${result.paperTypeConfidence}%, Questions: ${result.questions.length}`);
+        console.log(`[Paper Stream] ✓ Paper ${index + 1} extracted: "${paperName}" → Questions: ${result.questions.length}`);
 
         return {
           status: 'success' as const,
           index,
           paperName,
+          paper_type_id: paper.paper_type_id,
           data: result
         };
       } catch (error: any) {
@@ -113,20 +107,21 @@ export async function POST(req: NextRequest) {
           status: 'failed' as const,
           index,
           paperName,
+          paper_type_id: paper.paper_type_id,
           error: error.message
         };
       }
     });
 
     // 1.2: Extract solutions from markschemes (parallel)
-    const markschemeExtractionPromises = markschemesDataUris.map(async (markschemeDataUri, index) => {
-      const msName = dbMarkschemes[index]?.name || `markscheme-${index + 1}`;
-      console.log(`[Markscheme Stream] Processing markscheme ${index + 1}/${markschemesDataUris.length}: "${msName}"`);
+    const markschemeExtractionPromises = markschemes.map(async (markscheme, index) => {
+      const msName = markscheme.filename;
+      console.log(`[Markscheme Stream] Processing markscheme ${index + 1}/${markschemes.length}: "${msName}"`);
 
       try {
         const result = await extractMarkschemesSolutions({
-          markschemeDataUri,
-          paperTypes: paperTypesWithIndices.map(pt => ({ name: pt.name })),
+          markschemeDataUri: markscheme.dataUri,
+          filename: markscheme.filename,
         });
 
         console.log(`[Markscheme Stream] ✓ Markscheme ${index + 1} extracted: "${msName}" → Solutions: ${result.solutions.length}`);
@@ -135,6 +130,7 @@ export async function POST(req: NextRequest) {
           status: 'success' as const,
           index,
           msName,
+          paper_type_id: markscheme.paper_type_id,
           data: result
         };
       } catch (error: any) {
@@ -143,6 +139,7 @@ export async function POST(req: NextRequest) {
           status: 'failed' as const,
           index,
           msName,
+          paper_type_id: markscheme.paper_type_id,
           error: error.message
         };
       }
@@ -167,68 +164,61 @@ export async function POST(req: NextRequest) {
 
     console.log(`[Batch Extraction] Successful extractions: ${successfulPapers.length} papers, ${successfulMarkschemes.length} markschemes`);
 
+    // Helper function to format date for logging
+    const formatDate = (year: number | null, month: number | null, day: number | null): string => {
+      if (year === null) return 'No date';
+      let dateStr = year.toString();
+      if (month !== null) {
+        const monthPadded = month.toString().padStart(2, '0');
+        dateStr += `-${monthPadded}`;
+        if (day !== null) {
+          const dayPadded = day.toString().padStart(2, '0');
+          dateStr += `-${dayPadded}`;
+        }
+      }
+      return dateStr;
+    };
+
     // Log extracted identifiers for debugging
     console.log(`\n[Batch Extraction] Extracted Paper Information:`);
     successfulPapers.forEach((p, idx) => {
       const qCount = p.data.questions.length;
-      const monthPadded = p.data.month.toString().padStart(2, '0');
-      const paperTypeName = paperTypesWithIndices[p.data.paperTypeIndex]?.name || `Type ${p.data.paperTypeIndex}`;
-      console.log(`  ${idx + 1}. ${p.data.year}-${monthPadded} "${paperTypeName}" (confidence: ${p.data.paperTypeConfidence}%) - ${qCount} questions`);
+      const paperType = paperTypeMap.get(p.paper_type_id);
+      const paperTypeName = paperType?.name || 'Unknown';
+      const dateStr = formatDate(p.data.year, p.data.month, p.data.day);
+      console.log(`  ${idx + 1}. ${dateStr} "${paperTypeName}" - ${qCount} questions`);
     });
 
     console.log(`\n[Batch Extraction] Extracted Markscheme Information:`);
     successfulMarkschemes.forEach((m, idx) => {
       const sCount = m.data.solutions.length;
-      const monthPadded = m.data.month.toString().padStart(2, '0');
-      console.log(`  ${idx + 1}. ${m.data.year}-${monthPadded} - ${sCount} solutions`);
+      const paperType = paperTypeMap.get(m.paper_type_id);
+      const paperTypeName = paperType?.name || 'Unknown';
+      const dateStr = formatDate(m.data.year, m.data.month, m.data.day);
+      console.log(`  ${idx + 1}. ${dateStr} "${paperTypeName}" - ${sCount} solutions`);
     });
 
     // Step 2: Process markschemes and build solution lookup map
-    console.log(`\n[Batch Extraction] Step 2: ${markschemesDataUris.length > 0 ? 'Processing markschemes and matching to questions...' : 'Processing questions without markschemes...'}`);
+    console.log(`\n[Batch Extraction] Step 2: ${markschemes.length > 0 ? 'Processing markschemes and matching to questions...' : 'Processing questions without markschemes...'}`);
 
-    // Build solution lookup map: key = "YYYY-MM-P-Q", value = solution objectives
+    // Build solution lookup map: key = "paper_type_id-YYYY-Q", value = solution objectives
+    // We match by paper_type_id + year + question_number (month/day not required for matching)
     const solutionMap = new Map<string, string[]>();
 
-    if (markschemesDataUris.length > 0) {
+    if (markschemes.length > 0) {
       for (const msResult of successfulMarkschemes) {
-        const { msName, data: msData } = msResult;
+        const { msName, paper_type_id, data: msData } = msResult;
 
-        // Extract paper type name from markscheme
-        const aiPaperTypeName = msData.paperTypeName || '';
-        if (!aiPaperTypeName.trim()) {
-          console.warn(`[Markscheme Processing] ✗ Markscheme "${msName}" missing paper type name, skipping`);
+        // Skip if year is null (required for matching)
+        if (msData.year === null) {
+          console.warn(`[Markscheme Processing] ✗ Markscheme "${msName}" missing year, skipping`);
           continue;
         }
-
-        // Fuzzy match paper type name (still needed for markschemes until we update their extraction too)
-        let paperTypeIndex = -1;
-        for (let i = 0; i < paperTypes.length; i++) {
-          const dbPaperType = paperTypes[i];
-          const dbPaperTypeLower = dbPaperType.name.toLowerCase();
-          const aiPaperTypeLower = aiPaperTypeName.toLowerCase();
-
-          const dbContainsAi = dbPaperTypeLower.includes(aiPaperTypeLower);
-          const aiContainsDb = aiPaperTypeLower.includes(dbPaperTypeLower);
-
-          if (dbContainsAi || aiContainsDb) {
-            paperTypeIndex = i;
-            console.log(`[Markscheme Processing] ✓ Fuzzy matched paper type: AI="${aiPaperTypeName}" → DB="${dbPaperType.name}" (index ${paperTypeIndex})`);
-            break;
-          }
-        }
-
-        if (paperTypeIndex === -1) {
-          console.warn(`[Markscheme Processing] ✗ Markscheme "${msName}" paper type "${aiPaperTypeName}" could not be matched, skipping`);
-          continue;
-        }
-
-        // Construct paper identifier for this markscheme
-        const monthPadded = msData.month.toString().padStart(2, '0');
-        const msPaperIdentifier = `${msData.year}-${monthPadded}-${paperTypeIndex}`;
 
         // Add all solutions to the map
         for (const solution of msData.solutions) {
-          const solutionKey = `${msPaperIdentifier}-${solution.questionNumber}`;
+          // Match key: paper_type_id + year + question number
+          const solutionKey = `${paper_type_id}-${msData.year}-${solution.questionNumber}`;
           solutionMap.set(solutionKey, solution.solutionObjectives);
           console.log(`[Markscheme Processing] ✓ Indexed solution: ${solutionKey} (${solution.solutionObjectives.length} objectives)`);
         }
@@ -240,17 +230,14 @@ export async function POST(req: NextRequest) {
     interface QuestionToSave {
       paperIndex: number;
       paperName: string;
-      paperTypeIndex: number;
-      paperIdentifier: string;
-      questionId: string;
-      topicIndex: number;
+      paper_type_id: string;
       topicId: string;
       questionText: string;
       summary: string;
       solutionObjectives?: string[]; // Optional - may be null if no markscheme
       diagramMermaid?: string; // Optional - mermaid diagram syntax for rendering
-      paperDate: string; // e.g., "2022-06"
-      questionNumber: string; // e.g., "1-3-5"
+      paperDate: string | null; // e.g., "2024-06-15", "2024-06", "2024", or null
+      questionNumber: string; // Just the question number (e.g., "1", "2", "3")
       categorizationConfidence: number; // 0-100
       categorizationReasoning: string;
     }
@@ -259,29 +246,37 @@ export async function POST(req: NextRequest) {
     const unmatchedQuestions: any[] = [];
     const unmatchedSolutions: any[] = [];
 
-    // Process all questions using index-based approach (NO fuzzy matching)
+    // Process all questions (NO paper type classification needed)
     for (const paperResult of successfulPapers) {
-      const { index: paperIndex, paperName, data: paperData } = paperResult;
+      const { index: paperIndex, paperName, paper_type_id, data: paperData } = paperResult;
 
-      // Paper type index is already determined by AI
-      const paperTypeIndex = paperData.paperTypeIndex;
-
-      // Validate paper type index
-      if (paperTypeIndex < 0 || paperTypeIndex >= paperTypes.length) {
-        console.warn(`[Processing] ✗ Paper "${paperName}" has invalid paper type index ${paperTypeIndex}, skipping all questions`);
+      // Get paper type from map
+      const paperType = paperTypeMap.get(paper_type_id);
+      if (!paperType) {
+        console.warn(`[Processing] ✗ Paper "${paperName}" has invalid paper_type_id ${paper_type_id}, skipping all questions`);
         continue;
       }
 
-      const paperTypeName = paperTypes[paperTypeIndex].name;
+      const paperTypeName = paperType.name;
 
-      // Construct paper identifier: YYYY-MM-P
-      const monthPadded = paperData.month.toString().padStart(2, '0');
-      const paperIdentifier = `${paperData.year}-${monthPadded}-${paperTypeIndex}`;
-      const paperDate = `${paperData.year}-${monthPadded}`; // YYYY-MM
+      // Build paper_date from extracted date components (nullable)
+      let paperDate: string | null = null;
+      if (paperData.year !== null) {
+        paperDate = paperData.year.toString();
+        if (paperData.month !== null) {
+          const monthPadded = paperData.month.toString().padStart(2, '0');
+          paperDate += `-${monthPadded}`;
+          if (paperData.day !== null) {
+            const dayPadded = paperData.day.toString().padStart(2, '0');
+            paperDate += `-${dayPadded}`;
+          }
+        }
+      }
 
-      console.log(`[Processing] Processing paper "${paperName}" → Type: ${paperTypeName} (index ${paperTypeIndex}), Date: ${paperDate}, Confidence: ${paperData.paperTypeConfidence}%`);
+      const dateStr = formatDate(paperData.year, paperData.month, paperData.day);
+      console.log(`[Processing] Processing paper "${paperName}" → Type: ${paperTypeName}, Date: ${dateStr}`);
 
-      // Step 2: Process each question
+      // Process each question
       for (const question of paperData.questions) {
         const questionNumber = question.questionNumber;
         if (typeof questionNumber !== 'number' || questionNumber < 1) {
@@ -292,14 +287,14 @@ export async function POST(req: NextRequest) {
         // Get topic index directly from AI output (NO fuzzy matching)
         const topicIndex = question.topicIndex;
 
-        // Validate topic index
-        if (topicIndex < 0 || topicIndex >= allTopicsFlat.length) {
-          console.warn(`[Processing] ✗ Paper "${paperName}" Q${questionNumber} has invalid topic index ${topicIndex} (valid range: 0-${allTopicsFlat.length - 1}), skipping`);
+        // Validate topic index (scoped to this paper type's topics)
+        if (topicIndex < 0 || topicIndex >= paperType.topics.length) {
+          console.warn(`[Processing] ✗ Paper "${paperName}" Q${questionNumber} has invalid topic index ${topicIndex} (valid range: 0-${paperType.topics.length - 1}), skipping`);
           continue;
         }
 
-        // Get topic from flat array using index
-        const topic = allTopicsFlat[topicIndex];
+        // Get topic from paper type's topics using index
+        const topic = paperType.topics[topicIndex];
         const topicId = topic.id;
         const topicName = topic.name;
 
@@ -312,15 +307,12 @@ export async function POST(req: NextRequest) {
           console.warn(`[Processing] ⚠ Q${questionNumber} low confidence (${categorizationConfidence}%): ${categorizationReasoning}`);
         }
 
-        // Construct identifiers
-        const questionNumberStr = `${paperTypeIndex}-${questionNumber}-${topicIndex}`; // P-Q-T (for database storage)
-        const matchingKey = `${paperIdentifier}-${questionNumber}`; // YYYY-MM-P-Q (for markscheme matching)
-        const fullQuestionId = `${matchingKey}-${topicIndex}`; // YYYY-MM-P-Q-T (complete ID)
-
-        // Look up solution from preprocessed map
+        // Construct match key for markscheme lookup: paper_type_id + year + question_number
+        // Note: We require year for matching, but not month/day
         let solutionObjectives: string[] | undefined = undefined;
 
-        if (solutionMap.size > 0) {
+        if (solutionMap.size > 0 && paperData.year !== null) {
+          const matchingKey = `${paper_type_id}-${paperData.year}-${questionNumber}`;
           solutionObjectives = solutionMap.get(matchingKey);
 
           if (solutionObjectives) {
@@ -328,33 +320,31 @@ export async function POST(req: NextRequest) {
           } else {
             unmatchedQuestions.push({
               paperName,
-              paperIdentifier,
-              paperTypeIndex,
-              questionId: fullQuestionId,
-              topicIndex,
+              paper_type_id,
+              year: paperData.year,
+              questionNumber,
               topicName
             });
             console.log(`[Processing] ℹ ${matchingKey} has no matching solution (will save without objectives) → topic: ${topicName} (confidence: ${categorizationConfidence}%)`);
           }
+        } else if (solutionMap.size > 0 && paperData.year === null) {
+          console.log(`[Processing] ℹ Q${questionNumber} cannot match markscheme (no year) → topic: ${topicName} (confidence: ${categorizationConfidence}%)`);
         } else {
-          console.log(`[Processing] ℹ ${matchingKey} processing without markscheme → topic: ${topicName} (confidence: ${categorizationConfidence}%)`);
+          console.log(`[Processing] ℹ Q${questionNumber} processing without markscheme → topic: ${topicName} (confidence: ${categorizationConfidence}%)`);
         }
 
         // Add question to save list (with confidence and reasoning)
         questionsToSave.push({
           paperIndex,
           paperName,
-          paperTypeIndex,
-          paperIdentifier,
-          questionId: fullQuestionId,
-          topicIndex,
+          paper_type_id,
           topicId,
           questionText: question.questionText,
           summary: question.summary,
           solutionObjectives,
           diagramMermaid: question.diagramMermaid,
           paperDate,
-          questionNumber: questionNumberStr,
+          questionNumber: questionNumber.toString(), // Just the question number
           categorizationConfidence,
           categorizationReasoning
         });
@@ -366,10 +356,14 @@ export async function POST(req: NextRequest) {
       // Get all matched solution keys from questions
       const matchedSolutionKeys = new Set<string>();
       for (const question of questionsToSave) {
-        if (question.solutionObjectives) {
-          const questionParts = question.questionId.split('-');
-          const matchingKey = questionParts.slice(0, 4).join('-'); // YYYY-MM-P-Q
-          matchedSolutionKeys.add(matchingKey);
+        if (question.solutionObjectives && question.paperDate) {
+          // Extract year from paperDate (could be "2024-06-15", "2024-06", or "2024")
+          const yearMatch = question.paperDate.match(/^(\d{4})/);
+          if (yearMatch) {
+            const year = yearMatch[1];
+            const matchingKey = `${question.paper_type_id}-${year}-${question.questionNumber}`;
+            matchedSolutionKeys.add(matchingKey);
+          }
         }
       }
 
@@ -409,9 +403,11 @@ export async function POST(req: NextRequest) {
         totalQuestionsSaved++;
         const hasMarkscheme = question.solutionObjectives ? '✓ with solution' : '○ no solution';
         const confidenceIndicator = question.categorizationConfidence < 70 ? ` [⚠ ${question.categorizationConfidence}%]` : ` [${question.categorizationConfidence}%]`;
-        console.log(`[Database] ✓ Saved question ${question.questionId} ${hasMarkscheme}${confidenceIndicator} → Topic: ${allTopicsFlat[question.topicIndex]?.name}`);
+        const paperType = paperTypeMap.get(question.paper_type_id);
+        const topic = paperType?.topics.find(t => t.id === question.topicId);
+        console.log(`[Database] ✓ Saved question ${question.questionNumber} ${hasMarkscheme}${confidenceIndicator} → Topic: ${topic?.name || 'Unknown'}`);
       } catch (error: any) {
-        console.error(`[Database] Error saving question ${question.questionId} from "${question.paperName}":`, error.message);
+        console.error(`[Database] Error saving question ${question.questionNumber} from "${question.paperName}":`, error.message);
       }
     }
 
@@ -444,9 +440,9 @@ export async function POST(req: NextRequest) {
       console.log(`[Batch Extraction] Failed markschemes:`);
       failedMarkschemes.forEach(fm => console.log(`  - ${fm}`));
     }
-    if (questionsWithoutSolutions > 0 && markschemesDataUris.length > 0) {
+    if (questionsWithoutSolutions > 0 && markschemes.length > 0) {
       console.log(`[Batch Extraction] Questions without matching solutions:`);
-      unmatchedQuestions.forEach(uq => console.log(`  - ${uq.questionId} → ${uq.topicName}`));
+      unmatchedQuestions.forEach(uq => console.log(`  - ${uq.paper_type_id}-${uq.year}-${uq.questionNumber} → ${uq.topicName}`));
     }
     if (unmatchedSolutions.length > 0) {
       console.log(`[Batch Extraction] Unmatched solutions (no corresponding questions):`);
@@ -455,8 +451,10 @@ export async function POST(req: NextRequest) {
     if (lowConfidenceCount > 0) {
       console.log(`[Batch Extraction] Low confidence questions (<70%):`);
       questionsToSave.filter(q => q.categorizationConfidence < 70).forEach(q => {
-        const topicName = allTopicsFlat[q.topicIndex]?.name;
-        console.log(`  - ${q.questionId} → ${topicName} (${q.categorizationConfidence}%): ${q.categorizationReasoning}`);
+        const paperType = paperTypeMap.get(q.paper_type_id);
+        const topic = paperType?.topics.find(t => t.id === q.topicId);
+        const topicName = topic?.name || 'Unknown';
+        console.log(`  - Q${q.questionNumber} → ${topicName} (${q.categorizationConfidence}%): ${q.categorizationReasoning}`);
       });
     }
     console.log(`[Batch Extraction] ================================\n`);
