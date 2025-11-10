@@ -31,8 +31,7 @@ export default function HomePage() {
         </Link>
 
         {/* RAG for RAG Subheading */}
-        <div className="mt-8 flex items-start gap-6 text-2xl font-mono leading-tight">
-          {/* First RAG - RETRIEVAL AUGMENTED GENERATION */}
+        {/* <div className="mt-8 flex items-start gap-6 text-2xl font-mono leading-tight">
           <div className="flex gap-4">
             <div className="flex flex-col leading-[1.1]">
               <span className="font-extrabold text-gray-500">R</span>
@@ -70,12 +69,10 @@ export default function HomePage() {
             </div>
           </div>
 
-          {/* "for" */}
           <div className="flex items-start pt-0">
             <span className="text-muted-foreground italic text-lg">for</span>
           </div>
 
-          {/* Second RAG - RED AMBER GREEN */}
           <div className="flex gap-4">
             <div className="flex flex-col leading-[1.1]">
               <span className="font-extrabold text-red-500">R</span>
@@ -97,7 +94,7 @@ export default function HomePage() {
               <span className="text-green-400">n</span>
             </div>
           </div>
-        </div>
+        </div> */}
 
         {/* Product Description */}
         <p className="mt-6 max-w-4xl text-center text-3xl text-muted-foreground px-4 leading-snug">
@@ -110,53 +107,6 @@ export default function HomePage() {
       <div className="container mx-auto px-4 py-12 max-w-6xl">
 
         <div className="grid md:grid-cols-2 gap-8">
-          {/* Levels of Understanding */}
-          <Card className="hover:shadow-lg transition-shadow">
-            <CardHeader>
-              <div className="flex items-center gap-3">
-                <div className="[&>div>div:last-child]:hidden">
-                  <UnderstandingIndicator percentage={75} size="lg" />
-                </div>
-                <CardTitle>Levels of Understanding</CardTitle>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <p className="text-muted-foreground mb-4">
-                Track your progress with Red, Amber, and Green markers. Every question is categorized by your
-                understanding level, helping you focus on what needs improvement.
-              </p>
-              <div className="grid grid-cols-1 gap-3">
-                {/* Green with few questions completed */}
-                <div className="border-2 rounded-lg p-3" style={{backgroundColor: '#4ade80', borderColor: '#22c55e'}}>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-semibold text-black">Trigonometry Basics</span>
-                    <UnderstandingIndicator percentage={95} size="sm" />
-                  </div>
-                  <p className="text-xs text-black mt-1">3/10 attempted</p>
-                  <Progress value={30} className="h-1.5 mt-2" />
-                </div>
-                {/* Yellow/Amber with all completed */}
-                <div className="border-2 rounded-lg p-3" style={{backgroundColor: '#fbbf24', borderColor: '#f59e0b'}}>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-semibold text-black">Statistics & Probability</span>
-                    <UnderstandingIndicator percentage={72} size="sm" />
-                  </div>
-                  <p className="text-xs text-black mt-1">6/6 attempted</p>
-                  <Progress value={100} className="h-1.5 mt-2" />
-                </div>
-                {/* Red with partial completion */}
-                <div className="border-2 rounded-lg p-3" style={{backgroundColor: '#f87171', borderColor: '#dc2626'}}>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-semibold text-black">Calculus Integration</span>
-                    <UnderstandingIndicator percentage={38} size="sm" />
-                  </div>
-                  <p className="text-xs text-black mt-1">5/12 attempted</p>
-                  <Progress value={42} className="h-1.5 mt-2" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
           {/* The Workspace */}
           <Card className="hover:shadow-lg transition-shadow">
             <CardHeader>
@@ -217,6 +167,52 @@ export default function HomePage() {
             </CardContent>
           </Card>
 
+          {/* Levels of Understanding */}
+          <Card className="hover:shadow-lg transition-shadow">
+            <CardHeader>
+              <div className="flex items-center gap-3">
+                <div className="[&>div>div:last-child]:hidden">
+                  <UnderstandingIndicator percentage={75} size="lg" />
+                </div>
+                <CardTitle>Levels of Understanding</CardTitle>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <p className="text-muted-foreground mb-4">
+                Every question, topic, and paper type is categorized by your understanding level, helping you focus on what needs improvement.
+              </p>
+              <div className="grid grid-cols-1 gap-3">
+                {/* Green with few questions completed */}
+                <div className="border-2 rounded-lg p-3" style={{backgroundColor: '#4ade80', borderColor: '#22c55e'}}>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-semibold text-black">Trigonometry Basics</span>
+                    <UnderstandingIndicator percentage={95} size="sm" />
+                  </div>
+                  <p className="text-xs text-black mt-1">3/10 attempted</p>
+                  <Progress value={30} className="h-1.5 mt-2" />
+                </div>
+                {/* Yellow/Amber with all completed */}
+                <div className="border-2 rounded-lg p-3" style={{backgroundColor: '#fbbf24', borderColor: '#f59e0b'}}>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-semibold text-black">Statistics & Probability</span>
+                    <UnderstandingIndicator percentage={72} size="sm" />
+                  </div>
+                  <p className="text-xs text-black mt-1">6/6 attempted</p>
+                  <Progress value={100} className="h-1.5 mt-2" />
+                </div>
+                {/* Red with partial completion */}
+                <div className="border-2 rounded-lg p-3" style={{backgroundColor: '#f87171', borderColor: '#dc2626'}}>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-semibold text-black">Calculus Integration</span>
+                    <UnderstandingIndicator percentage={38} size="sm" />
+                  </div>
+                  <p className="text-xs text-black mt-1">5/12 attempted</p>
+                  <Progress value={42} className="h-1.5 mt-2" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
           {/* Classrooms */}
           <Card className="hover:shadow-lg transition-shadow">
             <CardHeader>
@@ -227,8 +223,7 @@ export default function HomePage() {
             </CardHeader>
             <CardContent>
               <p className="text-muted-foreground mb-4">
-                Join or create classrooms to collaborate with peers and teachers. Share progress,
-                compare understanding levels, and work together towards exam success.
+                Share progress, compare understanding levels, identify weak spots, and work together towards exam success.
               </p>
               <div className="space-y-3">
                 {/* Classroom Card Example */}
@@ -255,7 +250,7 @@ export default function HomePage() {
           <Card className="hover:shadow-lg transition-shadow">
             <CardHeader>
               <div className="flex items-center gap-3">
-                <MessageSquare className="h-8 w-8 text-primary" />
+                <Bot className="h-8 w-8 text-primary" />
                 <CardTitle>Xam - Your AI Tutor</CardTitle>
               </div>
             </CardHeader>
