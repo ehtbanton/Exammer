@@ -31,11 +31,11 @@ export default function HomePage() {
         </Link>
 
         {/* RAG for RAG Subheading */}
-        <div className="mt-8 flex items-start gap-4 text-sm font-mono">
+        <div className="mt-8 flex items-start gap-6 text-2xl font-mono leading-tight">
           {/* First RAG - RETRIEVAL AUGMENTED GENERATION */}
-          <div className="flex gap-3">
-            <div className="flex flex-col">
-              <span className="font-bold text-gray-500">R</span>
+          <div className="flex gap-4">
+            <div className="flex flex-col leading-[1.1]">
+              <span className="font-extrabold text-gray-500">R</span>
               <span className="text-gray-400">e</span>
               <span className="text-gray-400">t</span>
               <span className="text-gray-400">r</span>
@@ -45,8 +45,8 @@ export default function HomePage() {
               <span className="text-gray-400">a</span>
               <span className="text-gray-400">l</span>
             </div>
-            <div className="flex flex-col">
-              <span className="font-bold text-gray-500">A</span>
+            <div className="flex flex-col leading-[1.1]">
+              <span className="font-extrabold text-gray-500">A</span>
               <span className="text-gray-400">u</span>
               <span className="text-gray-400">g</span>
               <span className="text-gray-400">m</span>
@@ -56,8 +56,8 @@ export default function HomePage() {
               <span className="text-gray-400">e</span>
               <span className="text-gray-400">d</span>
             </div>
-            <div className="flex flex-col">
-              <span className="font-bold text-gray-500">G</span>
+            <div className="flex flex-col leading-[1.1]">
+              <span className="font-extrabold text-gray-500">G</span>
               <span className="text-gray-400">e</span>
               <span className="text-gray-400">n</span>
               <span className="text-gray-400">e</span>
@@ -72,25 +72,25 @@ export default function HomePage() {
 
           {/* "for" */}
           <div className="flex items-start pt-0">
-            <span className="text-muted-foreground italic">for</span>
+            <span className="text-muted-foreground italic text-lg">for</span>
           </div>
 
           {/* Second RAG - RED AMBER GREEN */}
-          <div className="flex gap-3">
-            <div className="flex flex-col">
-              <span className="font-bold text-red-500">R</span>
+          <div className="flex gap-4">
+            <div className="flex flex-col leading-[1.1]">
+              <span className="font-extrabold text-red-500">R</span>
               <span className="text-red-400">e</span>
               <span className="text-red-400">d</span>
             </div>
-            <div className="flex flex-col">
-              <span className="font-bold text-amber-500">A</span>
+            <div className="flex flex-col leading-[1.1]">
+              <span className="font-extrabold text-amber-500">A</span>
               <span className="text-amber-400">m</span>
               <span className="text-amber-400">b</span>
               <span className="text-amber-400">e</span>
               <span className="text-amber-400">r</span>
             </div>
-            <div className="flex flex-col">
-              <span className="font-bold text-green-500">G</span>
+            <div className="flex flex-col leading-[1.1]">
+              <span className="font-extrabold text-green-500">G</span>
               <span className="text-green-400">r</span>
               <span className="text-green-400">e</span>
               <span className="text-green-400">e</span>
@@ -100,23 +100,14 @@ export default function HomePage() {
         </div>
 
         {/* Product Description */}
-        <p className="mt-6 max-w-3xl text-center text-lg text-muted-foreground px-4">
+        <p className="mt-6 max-w-4xl text-center text-3xl text-muted-foreground px-4 leading-snug">
           Exammer is an AI framework that turns past papers for your course into a structured revision plan,
           using an interactive tutor and gamified progress tracking to replace guesswork with clarity.
         </p>
-
-        <div className="mt-8">
-          <Link href="/auth/signin">
-            <Button size="lg" className="text-lg px-8 py-6">
-              Get Started
-            </Button>
-          </Link>
-        </div>
       </div>
 
       {/* Features Section */}
       <div className="container mx-auto px-4 py-12 max-w-6xl">
-        <h2 className="text-3xl font-bold text-center mb-12">How Exammer Works</h2>
 
         <div className="grid md:grid-cols-2 gap-8">
           {/* Understanding Levels */}
@@ -133,32 +124,41 @@ export default function HomePage() {
                 understanding level, helping you focus on what needs improvement.
               </p>
               <div className="grid grid-cols-1 gap-3">
-                {/* Red Level Example */}
-                <div className="border-2 rounded-lg p-3" style={{backgroundColor: '#f87171', borderColor: '#dc2626'}}>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-semibold text-black">Calculus Integration</span>
-                    <UnderstandingIndicator percentage={35} size="sm" />
-                  </div>
-                  <p className="text-xs text-black mt-1">3/8 attempted</p>
-                  <Progress value={37.5} className="h-1.5 mt-2" />
-                </div>
-                {/* Amber Level Example */}
-                <div className="border-2 rounded-lg p-3" style={{backgroundColor: '#fbbf24', borderColor: '#f59e0b'}}>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-semibold text-black">Algebra Equations</span>
-                    <UnderstandingIndicator percentage={67} size="sm" />
-                  </div>
-                  <p className="text-xs text-black mt-1">5/6 attempted</p>
-                  <Progress value={83} className="h-1.5 mt-2" />
-                </div>
-                {/* Green Level Example */}
+                {/* Green with few questions completed */}
                 <div className="border-2 rounded-lg p-3" style={{backgroundColor: '#4ade80', borderColor: '#22c55e'}}>
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-semibold text-black">Trigonometry Basics</span>
-                    <UnderstandingIndicator percentage={92} size="sm" />
+                    <UnderstandingIndicator percentage={95} size="sm" />
                   </div>
-                  <p className="text-xs text-black mt-1">7/7 attempted</p>
+                  <p className="text-xs text-black mt-1">3/10 attempted</p>
+                  <Progress value={30} className="h-1.5 mt-2" />
+                </div>
+                {/* Amber with half completed */}
+                <div className="border-2 rounded-lg p-3" style={{backgroundColor: '#fbbf24', borderColor: '#f59e0b'}}>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-semibold text-black">Algebra Equations</span>
+                    <UnderstandingIndicator percentage={68} size="sm" />
+                  </div>
+                  <p className="text-xs text-black mt-1">4/8 attempted</p>
+                  <Progress value={50} className="h-1.5 mt-2" />
+                </div>
+                {/* Yellow/Amber with all completed */}
+                <div className="border-2 rounded-lg p-3" style={{backgroundColor: '#fbbf24', borderColor: '#f59e0b'}}>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-semibold text-black">Statistics & Probability</span>
+                    <UnderstandingIndicator percentage={72} size="sm" />
+                  </div>
+                  <p className="text-xs text-black mt-1">6/6 attempted</p>
                   <Progress value={100} className="h-1.5 mt-2" />
+                </div>
+                {/* Red with partial completion */}
+                <div className="border-2 rounded-lg p-3" style={{backgroundColor: '#f87171', borderColor: '#dc2626'}}>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-semibold text-black">Calculus Integration</span>
+                    <UnderstandingIndicator percentage={38} size="sm" />
+                  </div>
+                  <p className="text-xs text-black mt-1">5/12 attempted</p>
+                  <Progress value={42} className="h-1.5 mt-2" />
                 </div>
               </div>
             </CardContent>
@@ -177,22 +177,42 @@ export default function HomePage() {
                 Your personal study hub where subjects, topics, and questions are organized. Navigate through
                 past papers, practice questions, and track your mastery of each topic.
               </p>
-              <div className="grid grid-cols-1 gap-2">
-                {/* Subject Card Example */}
-                <div className="border rounded-lg p-3 bg-card hover:shadow-md transition-shadow">
-                  <div className="flex items-center gap-2 mb-1">
-                    <BookOpen className="h-4 w-4 text-primary" />
-                    <span className="font-semibold text-sm">Mathematics A-Level</span>
+              <div className="grid grid-cols-2 gap-2">
+                {/* Paper 1 */}
+                <div className="border rounded-lg p-2 bg-card hover:shadow-md transition-shadow">
+                  <div className="flex items-center gap-1 mb-1">
+                    <BookOpen className="h-3 w-3 text-primary" />
+                    <span className="font-semibold text-xs">Paper 1</span>
                   </div>
-                  <p className="text-xs text-muted-foreground">3 paper types identified</p>
+                  <p className="text-[10px] text-muted-foreground">Pure Mathematics</p>
+                  <p className="text-[10px] text-muted-foreground mt-1">15 topics • 89 questions</p>
                 </div>
-                {/* Topic Navigation Example */}
-                <div className="border rounded-lg p-3 bg-muted/50">
-                  <div className="text-xs text-muted-foreground mb-2">Paper 1 → Pure Mathematics</div>
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="font-medium">15 Topics</span>
-                    <span className="text-xs">124 Questions</span>
+                {/* Paper 2 */}
+                <div className="border rounded-lg p-2 bg-card hover:shadow-md transition-shadow">
+                  <div className="flex items-center gap-1 mb-1">
+                    <BookOpen className="h-3 w-3 text-primary" />
+                    <span className="font-semibold text-xs">Paper 2</span>
                   </div>
+                  <p className="text-[10px] text-muted-foreground">Applied Math</p>
+                  <p className="text-[10px] text-muted-foreground mt-1">12 topics • 67 questions</p>
+                </div>
+                {/* Paper 3 */}
+                <div className="border rounded-lg p-2 bg-card hover:shadow-md transition-shadow">
+                  <div className="flex items-center gap-1 mb-1">
+                    <BookOpen className="h-3 w-3 text-primary" />
+                    <span className="font-semibold text-xs">Paper 3</span>
+                  </div>
+                  <p className="text-[10px] text-muted-foreground">Statistics</p>
+                  <p className="text-[10px] text-muted-foreground mt-1">10 topics • 52 questions</p>
+                </div>
+                {/* Paper 4 */}
+                <div className="border rounded-lg p-2 bg-card hover:shadow-md transition-shadow">
+                  <div className="flex items-center gap-1 mb-1">
+                    <BookOpen className="h-3 w-3 text-primary" />
+                    <span className="font-semibold text-xs">Paper 4</span>
+                  </div>
+                  <p className="text-[10px] text-muted-foreground">Mechanics</p>
+                  <p className="text-[10px] text-muted-foreground mt-1">8 topics • 43 questions</p>
                 </div>
               </div>
             </CardContent>
