@@ -3,9 +3,13 @@
  *
  * Manages multiple Gemini API keys on a when-available basis across the entire application.
  *
- * Rules per API key:
- * - Max 2 concurrent requests
+ * Rules per API key (free tier):
+ * - Max 1 concurrent request
  * - Max 10 requests per minute
+ *
+ * Rules for billed key (GEMINI_API_KEY_BILLED):
+ * - Max 300 concurrent requests
+ * - Max 1000 requests per minute
  *
  * Usage:
  * ```typescript
@@ -37,12 +41,13 @@ export class GeminiApiKeyManager {
   }>;
   private currentKeyIndex: number;
   private isProcessingQueue: boolean;
+  private isBilledKey: boolean = false;
 
-  // Rate limiting constants
-  private readonly MAX_CONCURRENT_PER_KEY = 1;
-  private readonly MAX_REQUESTS_PER_MINUTE = 10;
+  // Rate limiting constants (set during initialization based on key type)
+  private MAX_CONCURRENT_PER_KEY = 1;
+  private MAX_REQUESTS_PER_MINUTE = 10;
+  private MIN_REQUEST_INTERVAL_MS = 1000; // milliseconds between requests to same key
   private readonly MINUTE_MS = 60 * 1000;
-  private readonly MIN_REQUEST_INTERVAL_MS = 1000; // 1 second between requests to same key
 
   private initialized: boolean = false;
 
@@ -80,26 +85,40 @@ export class GeminiApiKeyManager {
    * Initialize API keys from environment variables
    */
   private initialize(): void {
-    // Try to load parallel keys first
-    const parallelKeysEnv = process.env.GEMINI_API_KEYS_PARALLEL;
-    if (parallelKeysEnv) {
-      try {
-        const parsedKeys = JSON.parse(parallelKeysEnv);
-        if (Array.isArray(parsedKeys) && parsedKeys.length > 0) {
-          this.apiKeys = parsedKeys.filter((k) => typeof k === 'string' && k.length > 0);
+    // Check for billed key first - this takes priority
+    const billedKey = process.env.GEMINI_API_KEY_BILLED;
+    if (billedKey) {
+      this.apiKeys = [billedKey];
+      this.isBilledKey = true;
+      // Set higher rate limits for billed key
+      this.MAX_CONCURRENT_PER_KEY = 300;
+      this.MAX_REQUESTS_PER_MINUTE = 1000;
+      // No burst protection needed - with 300 concurrent, we want many requests to start simultaneously
+      // The per-minute rate limit will handle overall throughput
+      this.MIN_REQUEST_INTERVAL_MS = 0;
+      console.log('[GeminiApiKeyManager] Using billed API key with enhanced rate limits (300 concurrent, 1000/min, no burst protection)');
+    } else {
+      // Try to load parallel keys
+      const parallelKeysEnv = process.env.GEMINI_API_KEYS_PARALLEL;
+      if (parallelKeysEnv) {
+        try {
+          const parsedKeys = JSON.parse(parallelKeysEnv);
+          if (Array.isArray(parsedKeys) && parsedKeys.length > 0) {
+            this.apiKeys = parsedKeys.filter((k) => typeof k === 'string' && k.length > 0);
+          }
+        } catch (error) {
+          console.error('Failed to parse GEMINI_API_KEYS_PARALLEL:', error);
         }
-      } catch (error) {
-        console.error('Failed to parse GEMINI_API_KEYS_PARALLEL:', error);
       }
-    }
 
-    // Fallback to single key if parallel keys not available
-    if (this.apiKeys.length === 0) {
-      const singleKey = process.env.GEMINI_API_KEY;
-      if (singleKey) {
-        this.apiKeys = [singleKey];
-      } else {
-        throw new Error('No Gemini API keys found in environment variables');
+      // Fallback to single key if parallel keys not available
+      if (this.apiKeys.length === 0) {
+        const singleKey = process.env.GEMINI_API_KEY;
+        if (singleKey) {
+          this.apiKeys = [singleKey];
+        } else {
+          throw new Error('No Gemini API keys found in environment variables');
+        }
       }
     }
 
