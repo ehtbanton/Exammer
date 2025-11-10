@@ -29,14 +29,20 @@
 
 export const DIAGRAM_CONFIG = {
   /**
-   * Force Imagen mode (NOT RECOMMENDED - Imagen has poor text rendering)
+   * Force Imagen mode
    *
-   * When true: Skips SVG and Mermaid, goes straight to Imagen
-   * When false: Uses tiered system (SVG → Mermaid → Imagen)
+   * When true: Skips SVG and Mermaid, goes straight to Imagen generation
+   * When false: Uses tiered system (Original → SVG → Mermaid → Imagen)
    *
-   * Recommendation: Set to FALSE to enable SVG rendering for accurate text
+   * Tiered system priority:
+   *   1. Original image from PDF (if available) - 100% accurate
+   *   2. SVG programmatic rendering (for triangles, geometric shapes) - Perfect text
+   *   3. Mermaid (for flowcharts) - Good for process diagrams
+   *   4. Imagen (auto-generates when nothing else works) - Last resort
    *
-   * Current: false (Tiered system enabled - SVG for geometric diagrams)
+   * Recommendation: FALSE for best quality (enables all tiers)
+   *
+   * Current: false (Tiered system - will auto-generate Imagen when needed)
    */
   FORCE_IMAGEN: false,
 

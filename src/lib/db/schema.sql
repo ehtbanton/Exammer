@@ -159,6 +159,7 @@ CREATE TABLE IF NOT EXISTS questions (
   diagram_mermaid TEXT,
   diagram_type TEXT CHECK(diagram_type IN ('mermaid', 'imagen')) DEFAULT NULL,
   diagram_image_uri TEXT,
+  diagram_original_image_uri TEXT,
   diagram_aspect_ratio TEXT DEFAULT '1:1',
   diagram_style TEXT DEFAULT 'technical',
   diagram_detailed_data TEXT,

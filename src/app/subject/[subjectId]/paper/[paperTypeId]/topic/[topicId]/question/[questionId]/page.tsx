@@ -523,6 +523,8 @@ function InterviewPageContent() {
                             <div className="mt-6">
                               <HybridDiagramRenderer
                                 mermaidCode={generatedVariant.diagramMermaid}
+                                originalImageUri={generatedVariant.diagramOriginalImageUri}
+                                detailedData={generatedVariant.diagramDetailedData}
                                 enableFallback={DIAGRAM_CONFIG.ENABLE_FALLBACK}
                                 diagramDescription={generatedVariant.questionText}
                                 subject={subject?.name}

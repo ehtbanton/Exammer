@@ -1,5 +1,5 @@
 {
-  "currentVersion": 8,
+  "currentVersion": 9,
   "versions": {
     "0": {
       "description": "Initial schema - subjects owned by users",
@@ -315,6 +315,25 @@
             "action": "add_column",
             "table": "questions",
             "sql": "ALTER TABLE questions ADD COLUMN diagram_detailed_data TEXT"
+          }
+        ]
+      }
+    },
+    "9": {
+      "description": "Add original diagram image storage for 100% accurate diagram display",
+      "schema": {
+        "questions": {
+          "columns": ["id", "topic_id", "question_text", "summary", "solution_objectives", "markscheme_id", "paper_date", "question_number", "diagram_mermaid", "diagram_type", "diagram_image_uri", "diagram_original_image_uri", "diagram_aspect_ratio", "diagram_style", "diagram_detailed_data", "created_at"],
+          "note": "diagram_original_image_uri stores the actual diagram image extracted from the PDF (base64 data URI) for 100% accurate display"
+        }
+      },
+      "migration": {
+        "from": 8,
+        "steps": [
+          {
+            "action": "add_column",
+            "table": "questions",
+            "sql": "ALTER TABLE questions ADD COLUMN diagram_original_image_uri TEXT"
           }
         ]
       }

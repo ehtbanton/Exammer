@@ -54,6 +54,7 @@ export interface ExamQuestion {
   diagramMermaid?: string; // Optional mermaid diagram syntax for rendering diagrams
   diagramType?: DiagramType | null; // Type of diagram rendering: 'mermaid' or 'imagen'
   diagramImageUri?: string | null; // Base64 data URI for Imagen-generated images
+  diagramOriginalImageUri?: string | null; // Base64 data URI for original diagram extracted from PDF (Tier 1 - 100% accurate)
   diagramAspectRatio?: string; // Aspect ratio for image generation (e.g., '1:1', '16:9', '3:4')
   diagramStyle?: DiagramStyle; // Style preference for image generation
   diagramDetailedData?: DiagramDetailedData | null; // Detailed structured diagram data for accurate regeneration

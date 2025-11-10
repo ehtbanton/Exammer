@@ -12,7 +12,10 @@ interface HybridDiagramRendererProps {
   // Mermaid diagram
   mermaidCode?: string;
 
-  // Imagen diagram
+  // Original image from PDF (Tier 1 - 100% accurate)
+  originalImageUri?: string;
+
+  // Imagen diagram (generated)
   imageUri?: string;
 
   // Diagram metadata
@@ -37,6 +40,7 @@ interface HybridDiagramRendererProps {
 
 export function HybridDiagramRenderer({
   mermaidCode,
+  originalImageUri,
   imageUri,
   diagramType,
   aspectRatio,
@@ -56,10 +60,27 @@ export function HybridDiagramRenderer({
   const [renderAttempt, setRenderAttempt] = useState(0);
 
   // TIERED RENDERING SYSTEM:
-  // Tier 1: Original image from PDF (imageUri) - 100% accurate
+  // Tier 1: Original image from PDF (originalImageUri) - 100% accurate, THE ACTUAL DIAGRAM
   // Tier 2: SVG programmatic rendering (detailedData) - Perfect text, mathematically accurate
   // Tier 3: Mermaid (for flowcharts/graphs)
   // Tier 4: Imagen (last resort - poor text rendering)
+
+  // Tier 1: If we have the original image, use it - nothing beats the real thing!
+  if (originalImageUri) {
+    return (
+      <div className={`relative flex justify-center items-center p-4 bg-muted/30 rounded-lg border ${className}`}>
+        <img
+          src={originalImageUri}
+          alt="Original question diagram"
+          className="max-w-full h-auto rounded"
+          style={{ maxHeight: '500px' }}
+        />
+        <div className="absolute top-2 right-2 bg-blue-600 text-white text-xs px-2 py-1 rounded">
+          Original (100%)
+        </div>
+      </div>
+    );
+  }
 
   // Try SVG rendering first if we have detailed data
   useEffect(() => {
@@ -119,13 +140,20 @@ export function HybridDiagramRenderer({
     renderDiagram();
   }, [mermaidCode, shouldRenderMermaid, renderAttempt]);
 
-  // Auto-generate Imagen when forceImagen is true
+  // Auto-generate Imagen when appropriate (Tier 4)
   useEffect(() => {
-    if (forceImagen && diagramDescription && !imageUri && !fallbackImageUri && !isGeneratingFallback) {
-      console.log('[HybridDiagram] Force Imagen mode - auto-generating image...');
+    // Should auto-generate if:
+    // 1. Force Imagen mode is on, OR
+    // 2. We have description/data but no other rendering method worked
+    const shouldAutoGenerate =
+      (forceImagen && diagramDescription) || // Force mode
+      (!originalImageUri && !svgDiagramUri && !shouldRenderMermaid && diagramDescription); // Tier 4 fallback
+
+    if (shouldAutoGenerate && !imageUri && !fallbackImageUri && !isGeneratingFallback) {
+      console.log('[HybridDiagram] Auto-generating with Imagen (Tier 4)...');
       attemptImagenFallback();
     }
-  }, [forceImagen, diagramDescription, imageUri, fallbackImageUri]);
+  }, [forceImagen, diagramDescription, imageUri, fallbackImageUri, originalImageUri, svgDiagramUri, shouldRenderMermaid]);
 
   // Attempt to generate diagram using Imagen as fallback
   const attemptImagenFallback = async () => {
