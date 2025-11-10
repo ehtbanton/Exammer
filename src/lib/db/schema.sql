@@ -161,6 +161,7 @@ CREATE TABLE IF NOT EXISTS questions (
   diagram_image_uri TEXT,
   diagram_aspect_ratio TEXT DEFAULT '1:1',
   diagram_style TEXT DEFAULT 'technical',
+  diagram_detailed_data TEXT,
   created_at INTEGER DEFAULT (unixepoch()),
   FOREIGN KEY (topic_id) REFERENCES topics(id) ON DELETE CASCADE,
   FOREIGN KEY (markscheme_id) REFERENCES markschemes(id) ON DELETE SET NULL

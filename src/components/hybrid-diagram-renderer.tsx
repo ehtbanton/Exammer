@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import mermaid from 'mermaid';
-import type { DiagramType, DiagramStyle } from '@/lib/types';
+import type { DiagramType, DiagramStyle, DiagramDetailedData } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { AlertCircle, RefreshCw } from 'lucide-react';
 import { generateDiagramImage } from '@/ai/flows/generate-diagram-image';
@@ -18,6 +18,9 @@ interface HybridDiagramRendererProps {
   diagramType?: DiagramType | null;
   aspectRatio?: string;
   style?: DiagramStyle;
+
+  // Detailed diagram data for accurate generation
+  detailedData?: DiagramDetailedData | null;
 
   // Fallback options
   enableFallback?: boolean; // If true, will try Imagen if Mermaid fails
@@ -37,6 +40,7 @@ export function HybridDiagramRenderer({
   diagramType,
   aspectRatio,
   style,
+  detailedData,
   enableFallback = true,
   diagramDescription,
   subject,
@@ -98,8 +102,8 @@ export function HybridDiagramRenderer({
 
   // Attempt to generate diagram using Imagen as fallback
   const attemptImagenFallback = async () => {
-    if (!diagramDescription) {
-      console.warn('[HybridDiagram] Cannot generate fallback - no description provided');
+    if (!diagramDescription && !detailedData) {
+      console.warn('[HybridDiagram] Cannot generate fallback - no description or detailed data provided');
       return;
     }
 
@@ -107,10 +111,11 @@ export function HybridDiagramRenderer({
 
     try {
       const result = await generateDiagramImage({
-        description: diagramDescription,
+        description: diagramDescription || 'Diagram',
         aspectRatio: aspectRatio as any,
         style: style,
         subject: subject,
+        detailedData: detailedData, // Pass detailed data for accurate generation
       });
 
       setFallbackImageUri(result.imageDataUri);

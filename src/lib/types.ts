@@ -17,6 +17,29 @@ export interface Markscheme {
 export type DiagramType = 'mermaid' | 'imagen';
 export type DiagramStyle = 'technical' | 'hand-drawn' | 'minimalist' | 'detailed';
 
+// Detailed diagram data for accurate regeneration
+export interface DiagramDetailedData {
+  type: string; // Specific diagram type (e.g., 'triangle', 'bar_chart', 'circuit')
+  measurements?: {
+    lengths?: string[]; // e.g., ["AB = 5 cm", "BC = 3 cm"]
+    angles?: string[]; // e.g., ["angle ABC = 90 degrees"]
+    other?: string[]; // Other measurements
+  };
+  elements?: Array<{
+    id: string;
+    label: string;
+    type?: string;
+  }>;
+  connections?: Array<{
+    from: string;
+    to: string;
+    label?: string;
+    type?: string;
+  }>;
+  labels?: string[];
+  specialProperties?: string[];
+}
+
 export interface ExamQuestion {
   id: string;
   questionText: string; // The ORIGINAL exam question from past papers (kept for reference, not displayed)
@@ -33,6 +56,7 @@ export interface ExamQuestion {
   diagramImageUri?: string | null; // Base64 data URI for Imagen-generated images
   diagramAspectRatio?: string; // Aspect ratio for image generation (e.g., '1:1', '16:9', '3:4')
   diagramStyle?: DiagramStyle; // Style preference for image generation
+  diagramDetailedData?: DiagramDetailedData | null; // Detailed structured diagram data for accurate regeneration
 }
 
 export interface Topic {

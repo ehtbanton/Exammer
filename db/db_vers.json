@@ -1,5 +1,5 @@
 {
-  "currentVersion": 7,
+  "currentVersion": 8,
   "versions": {
     "0": {
       "description": "Initial schema - subjects owned by users",
@@ -296,6 +296,25 @@
             "action": "add_column",
             "table": "questions",
             "sql": "ALTER TABLE questions ADD COLUMN diagram_style TEXT DEFAULT 'technical'"
+          }
+        ]
+      }
+    },
+    "8": {
+      "description": "Add detailed diagram data for accurate diagram regeneration with exact measurements",
+      "schema": {
+        "questions": {
+          "columns": ["id", "topic_id", "question_text", "summary", "solution_objectives", "markscheme_id", "paper_date", "question_number", "diagram_mermaid", "diagram_type", "diagram_image_uri", "diagram_aspect_ratio", "diagram_style", "diagram_detailed_data", "created_at"],
+          "note": "diagram_detailed_data stores JSON with structured diagram information including all measurements, elements, connections, and labels for accurate recreation"
+        }
+      },
+      "migration": {
+        "from": 7,
+        "steps": [
+          {
+            "action": "add_column",
+            "table": "questions",
+            "sql": "ALTER TABLE questions ADD COLUMN diagram_detailed_data TEXT"
           }
         ]
       }

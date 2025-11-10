@@ -9,7 +9,8 @@
 
 import { GoogleGenAI } from "@google/genai";
 import { getOptimalAspectRatio, suggestDiagramStyle } from '@/lib/diagram-utils';
-import type { DiagramStyle } from '@/lib/types';
+import { buildAccurateImagenPrompt, hasDetailedData } from '@/lib/diagram-generation';
+import type { DiagramStyle, DiagramDetailedData } from '@/lib/types';
 
 export interface GenerateDiagramImageInput {
   description: string;
@@ -17,6 +18,7 @@ export interface GenerateDiagramImageInput {
   style?: DiagramStyle;
   diagramType?: string; // e.g., 'flowchart', 'circuit', 'geometric'
   subject?: string; // Subject context for better style suggestions
+  detailedData?: DiagramDetailedData | null; // Structured diagram data for accurate generation
 }
 
 export interface GenerateDiagramImageOutput {
@@ -51,9 +53,18 @@ export async function generateDiagramImage(
 
   console.log(`[Imagen] Using aspect ratio: ${aspectRatio}, style: ${style}`);
 
-  // Enhance the prompt with style instructions
-  const styleInstructions = getStyleInstructions(style);
-  const enhancedPrompt = `${input.description}\n\nStyle: ${styleInstructions}`;
+  // Build prompt: use detailed data if available, otherwise use description
+  let enhancedPrompt: string;
+
+  if (hasDetailedData(input.detailedData)) {
+    console.log('[Imagen] Using detailed diagram data for accurate generation');
+    enhancedPrompt = buildAccurateImagenPrompt(input.detailedData!);
+  } else {
+    console.log('[Imagen] Using description-based generation (no detailed data)');
+    // Enhance the prompt with style instructions
+    const styleInstructions = getStyleInstructions(style);
+    enhancedPrompt = `${input.description}\n\nStyle: ${styleInstructions}`;
+  }
 
   // Use the billed API key directly
   const ai = new GoogleGenAI({ apiKey });

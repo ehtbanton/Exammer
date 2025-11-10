@@ -57,6 +57,29 @@ const PaperQuestionSchema = z.object({
   topicName: z.string().describe('The name of the topic this question belongs to, chosen from the provided topics list.'),
   diagramMermaid: z.string().optional().describe('If this question includes a diagram, graph, figure, or visual element, provide mermaid diagram syntax to represent it. Use appropriate mermaid diagram types (graph, flowchart, sequenceDiagram, etc.). Include all measurements, labels, and relationships from the original. Omit if question is text-only.'),
   diagramDescription: z.string().optional().describe('If diagram is present, provide a text description of the diagram to help determine optimal rendering method and settings.'),
+
+  // Enhanced diagram data for accurate regeneration
+  diagramDetailedData: z.object({
+    type: z.string().describe('Specific diagram type (triangle, rectangle, circle, bar_chart, line_graph, circuit, etc.)'),
+    measurements: z.object({
+      lengths: z.array(z.string()).optional().describe('ALL length measurements with exact values and units (e.g., ["AB = 5 cm", "BC = 3.5 cm", "AC = 4 cm"])'),
+      angles: z.array(z.string()).optional().describe('ALL angle measurements with exact values (e.g., ["angle ABC = 90 degrees", "angle BAC = 60 degrees"])'),
+      other: z.array(z.string()).optional().describe('Other measurements like areas, volumes, coordinates, etc.')
+    }).optional(),
+    elements: z.array(z.object({
+      id: z.string().describe('Element identifier (e.g., "A", "B", "Point1", "Node1")'),
+      label: z.string().describe('Display label'),
+      type: z.string().optional().describe('Element type (point, node, shape, etc.)')
+    })).optional().describe('All points, nodes, or elements in the diagram'),
+    connections: z.array(z.object({
+      from: z.string().describe('Source element ID'),
+      to: z.string().describe('Target element ID'),
+      label: z.string().optional().describe('Label or measurement on this connection'),
+      type: z.string().optional().describe('Connection type (edge, distance, angle, etc.)')
+    })).optional().describe('All connections, edges, or relationships'),
+    labels: z.array(z.string()).optional().describe('All text labels, annotations, or axis labels'),
+    specialProperties: z.array(z.string()).optional().describe('Special properties like "right angle at B", "parallel lines", "equal sides", etc.')
+  }).optional().describe('Detailed structured data about the diagram for accurate regeneration. CRITICAL: Include ALL measurements with exact values.'),
 });
 
 const ExtractPaperQuestionsOutputSchema = z.object({
@@ -165,6 +188,25 @@ EXTRACTION REQUIREMENTS:
      * Include specific values, angles, dimensions shown in the diagram
      * Example for a triangle: "graph TD\n    A[\"Point A\"] ---|\"3 cm\"| B[\"Point B\"]\n    B ---|\"4 cm\"| C[\"Point C\"]\n    C ---|\"5 cm\"| A"
      * If question is text-only with no visual elements, OMIT this field entirely
+
+   - diagramDetailedData (CRITICAL FOR DIAGRAMS): If diagram present, provide comprehensive structured data:
+     * type: Specific diagram type (e.g., "triangle", "right_angled_triangle", "bar_chart", "circuit", "coordinate_graph")
+     * measurements: EXTRACT EVERY MEASUREMENT WITH EXACT VALUES
+       - lengths: ["side AB = 5 cm", "side BC = 3 cm", "side AC = 4 cm"]
+       - angles: ["angle ABC = 90 degrees", "angle BAC = 53.13 degrees", "angle BCA = 36.87 degrees"]
+       - other: ["area = 6 cm²", "perimeter = 12 cm", etc.]
+     * elements: [{id: "A", label: "Point A", type: "vertex"}, {id: "B", label: "Point B", type: "vertex"}, ...]
+     * connections: [{from: "A", to: "B", label: "5 cm", type: "side"}, ...]
+     * labels: All axis labels, legends, annotations visible
+     * specialProperties: ["right angle at B", "isosceles triangle", "parallel to x-axis", etc.]
+
+     CRITICAL RULES FOR DIAGRAM DATA:
+     - NEVER approximate - if you see "5.7 cm", write exactly "5.7 cm", not "approximately 6 cm"
+     - NEVER omit measurements - include ALL visible values, even if redundant
+     - For triangles: Extract ALL 3 sides, ALL 3 angles, ALL 3 vertices
+     - For graphs: Extract ALL data points, ALL axis values, ALL labels
+     - For circuits: Extract ALL component values (resistances, voltages, currents)
+     - If a number appears on the diagram, it MUST be in the data
 
 VALIDATION REQUIREMENTS:
 
