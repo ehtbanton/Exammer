@@ -1,9 +1,10 @@
 import Image from 'next/image';
+import Link from 'next/link';
 
 export default function HomePage() {
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-background">
-      <div className="flex flex-col items-center gap-6">
+      <Link href="/home" className="flex flex-col items-center gap-6 cursor-pointer hover:opacity-80 transition-opacity">
         <Image
           src="/exammer.png"
           alt="Exammer Logo"
@@ -20,7 +21,7 @@ export default function HomePage() {
             Get hooked on Revision
           </p>
         </div>
-      </div>
+      </Link>
     </div>
   );
 }
