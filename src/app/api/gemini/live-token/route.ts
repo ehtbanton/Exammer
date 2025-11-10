@@ -1,21 +1,20 @@
 import { NextResponse } from 'next/server'
-import { geminiApiKeyManager } from '@root/gemini-api-key-manager'
 
 export async function GET() {
   try {
-    // Get keys directly without acquire/release since this is for client-side WebSocket usage
-    // The key manager's acquire/release pattern is for server-side API calls
-    const keys = geminiApiKeyManager.getAllKeys()
+    // Use the billed API key for Gemini Live voice interviews
+    const apiKey = process.env.GEMINI_API_KEY_BILLED
 
-    if (!keys || keys.length === 0) {
+    if (!apiKey) {
+      console.error('GEMINI_API_KEY_BILLED not found in environment variables')
       return NextResponse.json(
-        { error: 'No API keys available' },
+        { error: 'API key not configured. Please set GEMINI_API_KEY_BILLED in .env' },
         { status: 503 }
       )
     }
 
-    // Return the first available key for client-side Gemini Live connection
-    return NextResponse.json({ apiKey: keys[0] })
+    // Return the billed key for client-side Gemini Live connection
+    return NextResponse.json({ apiKey })
   } catch (error) {
     console.error('Error getting API key:', error)
     return NextResponse.json(
