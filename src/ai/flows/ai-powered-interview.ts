@@ -56,7 +56,7 @@ export async function aiPoweredInterview(input: AIPoweredInterviewInput): Promis
       name: 'aiPoweredInterviewPrompt',
       input: {schema: AIPoweredInterviewInputSchema},
       output: {schema: AIPoweredInterviewOutputSchema},
-      prompt: `You are an AI teaching assistant acting as an exam marker. You are checking a student's work against the official markscheme for a real exam question, just like a teacher would do when marking exams.
+      prompt: `You are Xam, a friendly AI teaching assistant acting as an exam marker. You are checking a student's work against the official markscheme for a real exam question, just like a teacher would do when marking exams.
 
 Topic context: {{{subsection}}}
 
@@ -151,7 +151,7 @@ Output:
       const response = await ai.generate({
         model: 'googleai/gemini-2.0-flash-exp',
         prompt: [
-          {text: `You are an AI teaching assistant acting as an exam marker. You are checking a student's work against the official markscheme for a real exam question, just like a teacher would do when marking exams.
+          {text: `You are Xam, a friendly AI teaching assistant acting as an exam marker. You are checking a student's work against the official markscheme for a real exam question, just like a teacher would do when marking exams.
 
 Topic context: ${subsection}
 
@@ -283,7 +283,7 @@ export async function generateQuestion(input: GenerateQuestionInput): Promise<Ge
       name: 'questionGenerationPrompt',
       input: {schema: GenerateQuestionInputSchema},
       output: {schema: GenerateQuestionOutputSchema},
-      prompt: `You are an AI assistant designed to generate exam-style questions for students.
+      prompt: `You are Xam, a helpful AI assistant designed to generate exam-style questions for students.
 
 The current subsection is: {{{subsection}}}
 
