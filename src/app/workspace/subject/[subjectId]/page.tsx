@@ -9,14 +9,12 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import PageSpinner from '@/components/PageSpinner';
-import { ArrowLeft, BookCopy, FileText, List, Upload, Crown } from 'lucide-react';
+import { ArrowLeft, BookCopy, FileText, Crown } from 'lucide-react';
 import { getScoreColorStyle, getDefaultBoxStyle, getUnattemptedBoxStyle } from '@/lib/utils';
 import { PaperType } from '@/lib/types';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { SubjectNameDescriptionModal } from '@/components/SubjectNameDescriptionModal';
-import { PaperUploadSections } from '@/components/PaperUploadSections';
-import { MarkschemeUploadSections } from '@/components/MarkschemeUploadSections';
 import { UnderstandingIndicator } from '@/components/ui/understanding-indicator';
 
 export default function SubjectPage() {
@@ -37,8 +35,6 @@ function SubjectPageContent() {
 
   const [hideEmptyPapers, setHideEmptyPapers] = useState(true);
   const [isNameDescModalOpen, setNameDescModalOpen] = useState(false);
-  const [isPaperUploadOpen, setPaperUploadOpen] = useState(false);
-  const [isMarkschemeUploadOpen, setMarkschemeUploadOpen] = useState(false);
 
   useEffect(() => {
     // Reset loading state on mount in case user navigated back
@@ -131,61 +127,17 @@ function SubjectPageContent() {
         {subject.isCreator ? 'Manage your subject, syllabus, and past papers' : 'View and practice questions from this subject'}
       </p>
 
-      {/* Syllabus and Past Papers Info - Only show for creators */}
+      {/* Syllabus Info - Only show for creators */}
       {subject.isCreator && (
-        <div className="space-y-8 mb-8">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2"><FileText /> Syllabus Info</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-green-600">Syllabus uploaded and {subject.paperTypes.length} paper types identified.</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2"><List /> Past Papers & Markschemes</CardTitle>
-              <CardDescription>Upload past papers and markschemes for each paper type separately.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex gap-2">
-                <Button
-                  variant={isPaperUploadOpen ? "default" : "secondary"}
-                  onClick={() => setPaperUploadOpen(!isPaperUploadOpen)}
-                >
-                  <Upload className="mr-2 h-4 w-4" />
-                  {isPaperUploadOpen ? "Hide" : "Upload"} Past Papers
-                </Button>
-                <Button
-                  variant={isMarkschemeUploadOpen ? "default" : "outline"}
-                  onClick={() => setMarkschemeUploadOpen(!isMarkschemeUploadOpen)}
-                >
-                  <Upload className="mr-2 h-4 w-4" />
-                  {isMarkschemeUploadOpen ? "Hide" : "Upload"} Markschemes
-                </Button>
-              </div>
-
-              {isPaperUploadOpen && (
-                <PaperUploadSections
-                  paperTypes={subject.paperTypes}
-                  subjectId={subject.id}
-                  onUpload={processExamPapers}
-                  isLoading={isLoading}
-                />
-              )}
-
-              {isMarkschemeUploadOpen && (
-                <MarkschemeUploadSections
-                  paperTypes={subject.paperTypes}
-                  subjectId={subject.id}
-                  onUpload={processMarkschemes}
-                  isLoading={isLoading}
-                />
-              )}
-            </CardContent>
-          </Card>
-        </div>
+        <Card className="mb-8">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2"><FileText /> Syllabus Info</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-green-600">Syllabus uploaded and {subject.paperTypes.length} paper types identified.</p>
+            <p className="text-sm text-muted-foreground mt-2">To upload past papers or markschemes, click on a paper type below.</p>
+          </CardContent>
+        </Card>
       )}
 
       <div>
