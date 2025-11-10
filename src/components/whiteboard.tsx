@@ -3,7 +3,14 @@
 import React, { useRef, useState } from "react";
 import { ReactSketchCanvas, ReactSketchCanvasRef } from "react-sketch-canvas";
 import { Button } from "@/components/ui/button";
-import { Eraser, Pen, Trash2, Send } from "lucide-react";
+import { Eraser, Pen, Trash2, Send, MoreHorizontal } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
 
 interface WhiteboardProps {
   onSubmit: (imageData: string) => void;
@@ -55,7 +62,7 @@ export function Whiteboard({ onSubmit, disabled = false }: WhiteboardProps) {
   return (
     <div className="flex flex-col space-y-2">
       {/* Toolbar */}
-      <div className="flex items-center justify-between p-2 border rounded-md bg-background">
+      <div className="flex items-center justify-between p-2 border rounded-md bg-background max-w-full overflow-x-hidden">
         <div className="flex items-center space-x-2">
           {/* Pen/Eraser Toggle */}
           <Button
@@ -75,39 +82,95 @@ export function Whiteboard({ onSubmit, disabled = false }: WhiteboardProps) {
             <Eraser className="h-4 w-4" />
           </Button>
 
-          {/* Color Palette */}
+          {/* Desktop: Inline Controls */}
           {!eraserMode && (
-            <div className="flex space-x-1 ml-2">
-              {colors.map((color) => (
-                <button
-                  key={color}
-                  className={`w-6 h-6 rounded-full border-2 transition-all ${
-                    strokeColor === color
-                      ? "border-primary scale-110"
-                      : "border-gray-300"
-                  }`}
-                  style={{ backgroundColor: color }}
-                  onClick={() => setStrokeColor(color)}
+            <>
+              {/* Color Palette - Hidden on mobile */}
+              <div className="hidden md:flex space-x-1 ml-2">
+                {colors.map((color) => (
+                  <button
+                    key={color}
+                    className={`w-6 h-6 rounded-full border-2 transition-all ${
+                      strokeColor === color
+                        ? "border-primary scale-110"
+                        : "border-gray-300"
+                    }`}
+                    style={{ backgroundColor: color }}
+                    onClick={() => setStrokeColor(color)}
+                    disabled={disabled}
+                  />
+                ))}
+              </div>
+
+              {/* Stroke Width - Hidden on mobile */}
+              <div className="hidden md:flex items-center space-x-2 ml-2">
+                <label className="text-sm">Size:</label>
+                <input
+                  type="range"
+                  min="1"
+                  max="10"
+                  value={strokeWidth}
+                  onChange={(e) => setStrokeWidth(Number(e.target.value))}
+                  className="w-20"
                   disabled={disabled}
                 />
-              ))}
-            </div>
+              </div>
+            </>
           )}
 
-          {/* Stroke Width */}
+          {/* Mobile: Menu Button */}
           {!eraserMode && (
-            <div className="flex items-center space-x-2 ml-2">
-              <label className="text-sm">Size:</label>
-              <input
-                type="range"
-                min="1"
-                max="10"
-                value={strokeWidth}
-                onChange={(e) => setStrokeWidth(Number(e.target.value))}
-                className="w-20"
-                disabled={disabled}
-              />
-            </div>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="md:hidden"
+                  disabled={disabled}
+                >
+                  <MoreHorizontal className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-56">
+                {/* Color Selection */}
+                <div className="p-3">
+                  <label className="text-sm font-medium mb-2 block">Color</label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {colors.map((color) => (
+                      <button
+                        key={color}
+                        className={`w-10 h-10 rounded-full border-2 transition-all ${
+                          strokeColor === color
+                            ? "border-primary scale-110 ring-2 ring-primary ring-offset-2"
+                            : "border-gray-300"
+                        }`}
+                        style={{ backgroundColor: color }}
+                        onClick={() => setStrokeColor(color)}
+                        disabled={disabled}
+                      />
+                    ))}
+                  </div>
+                </div>
+
+                <DropdownMenuSeparator />
+
+                {/* Stroke Width */}
+                <div className="p-3">
+                  <label className="text-sm font-medium mb-2 block">
+                    Brush Size: {strokeWidth}
+                  </label>
+                  <input
+                    type="range"
+                    min="1"
+                    max="10"
+                    value={strokeWidth}
+                    onChange={(e) => setStrokeWidth(Number(e.target.value))}
+                    className="w-full"
+                    disabled={disabled}
+                  />
+                </div>
+              </DropdownMenuContent>
+            </DropdownMenu>
           )}
         </div>
 
@@ -119,16 +182,16 @@ export function Whiteboard({ onSubmit, disabled = false }: WhiteboardProps) {
             onClick={handleClear}
             disabled={disabled}
           >
-            <Trash2 className="h-4 w-4 mr-1" />
-            Clear
+            <Trash2 className="h-4 w-4 md:mr-1" />
+            <span className="hidden md:inline">Clear</span>
           </Button>
           <Button
             size="sm"
             onClick={handleSubmit}
             disabled={disabled}
           >
-            <Send className="h-4 w-4 mr-1" />
-            Send
+            <Send className="h-4 w-4 md:mr-1" />
+            <span className="hidden md:inline">Send</span>
           </Button>
         </div>
       </div>

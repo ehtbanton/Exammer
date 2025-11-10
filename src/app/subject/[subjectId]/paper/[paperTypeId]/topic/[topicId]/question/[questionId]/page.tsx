@@ -392,7 +392,7 @@ function InterviewPageContent() {
   };
 
   return (
-    <div className="container mx-auto h-[calc(100vh-6rem)] flex flex-col p-4">
+    <div className="container mx-auto h-full flex flex-col p-4">
       {/* Header with Back Button and Topic */}
       <div className="flex items-center justify-between mb-4 pb-3 border-b shrink-0">
         <Button variant="ghost" onClick={handleBackClick}>
@@ -460,7 +460,7 @@ function InterviewPageContent() {
                   {generatedVariant ? (
                     <>
                       <ScrollArea className="flex-1 p-6 overflow-auto">
-                        <div className="prose prose-base max-w-none dark:prose-invert">
+                        <div className="prose prose-base max-w-none dark:prose-invert break-words">
                           <LatexRenderer className="text-base leading-relaxed whitespace-pre-wrap break-words font-normal">
                             {formatQuestionText(generatedVariant.questionText)}
                           </LatexRenderer>
