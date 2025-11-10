@@ -31,11 +31,71 @@ export default function HomePage() {
         </Link>
 
         {/* RAG for RAG Subheading */}
-        <div className="mt-8 flex flex-col items-center gap-1">
-          <h2 className="text-2xl font-semibold text-foreground">RAG for RAG</h2>
-          <div className="flex flex-col items-center text-sm text-muted-foreground">
-            <span className="tracking-wide">RETRIEVAL AUGMENTED GENERATION</span>
-            <span className="tracking-wide">RED AMBER GREEN</span>
+        <div className="mt-8 flex items-start gap-4 text-sm font-mono">
+          {/* First RAG - RETRIEVAL AUGMENTED GENERATION */}
+          <div className="flex gap-3">
+            <div className="flex flex-col">
+              <span className="font-bold text-gray-500">R</span>
+              <span className="text-gray-400">e</span>
+              <span className="text-gray-400">t</span>
+              <span className="text-gray-400">r</span>
+              <span className="text-gray-400">i</span>
+              <span className="text-gray-400">e</span>
+              <span className="text-gray-400">v</span>
+              <span className="text-gray-400">a</span>
+              <span className="text-gray-400">l</span>
+            </div>
+            <div className="flex flex-col">
+              <span className="font-bold text-gray-500">A</span>
+              <span className="text-gray-400">u</span>
+              <span className="text-gray-400">g</span>
+              <span className="text-gray-400">m</span>
+              <span className="text-gray-400">e</span>
+              <span className="text-gray-400">n</span>
+              <span className="text-gray-400">t</span>
+              <span className="text-gray-400">e</span>
+              <span className="text-gray-400">d</span>
+            </div>
+            <div className="flex flex-col">
+              <span className="font-bold text-gray-500">G</span>
+              <span className="text-gray-400">e</span>
+              <span className="text-gray-400">n</span>
+              <span className="text-gray-400">e</span>
+              <span className="text-gray-400">r</span>
+              <span className="text-gray-400">a</span>
+              <span className="text-gray-400">t</span>
+              <span className="text-gray-400">i</span>
+              <span className="text-gray-400">o</span>
+              <span className="text-gray-400">n</span>
+            </div>
+          </div>
+
+          {/* "for" */}
+          <div className="flex items-start pt-0">
+            <span className="text-muted-foreground italic">for</span>
+          </div>
+
+          {/* Second RAG - RED AMBER GREEN */}
+          <div className="flex gap-3">
+            <div className="flex flex-col">
+              <span className="font-bold text-red-500">R</span>
+              <span className="text-red-400">e</span>
+              <span className="text-red-400">d</span>
+            </div>
+            <div className="flex flex-col">
+              <span className="font-bold text-amber-500">A</span>
+              <span className="text-amber-400">m</span>
+              <span className="text-amber-400">b</span>
+              <span className="text-amber-400">e</span>
+              <span className="text-amber-400">r</span>
+            </div>
+            <div className="flex flex-col">
+              <span className="font-bold text-green-500">G</span>
+              <span className="text-green-400">r</span>
+              <span className="text-green-400">e</span>
+              <span className="text-green-400">e</span>
+              <span className="text-green-400">n</span>
+            </div>
           </div>
         </div>
 
