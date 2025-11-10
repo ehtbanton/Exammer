@@ -2,7 +2,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Target, BookOpen, Users, MessageSquare, Bot } from 'lucide-react';
+import { BookOpen, Users, MessageSquare, Bot } from 'lucide-react';
 import { UnderstandingIndicator } from '@/components/ui/understanding-indicator';
 import { Progress } from '@/components/ui/progress';
 
@@ -17,7 +17,7 @@ export default function HomePage() {
             alt="Exammer Logo"
             width={160}
             height={160}
-            className="h-40 w-40"
+            className="h-40 w-40 object-contain"
           />
 
           <div className="flex flex-col items-center gap-2">
@@ -110,12 +110,14 @@ export default function HomePage() {
       <div className="container mx-auto px-4 py-12 max-w-6xl">
 
         <div className="grid md:grid-cols-2 gap-8">
-          {/* Understanding Levels */}
+          {/* Levels of Understanding */}
           <Card className="hover:shadow-lg transition-shadow">
             <CardHeader>
               <div className="flex items-center gap-3">
-                <Target className="h-8 w-8 text-primary" />
-                <CardTitle>Understanding Levels</CardTitle>
+                <div className="[&>div>div:last-child]:hidden">
+                  <UnderstandingIndicator percentage={75} size="lg" />
+                </div>
+                <CardTitle>Levels of Understanding</CardTitle>
               </div>
             </CardHeader>
             <CardContent>
@@ -132,15 +134,6 @@ export default function HomePage() {
                   </div>
                   <p className="text-xs text-black mt-1">3/10 attempted</p>
                   <Progress value={30} className="h-1.5 mt-2" />
-                </div>
-                {/* Amber with half completed */}
-                <div className="border-2 rounded-lg p-3" style={{backgroundColor: '#fbbf24', borderColor: '#f59e0b'}}>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-semibold text-black">Algebra Equations</span>
-                    <UnderstandingIndicator percentage={68} size="sm" />
-                  </div>
-                  <p className="text-xs text-black mt-1">4/8 attempted</p>
-                  <Progress value={50} className="h-1.5 mt-2" />
                 </div>
                 {/* Yellow/Amber with all completed */}
                 <div className="border-2 rounded-lg p-3" style={{backgroundColor: '#fbbf24', borderColor: '#f59e0b'}}>
@@ -174,47 +167,53 @@ export default function HomePage() {
             </CardHeader>
             <CardContent>
               <p className="text-muted-foreground mb-4">
-                Your personal study hub where subjects, topics, and questions are organized. Navigate through
-                past papers, practice questions, and track your mastery of each topic.
+                Your personal study hub where all subjects and topics are organized.
               </p>
-              <div className="grid grid-cols-2 gap-2">
-                {/* Paper 1 */}
-                <div className="border rounded-lg p-2 bg-card hover:shadow-md transition-shadow">
-                  <div className="flex items-center gap-1 mb-1">
-                    <BookOpen className="h-3 w-3 text-primary" />
-                    <span className="font-semibold text-xs">Paper 1</span>
-                  </div>
-                  <p className="text-[10px] text-muted-foreground">Pure Mathematics</p>
-                  <p className="text-[10px] text-muted-foreground mt-1">15 topics • 89 questions</p>
-                </div>
-                {/* Paper 2 */}
-                <div className="border rounded-lg p-2 bg-card hover:shadow-md transition-shadow">
-                  <div className="flex items-center gap-1 mb-1">
-                    <BookOpen className="h-3 w-3 text-primary" />
-                    <span className="font-semibold text-xs">Paper 2</span>
-                  </div>
-                  <p className="text-[10px] text-muted-foreground">Applied Math</p>
-                  <p className="text-[10px] text-muted-foreground mt-1">12 topics • 67 questions</p>
-                </div>
-                {/* Paper 3 */}
-                <div className="border rounded-lg p-2 bg-card hover:shadow-md transition-shadow">
-                  <div className="flex items-center gap-1 mb-1">
-                    <BookOpen className="h-3 w-3 text-primary" />
-                    <span className="font-semibold text-xs">Paper 3</span>
-                  </div>
-                  <p className="text-[10px] text-muted-foreground">Statistics</p>
-                  <p className="text-[10px] text-muted-foreground mt-1">10 topics • 52 questions</p>
-                </div>
-                {/* Paper 4 */}
-                <div className="border rounded-lg p-2 bg-card hover:shadow-md transition-shadow">
-                  <div className="flex items-center gap-1 mb-1">
-                    <BookOpen className="h-3 w-3 text-primary" />
-                    <span className="font-semibold text-xs">Paper 4</span>
-                  </div>
-                  <p className="text-[10px] text-muted-foreground">Mechanics</p>
-                  <p className="text-[10px] text-muted-foreground mt-1">8 topics • 43 questions</p>
-                </div>
+              <div className="grid grid-cols-1 gap-3 mb-4">
+                {/* Subject Card 1 */}
+                <Card className="hover:shadow-md transition-shadow border">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="flex items-center gap-2 font-headline text-base">
+                      <BookOpen className="text-primary h-5 w-5" />
+                      Mathematics A-Level
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="pt-0">
+                    <p className="text-xs text-muted-foreground">4 paper types identified.</p>
+                  </CardContent>
+                </Card>
+                {/* Subject Card 2 */}
+                <Card className="hover:shadow-md transition-shadow border">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="flex items-center gap-2 font-headline text-base">
+                      <BookOpen className="text-primary h-5 w-5" />
+                      Physics AS-Level
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="pt-0">
+                    <p className="text-xs text-muted-foreground">3 paper types identified.</p>
+                  </CardContent>
+                </Card>
               </div>
+              {/* Bullet points */}
+              <ul className="space-y-1.5 text-sm text-muted-foreground">
+                <li className="flex items-start gap-2">
+                  <span className="text-primary mt-0.5">•</span>
+                  <span>All your revision in one place</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-primary mt-0.5">•</span>
+                  <span>Search and add new subjects</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-primary mt-0.5">•</span>
+                  <span>Track progress across all topics</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-primary mt-0.5">•</span>
+                  <span>Compete with peers in classrooms</span>
+                </li>
+              </ul>
             </CardContent>
           </Card>
 
@@ -301,6 +300,19 @@ export default function HomePage() {
             Sign Up Now
           </Button>
         </Link>
+      </div>
+
+      {/* Contact Section */}
+      <div className="container mx-auto px-4 pb-12 text-center">
+        <p className="text-xl text-muted-foreground">
+          Got questions? Contact the app's creator at{' '}
+          <a
+            href="mailto:anton.may@new.ox.ac.uk"
+            className="text-primary hover:underline"
+          >
+            anton.may@new.ox.ac.uk
+          </a>
+        </p>
       </div>
     </div>
   );
