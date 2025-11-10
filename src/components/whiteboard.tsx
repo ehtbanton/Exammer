@@ -82,50 +82,13 @@ export function Whiteboard({ onSubmit, disabled = false }: WhiteboardProps) {
             <Eraser className="h-4 w-4" />
           </Button>
 
-          {/* Desktop: Inline Controls */}
-          {!eraserMode && (
-            <>
-              {/* Color Palette - Hidden on mobile */}
-              <div className="hidden md:flex space-x-1 ml-2">
-                {colors.map((color) => (
-                  <button
-                    key={color}
-                    className={`w-6 h-6 rounded-full border-2 transition-all ${
-                      strokeColor === color
-                        ? "border-primary scale-110"
-                        : "border-gray-300"
-                    }`}
-                    style={{ backgroundColor: color }}
-                    onClick={() => setStrokeColor(color)}
-                    disabled={disabled}
-                  />
-                ))}
-              </div>
-
-              {/* Stroke Width - Hidden on mobile */}
-              <div className="hidden md:flex items-center space-x-2 ml-2">
-                <label className="text-sm">Size:</label>
-                <input
-                  type="range"
-                  min="1"
-                  max="10"
-                  value={strokeWidth}
-                  onChange={(e) => setStrokeWidth(Number(e.target.value))}
-                  className="w-20"
-                  disabled={disabled}
-                />
-              </div>
-            </>
-          )}
-
-          {/* Mobile: Menu Button */}
+          {/* Menu Button with Color & Size Controls */}
           {!eraserMode && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button
                   size="sm"
                   variant="outline"
-                  className="md:hidden"
                   disabled={disabled}
                 >
                   <MoreHorizontal className="h-4 w-4" />
