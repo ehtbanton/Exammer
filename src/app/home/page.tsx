@@ -1,24 +1,25 @@
 import Image from 'next/image';
-import Link from 'next/link';
-import { Button } from '@/components/ui/button';
 
 export default function HomePage() {
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-background">
-      <div className="flex flex-col items-center gap-8">
+      <div className="flex flex-col items-center gap-6">
         <Image
           src="/exammer.png"
           alt="Exammer Logo"
-          width={120}
-          height={120}
-          className="h-30 w-30"
+          width={200}
+          height={200}
+          className="h-50 w-50"
         />
 
-        <Link href="/auth/signin">
-          <Button size="lg">
-            Login
-          </Button>
-        </Link>
+        <div className="flex flex-col items-center gap-2">
+          <h1 className="text-5xl font-bold font-headline text-primary">
+            Exammer
+          </h1>
+          <p className="text-xl text-muted-foreground">
+            Get hooked on Revision
+          </p>
+        </div>
       </div>
     </div>
   );

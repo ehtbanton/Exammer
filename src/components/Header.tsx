@@ -58,7 +58,6 @@ export default function Header() {
   };
 
   const isDebugPage = pathname === '/t';
-  const isClassesPage = pathname.startsWith('/classes');
 
   return (
     <header className="bg-card border-b sticky top-0 z-10">
@@ -96,23 +95,22 @@ export default function Header() {
               <div className="h-8 w-8 rounded-full bg-gray-200 animate-pulse" />
             ) : session ? (
               <>
-                {/* Classes/Workspace button for students, teachers, and admins (level 1-3) */}
+                {/* Workspace and Classes buttons for students, teachers, and admins (level 1-3) */}
                 {accessLevel !== null && accessLevel >= 1 && (
-                  isClassesPage ? (
+                  <>
                     <Button variant="outline" size="sm" asChild>
                       <Link href="/workspace">
                         <Home className="h-4 w-4 mr-2" />
                         Workspace
                       </Link>
                     </Button>
-                  ) : (
                     <Button variant="outline" size="sm" asChild>
                       <Link href={accessLevel === 1 ? "/workspace/classes/join" : "/workspace/classes"}>
                         <Users className="h-4 w-4 mr-2" />
                         Classes
                       </Link>
                     </Button>
-                  )
+                  </>
                 )}
 
                 <DropdownMenu>
@@ -145,14 +143,9 @@ export default function Header() {
               </DropdownMenu>
               </>
             ) : (
-              <div className="flex items-center gap-2">
-                <Button variant="ghost" asChild>
-                  <Link href="/auth/signin">Sign In</Link>
-                </Button>
-                <Button asChild>
-                  <Link href="/auth/signup">Sign Up</Link>
-                </Button>
-              </div>
+              <Button variant="ghost" asChild>
+                <Link href="/auth/signin">Login</Link>
+              </Button>
             )}
           </div>
         </div>
