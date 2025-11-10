@@ -24,6 +24,9 @@ interface HybridDiagramRendererProps {
   diagramDescription?: string; // Description for Imagen fallback
   subject?: string; // Subject context for better Imagen generation
 
+  // Force Imagen-only mode (skips Mermaid entirely)
+  forceImagen?: boolean; // If true, always use Imagen instead of Mermaid
+
   // Styling
   className?: string;
 }
@@ -37,6 +40,7 @@ export function HybridDiagramRenderer({
   enableFallback = true,
   diagramDescription,
   subject,
+  forceImagen = false,
   className = '',
 }: HybridDiagramRendererProps) {
   const mermaidRef = useRef<HTMLDivElement>(null);
@@ -46,8 +50,9 @@ export function HybridDiagramRenderer({
   const [renderAttempt, setRenderAttempt] = useState(0);
 
   // Determine which diagram to render
-  const shouldRenderMermaid = diagramType === 'mermaid' || (!diagramType && mermaidCode);
-  const shouldRenderImagen = diagramType === 'imagen' || imageUri || fallbackImageUri;
+  // If forceImagen is true, always prefer Imagen
+  const shouldRenderMermaid = !forceImagen && (diagramType === 'mermaid' || (!diagramType && mermaidCode));
+  const shouldRenderImagen = forceImagen || diagramType === 'imagen' || imageUri || fallbackImageUri;
 
   // Render Mermaid diagram
   useEffect(() => {
@@ -82,6 +87,14 @@ export function HybridDiagramRenderer({
 
     renderDiagram();
   }, [mermaidCode, shouldRenderMermaid, renderAttempt]);
+
+  // Auto-generate Imagen when forceImagen is true
+  useEffect(() => {
+    if (forceImagen && diagramDescription && !imageUri && !fallbackImageUri && !isGeneratingFallback) {
+      console.log('[HybridDiagram] Force Imagen mode - auto-generating image...');
+      attemptImagenFallback();
+    }
+  }, [forceImagen, diagramDescription, imageUri, fallbackImageUri]);
 
   // Attempt to generate diagram using Imagen as fallback
   const attemptImagenFallback = async () => {

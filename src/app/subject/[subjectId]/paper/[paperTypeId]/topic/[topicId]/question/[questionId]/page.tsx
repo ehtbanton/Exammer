@@ -27,6 +27,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useSession } from 'next-auth/react';
 import { LatexRenderer } from '@/components/latex-renderer';
 import { HybridDiagramRenderer } from '@/components/hybrid-diagram-renderer';
+import { DIAGRAM_CONFIG } from '@/config/diagram-config';
 import mermaid from 'mermaid';
 
 // Initialize mermaid with enhanced configuration
@@ -517,14 +518,17 @@ function InterviewPageContent() {
                           <LatexRenderer className="text-base leading-relaxed whitespace-pre-wrap break-words font-normal">
                             {formatQuestionText(generatedVariant.questionText)}
                           </LatexRenderer>
-                          {/* Diagram display - supports both Mermaid and Imagen */}
+                          {/* Diagram display - mode controlled by DIAGRAM_CONFIG */}
                           {generatedVariant.diagramMermaid && (
                             <div className="mt-6">
                               <HybridDiagramRenderer
                                 mermaidCode={generatedVariant.diagramMermaid}
-                                enableFallback={true}
+                                enableFallback={DIAGRAM_CONFIG.ENABLE_FALLBACK}
                                 diagramDescription={generatedVariant.questionText}
                                 subject={subject?.name}
+                                forceImagen={DIAGRAM_CONFIG.FORCE_IMAGEN}
+                                style={DIAGRAM_CONFIG.DEFAULT_STYLE}
+                                aspectRatio={DIAGRAM_CONFIG.DEFAULT_ASPECT_RATIO}
                               />
                             </div>
                           )}
