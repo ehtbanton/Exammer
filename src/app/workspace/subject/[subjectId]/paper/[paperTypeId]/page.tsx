@@ -27,23 +27,45 @@ export default function PaperTypePage() {
 function PaperTypePageContent() {
   const params = useParams();
   const router = useRouter();
-  const { subjects, isLoading, setLoading } = useAppContext();
+  const { loadSubjectsList, loadPaperTypes, loadTopics, isLoading, setLoading } = useAppContext();
 
   const subjectId = params.subjectId as string;
   const paperTypeId = decodeURIComponent(params.paperTypeId as string);
 
-  const subject = subjects.find(s => s.id === subjectId);
-  const paperType = subject?.paperTypes.find(p => p.id === paperTypeId);
-
+  const [subject, setSubject] = useState<import('@/app/context/AppContext').SubjectPreview | null>(null);
+  const [paperType, setPaperType] = useState<import('@/app/context/AppContext').PaperTypeWithMetrics | null>(null);
+  const [topics, setTopics] = useState<import('@/app/context/AppContext').TopicWithMetrics[]>([]);
   const [navigatingTo, setNavigatingTo] = useState<string | null>(null);
   const [hideEmptyTopics, setHideEmptyTopics] = useState(true);
 
+  // Load data on mount
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        const subjectsList = await loadSubjectsList();
+        const foundSubject = subjectsList.find(s => s.id === subjectId);
+        setSubject(foundSubject || null);
+
+        const paperTypesList = await loadPaperTypes(subjectId);
+        const foundPaperType = paperTypesList.find(pt => pt.id === paperTypeId);
+        setPaperType(foundPaperType || null);
+
+        if (foundPaperType) {
+          const topicsList = await loadTopics(paperTypeId);
+          setTopics(topicsList);
+        }
+      } catch (error) {
+        console.error('Error loading paper type data:', error);
+      }
+    };
+
+    loadData();
+  }, [subjectId, paperTypeId, loadSubjectsList, loadPaperTypes, loadTopics]);
+
   useEffect(() => {
     // Reset loading state on mount in case user navigated back
-    if (paperType) {
-       paperType.topics.forEach(topic => setLoading(`navigate-topic-${topic.id}`, false));
-    }
-  }, [paperType, setLoading]);
+    topics.forEach(topic => setLoading(`navigate-topic-${topic.id}`, false));
+  }, [topics, setLoading]);
 
   const handleNavigate = (topicId: string) => {
     const loadingKey = `navigate-topic-${topicId}`;
@@ -56,8 +78,8 @@ function PaperTypePageContent() {
     return <PageSpinner />;
   }
 
-  // Show loading spinner while subjects are being fetched
-  if (isLoading('fetch-subjects')) {
+  // Show loading spinner while data is being fetched
+  if (isLoading(`load-topics-${paperTypeId}`)) {
     return <PageSpinner />;
   }
 
@@ -72,23 +94,10 @@ function PaperTypePageContent() {
     );
   }
 
-  // Calculate average score for each topic based only on attempted questions
-  const getTopicAverageScore = (topic: Topic): number | null => {
-    const allQuestions = topic.examQuestions || [];
-    if (allQuestions.length === 0) return null;
-
-    // Only include questions with at least 1 attempt
-    const attemptedQuestions = allQuestions.filter(q => q.attempts > 0);
-    if (attemptedQuestions.length === 0) return null;
-
-    const sum = attemptedQuestions.reduce((acc, q) => acc + q.score, 0);
-    return sum / attemptedQuestions.length;
-  };
-
-  // Filter topics based on toggle
+  // Filter topics based on toggle (using metrics from API)
   const filteredTopics = hideEmptyTopics
-    ? paperType?.topics.filter(topic => topic.examQuestions && topic.examQuestions.length > 0) || []
-    : paperType?.topics || [];
+    ? topics.filter(topic => topic.total_questions > 0)
+    : topics;
 
   return (
     <div className="container mx-auto">
@@ -113,19 +122,18 @@ function PaperTypePageContent() {
         </div>
         {filteredTopics.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredTopics.map((topic: Topic) => {
-              const avgScore = getTopicAverageScore(topic);
-              const hasScore = avgScore !== null;
-              const hasQuestions = topic.examQuestions && topic.examQuestions.length > 0;
-
-              // Calculate progress
-              const totalQuestions = topic.examQuestions?.length || 0;
-              const attemptedQuestions = topic.examQuestions?.filter(q => q.attempts > 0).length || 0;
-              const progressPercentage = totalQuestions > 0 ? (attemptedQuestions / totalQuestions) * 100 : 0;
+            {filteredTopics.map((topic) => {
+              // Use metrics from API (already calculated server-side)
+              const avgScore = topic.avg_score;
+              const hasScore = avgScore !== null && topic.attempted_questions > 0;
+              const hasQuestions = topic.total_questions > 0;
+              const progressPercentage = topic.total_questions > 0
+                ? (topic.attempted_questions / topic.total_questions) * 100
+                : 0;
 
               // Determine which style to use
               let boxStyle;
-              if (hasScore) {
+              if (hasScore && avgScore !== null) {
                 boxStyle = getScoreColorStyle(avgScore);
               } else if (hasQuestions) {
                 boxStyle = getUnattemptedBoxStyle(); // Has questions but no attempts
@@ -142,14 +150,16 @@ function PaperTypePageContent() {
                     <CardHeader>
                       <div className="flex items-start justify-between gap-4">
                         <CardTitle className="text-lg text-black flex-1">{topic.name}</CardTitle>
-                        {hasScore && (
+                        {hasScore && avgScore !== null && (
                           <UnderstandingIndicator percentage={avgScore} size="sm" />
                         )}
                       </div>
                     </CardHeader>
                     <CardContent className="space-y-2">
-                      <p className="text-sm text-black">{totalQuestions > 0 ? `${attemptedQuestions}/${totalQuestions} attempted` : 'No questions yet'}</p>
-                      {totalQuestions > 0 && (
+                      <p className="text-sm text-black">
+                        {hasQuestions ? `${topic.attempted_questions}/${topic.total_questions} attempted` : 'No questions yet'}
+                      </p>
+                      {hasQuestions && (
                         <Progress value={progressPercentage} className="h-2" />
                       )}
                     </CardContent>

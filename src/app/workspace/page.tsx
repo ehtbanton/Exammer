@@ -24,7 +24,8 @@ export default function HomePage() {
 
 function HomePageContent() {
   const router = useRouter();
-  const { subjects, otherSubjects, isLevel3User, createSubjectFromSyllabus, deleteSubject, addSubjectToWorkspace, removeSubjectFromWorkspace, searchSubjects, isLoading, setLoading } = useAppContext();
+  const { otherSubjects, isLevel3User, createSubjectFromSyllabus, deleteSubject, addSubjectToWorkspace, removeSubjectFromWorkspace, searchSubjects, loadSubjectsList, isLoading, setLoading } = useAppContext();
+  const [subjects, setSubjects] = useState<import('@/app/context/AppContext').SubjectPreview[]>([]);
   const [navigatingTo, setNavigatingTo] = useState<string | null>(null);
   const [syllabusFile, setSyllabusFile] = useState<File | null>(null);
   const [uploadStage, setUploadStage] = useState<'initial' | 'syllabus'>('initial');
@@ -32,6 +33,20 @@ function HomePageContent() {
   const [hasSearched, setHasSearched] = useState<boolean>(false);
   const [accessLevel, setAccessLevel] = useState<number | null>(null);
   const syllabusInputRef = useRef<HTMLInputElement>(null);
+
+  // Load subjects list on mount
+  useEffect(() => {
+    const loadSubjects = async () => {
+      try {
+        const subjectsList = await loadSubjectsList();
+        setSubjects(subjectsList);
+      } catch (error) {
+        console.error('Error loading subjects:', error);
+      }
+    };
+
+    loadSubjects();
+  }, [loadSubjectsList]);
 
   // Fetch user's access level
   useEffect(() => {
@@ -150,7 +165,7 @@ function HomePageContent() {
       </AlertDialog>
 
       {/* My Workspace Section */}
-      {isLoading('fetch-subjects') ? (
+      {isLoading('load-subjects-list') ? (
         <WorkspaceLoading />
       ) : subjects.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
@@ -169,7 +184,7 @@ function HomePageContent() {
                 </CardHeader>
                 <CardContent className="flex-grow">
                   <p className="text-sm text-muted-foreground">
-                    {subject.paperTypes.length} paper types identified.
+                    {subject.paperTypesCount} paper types identified.
                   </p>
                 </CardContent>
                 <CardFooter className="flex justify-between gap-2">

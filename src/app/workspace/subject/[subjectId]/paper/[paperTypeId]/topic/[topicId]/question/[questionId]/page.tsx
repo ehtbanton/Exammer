@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { useAppContext } from '@/app/context/AppContext';
 import { AuthGuard } from '@/components/AuthGuard';
 import { aiPoweredInterview, generateQuestion } from '@/ai/flows/ai-powered-interview';
+import { generateSimilarQuestion } from '@/ai/flows/generate-similar-question';
 import { executeDevCommand } from '@/ai/flows/dev-commands';
 import { isDevCommand } from '@/lib/dev-commands-helpers';
 import type { ChatHistory } from '@/lib/types';
@@ -94,7 +95,7 @@ export default function InterviewPage() {
 function InterviewPageContent() {
   const params = useParams();
   const router = useRouter();
-  const { getSubjectById, updateExamQuestionScore, generateQuestionVariant, isLoading: isAppLoading } = useAppContext();
+  const { updateExamQuestionScore, loadFullQuestion, isLoading: isAppLoading } = useAppContext();
   const { toast } = useToast();
   const { data: session, status } = useSession();
 
@@ -103,11 +104,7 @@ function InterviewPageContent() {
   const topicId = decodeURIComponent(params.topicId as string);
   const questionId = decodeURIComponent(params.questionId as string);
 
-  const subject = getSubjectById(subjectId);
-  const paperType = subject?.paperTypes.find(p => p.id === paperTypeId);
-  const topic = paperType?.topics.find(t => t.id === topicId);
-  const examQuestion = topic?.examQuestions.find(q => q.id === questionId);
-
+  const [examQuestion, setExamQuestion] = useState<import('@/app/context/AppContext').FullQuestion | null>(null);
   const [chatHistory, setChatHistory] = useState<ChatHistory>([]);
   const [userInput, setUserInput] = useState('');
   const [isLoading, setIsLoading] = useState(true);
@@ -117,7 +114,22 @@ function InterviewPageContent() {
   const [completedObjectives, setCompletedObjectives] = useState<number[]>([]);
   const [showExitDialog, setShowExitDialog] = useState(false);
   const [noMarkscheme, setNoMarkscheme] = useState(false);
-  const hasOriginalMarkscheme = examQuestion?.solutionObjectives && examQuestion.solutionObjectives.length > 0;
+  const hasOriginalMarkscheme = examQuestion?.solution_objectives && examQuestion.solution_objectives.length > 0;
+
+  // Load full question on mount
+  useEffect(() => {
+    const loadQuestion = async () => {
+      try {
+        const fullQuestion = await loadFullQuestion(questionId);
+        setExamQuestion(fullQuestion);
+      } catch (error) {
+        console.error('Error loading full question:', error);
+        toast({ variant: "destructive", title: "Error", description: "Failed to load question" });
+      }
+    };
+
+    loadQuestion();
+  }, [questionId, loadFullQuestion, toast]);
 
   // Compute if all objectives are completed
   const isCompleted = generatedVariant
@@ -153,15 +165,15 @@ function InterviewPageContent() {
   }, [chatHistory]);
 
   useEffect(() => {
-    console.log('=== useEffect triggered ===', { subjectId: subject?.id, questionId: examQuestion?.id });
+    console.log('=== useEffect triggered ===', { questionId: examQuestion?.id });
 
-    if (!subject || !examQuestion || !paperType || !topic) {
-      console.log('Early return - no subject or exam question');
+    if (!examQuestion) {
+      console.log('Early return - no exam question loaded yet');
       return;
     }
 
     // Create a unique key for this question to track if we've already initialized
-    const questionKey = `${subject.id}-${examQuestion.id}`;
+    const questionKey = `${questionId}`;
 
     // Check both if we've already initialized AND if we're currently initializing
     if (hasInitialized.current === questionKey) {
@@ -180,9 +192,15 @@ function InterviewPageContent() {
       hasInitialized.current = questionKey;
       setIsLoading(true);
       try {
-        // Generate a fresh variant EVERY time
+        // Generate a fresh variant using the loaded question data
         console.log('Generating question variant with adapted objectives...');
-        const variantData = await generateQuestionVariant(subject.id, paperType.id, topic.id, examQuestion.id);
+        const variantData = await generateSimilarQuestion({
+          originalQuestionText: examQuestion.question_text,
+          topicName: '', // Not used in variant generation
+          topicDescription: '', // Not used in variant generation
+          originalObjectives: examQuestion.solution_objectives,
+          originalDiagramMermaid: examQuestion.diagram_mermaid,
+        });
         setGeneratedVariant(variantData);
         console.log('Question variant generated successfully with', variantData.solutionObjectives.length, 'objectives');
 
@@ -213,14 +231,14 @@ function InterviewPageContent() {
     };
     startInterview();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [subject?.id, examQuestion?.id]);
+  }, [examQuestion?.id, toast]);
 
   const handleVoiceMessage = (role: 'user' | 'assistant', content: string) => {
     setChatHistory(prev => [...prev, { role, content }]);
   };
 
   const handleVoiceEvaluation = async (userAnswer: string) => {
-    if (!generatedVariant || !subject || !examQuestion) return;
+    if (!generatedVariant || !examQuestion) return;
 
     try {
       console.log('Evaluating voice answer against objectives...');

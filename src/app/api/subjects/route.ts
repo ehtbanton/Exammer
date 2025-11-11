@@ -5,13 +5,22 @@ import type { Subject, PastPaper, PaperType } from '@/lib/db';
 
 export const dynamic = 'force-dynamic'; // Prevent caching to always get fresh data
 
-// GET /api/subjects - Get subjects in user's workspace (includes query param for filtering)
+// GET /api/subjects - DEPRECATED: Now only serves search results (filter=other)
+// Use /api/subjects/list for main workspace subjects
 export async function GET(req: NextRequest) {
   try {
     const user = await requireAuth();
     const { searchParams } = new URL(req.url);
-    const filter = searchParams.get('filter'); // 'workspace', 'created', 'other', or null (all workspace)
-    const search = searchParams.get('search'); // optional search query
+    const filter = searchParams.get('filter');
+    const search = searchParams.get('search');
+
+    // This endpoint now ONLY serves the "other subjects" search feature
+    if (filter !== 'other') {
+      return NextResponse.json(
+        { error: 'This endpoint only supports filter=other. Use /api/subjects/list for workspace subjects.' },
+        { status: 400 }
+      );
+    }
 
     // Get user's access level
     const fullUser = await db.get<{ access_level: number }>(
@@ -20,84 +29,34 @@ export async function GET(req: NextRequest) {
     );
 
     const accessLevel = fullUser?.access_level || 0;
+
+    // Level 1 users (students) cannot search for other subjects
+    if (accessLevel === 1) {
+      return NextResponse.json([]);
+    }
+
+    // Level 2+ users (teachers and admins) can search for subjects not in workspace
     let subjects: Subject[];
 
-    // Level 1 users (students) can only access subjects from their approved classes
-    if (accessLevel === 1) {
-      // Students cannot search for other subjects
-      if (filter === 'other') {
-        return NextResponse.json([]);
-      }
-
-      // Get subjects from user's approved classes
+    if (search && search.trim()) {
       subjects = await db.all<Subject>(
-        `SELECT DISTINCT s.*, 0 as is_creator
-         FROM subjects s
-         INNER JOIN class_subjects cs ON s.id = cs.subject_id
-         INNER JOIN class_memberships cm ON cs.class_id = cm.class_id
-         WHERE cm.user_id = ? AND cm.status = 'approved' AND cm.role = 'student'
+        `SELECT s.*, 0 as is_creator FROM subjects s
+         WHERE s.id NOT IN (
+           SELECT subject_id FROM user_workspaces WHERE user_id = ?
+         )
+         AND s.name LIKE ?
+         ORDER BY s.created_at DESC`,
+        [user.id, `%${search.trim()}%`]
+      );
+    } else {
+      subjects = await db.all<Subject>(
+        `SELECT s.*, 0 as is_creator FROM subjects s
+         WHERE s.id NOT IN (
+           SELECT subject_id FROM user_workspaces WHERE user_id = ?
+         )
          ORDER BY s.created_at DESC`,
         [user.id]
       );
-    } else {
-      // Level 2+ users (teachers and admins) can access workspace and search
-      if (filter === 'other') {
-        // Get subjects NOT in user's workspace, with optional search
-        if (search && search.trim()) {
-          subjects = await db.all<Subject>(
-            `SELECT s.*, 0 as is_creator FROM subjects s
-             WHERE s.id NOT IN (
-               SELECT subject_id FROM user_workspaces WHERE user_id = ?
-             )
-             AND s.name LIKE ?
-             ORDER BY s.created_at DESC`,
-            [user.id, `%${search.trim()}%`]
-          );
-        } else {
-          subjects = await db.all<Subject>(
-            `SELECT s.*, 0 as is_creator FROM subjects s
-             WHERE s.id NOT IN (
-               SELECT subject_id FROM user_workspaces WHERE user_id = ?
-             )
-             ORDER BY s.created_at DESC`,
-            [user.id]
-          );
-        }
-      } else if (filter === 'created') {
-        // Get subjects created by user
-        subjects = await db.all<Subject>(
-          `SELECT s.*, uw.is_creator FROM subjects s
-           INNER JOIN user_workspaces uw ON s.id = uw.subject_id
-           WHERE uw.user_id = ? AND uw.is_creator = 1
-           ORDER BY s.created_at DESC`,
-          [user.id]
-        );
-      } else {
-        // Default: Get all subjects in user's workspace + subjects from approved classes
-        const workspaceSubjects = await db.all<Subject>(
-          `SELECT s.*, uw.is_creator FROM subjects s
-           INNER JOIN user_workspaces uw ON s.id = uw.subject_id
-           WHERE uw.user_id = ?
-           ORDER BY s.created_at DESC`,
-          [user.id]
-        );
-
-        const classSubjects = await db.all<Subject>(
-          `SELECT DISTINCT s.*, 0 as is_creator
-           FROM subjects s
-           INNER JOIN class_subjects cs ON s.id = cs.subject_id
-           INNER JOIN class_memberships cm ON cs.class_id = cm.class_id
-           WHERE cm.user_id = ? AND cm.status = 'approved'
-           AND s.id NOT IN (
-             SELECT subject_id FROM user_workspaces WHERE user_id = ?
-           )
-           ORDER BY s.created_at DESC`,
-          [user.id, user.id]
-        );
-
-        // Merge workspace and class subjects
-        subjects = [...workspaceSubjects, ...classSubjects];
-      }
     }
 
     // If no subjects, return empty array early

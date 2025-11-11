@@ -25,24 +25,39 @@ export default function TopicPage() {
 function TopicPageContent() {
   const params = useParams();
   const router = useRouter();
-  const { subjects, isLoading, setLoading } = useAppContext();
+  const { loadTopics, loadQuestions, isLoading, setLoading } = useAppContext();
 
   const subjectId = params.subjectId as string;
   const paperTypeId = decodeURIComponent(params.paperTypeId as string);
   const topicId = decodeURIComponent(params.topicId as string);
   const [navigatingTo, setNavigatingTo] = useState<string | null>(null);
+  const [topic, setTopic] = useState<import('@/app/context/AppContext').TopicWithMetrics | null>(null);
+  const [questions, setQuestions] = useState<import('@/app/context/AppContext').QuestionPreview[]>([]);
 
-  // Directly access subjects to ensure component re-renders when subjects change
-  const subject = subjects.find(s => s.id === subjectId);
-  const paperType = subject?.paperTypes.find(pt => pt.id === paperTypeId);
-  const topic = paperType?.topics.find(t => t.id === topicId);
+  // Load data on mount
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        const topicsList = await loadTopics(paperTypeId);
+        const foundTopic = topicsList.find(t => t.id === topicId);
+        setTopic(foundTopic || null);
+
+        if (foundTopic) {
+          const questionsList = await loadQuestions(topicId);
+          setQuestions(questionsList);
+        }
+      } catch (error) {
+        console.error('Error loading topic data:', error);
+      }
+    };
+
+    loadData();
+  }, [paperTypeId, topicId, loadTopics, loadQuestions]);
 
   useEffect(() => {
     // Reset loading state on mount in case user navigated back
-    if (topic) {
-       Object.values(topic.examQuestions).forEach(q => setLoading(`navigate-question-${q.id}`, false));
-    }
-  }, [topic, setLoading]);
+    questions.forEach(q => setLoading(`navigate-question-${q.id}`, false));
+  }, [questions, setLoading]);
 
 
   const handleNavigate = (questionId: string) => {
@@ -56,12 +71,12 @@ function TopicPageContent() {
     return <PageSpinner />;
   }
 
-  // Show loading spinner while subjects are being fetched
-  if (isLoading('fetch-subjects')) {
+  // Show loading spinner while data is being fetched
+  if (isLoading(`load-questions-${topicId}`)) {
     return <PageSpinner />;
   }
 
-  if (!subject || !topic) {
+  if (!topic) {
     return (
       <div className="text-center">
         <h1 className="text-2xl font-bold">Topic not found</h1>
@@ -91,11 +106,11 @@ function TopicPageContent() {
 
       <p className="text-muted-foreground mb-8">Select a question to start practicing.</p>
 
-      {topic.examQuestions.length > 0 ? (
+      {questions.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {topic.examQuestions.map(question => {
+          {questions.map(question => {
             const hasAttempts = question.attempts > 0;
-            const hasMarkscheme = question.solutionObjectives && question.solutionObjectives.length > 0;
+            const hasMarkscheme = question.has_markscheme === 1;
             const boxStyle = hasAttempts ? getScoreColorStyle(question.score) : getUnattemptedBoxStyle();
 
             return (
