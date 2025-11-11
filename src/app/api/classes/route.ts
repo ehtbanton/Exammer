@@ -74,6 +74,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const user = await requireAuth();
+    console.log('[POST /api/classes] User authenticated:', user.id);
 
     // Check if user is level 2 or higher (teacher or admin)
     const fullUser = await db.get<{ access_level: number }>(
@@ -81,7 +82,10 @@ export async function POST(req: NextRequest) {
       [user.id]
     );
 
+    console.log('[POST /api/classes] User access level:', fullUser?.access_level);
+
     if (!fullUser || fullUser.access_level < 2) {
+      console.log('[POST /api/classes] Access denied - user level too low');
       return NextResponse.json(
         { error: 'Only teachers (level 2+) can create classes' },
         { status: 403 }
@@ -90,8 +94,10 @@ export async function POST(req: NextRequest) {
 
     const body = await req.json();
     const { name, description } = body;
+    console.log('[POST /api/classes] Request body:', { name, description });
 
     if (!name || typeof name !== 'string' || name.trim().length === 0) {
+      console.log('[POST /api/classes] Validation failed - name is required');
       return NextResponse.json({ error: 'Class name is required' }, { status: 400 });
     }
 
@@ -123,11 +129,14 @@ export async function POST(req: NextRequest) {
     }
 
     // Create the class
+    console.log('[POST /api/classes] Creating class with code:', classroomCode);
     const result = await db.run(
       `INSERT INTO classes (name, description, teacher_id, classroom_code)
        VALUES (?, ?, ?, ?)`,
       [name.trim(), description?.trim() || null, user.id, classroomCode]
     );
+
+    console.log('[POST /api/classes] Class created with ID:', result.lastID);
 
     // Automatically add the creator as a teacher member with approved status
     await db.run(
@@ -136,12 +145,15 @@ export async function POST(req: NextRequest) {
       [result.lastID, user.id]
     );
 
+    console.log('[POST /api/classes] Teacher membership created');
+
     // Fetch the created class
     const newClass = await db.get<Class>(
       'SELECT * FROM classes WHERE id = ?',
       [result.lastID]
     );
 
+    console.log('[POST /api/classes] Class creation successful:', newClass);
     return NextResponse.json(newClass, { status: 201 });
   } catch (error: any) {
     console.error('Error creating class:', error);

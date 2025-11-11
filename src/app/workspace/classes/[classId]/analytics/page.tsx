@@ -72,7 +72,7 @@ export default function ClassAnalyticsPage({ params }: { params: Promise<{ class
         setAnalytics(data);
       } else if (response.status === 403) {
         toast.error('You do not have access to this class analytics');
-        router.push('/classes');
+        router.push('/workspace/classes');
       } else {
         toast.error('Failed to load analytics');
       }

@@ -100,7 +100,7 @@ export default function ClassDashboardPage({ params }: { params: Promise<{ class
         setClassData(data);
       } else if (response.status === 403) {
         toast.error('You do not have access to this class');
-        router.push('/classes');
+        router.push('/workspace/classes');
       }
     } catch (error) {
       console.error('Error fetching class data:', error);
@@ -254,7 +254,7 @@ export default function ClassDashboardPage({ params }: { params: Promise<{ class
 
       if (response.ok) {
         toast.success('Class deleted successfully');
-        router.push('/classes');
+        router.push('/workspace/classes');
       } else {
         const error = await response.json();
         toast.error(error.error || 'Failed to delete class');
@@ -283,7 +283,7 @@ export default function ClassDashboardPage({ params }: { params: Promise<{ class
       <div className="container mx-auto px-4 py-8">
         <div className="text-center">
           <h1 className="text-2xl font-bold">Class not found</h1>
-          <Button className="mt-4" onClick={() => router.push('/classes')}>
+          <Button className="mt-4" onClick={() => router.push('/workspace/classes')}>
             Back to Classes
           </Button>
         </div>
@@ -297,7 +297,7 @@ export default function ClassDashboardPage({ params }: { params: Promise<{ class
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="mb-6">
-        <Button variant="ghost" onClick={() => router.push('/classes')} className="mb-4">
+        <Button variant="ghost" onClick={() => router.push('/workspace/classes')} className="mb-4">
           <ArrowLeft className="h-4 w-4 mr-2" />
           Back to Classes
         </Button>

@@ -78,6 +78,7 @@ export default function ClassesPage() {
       return;
     }
 
+    console.log('[handleCreateClass] Starting class creation:', { name: newClassName, description: newClassDescription });
     setCreating(true);
     try {
       const response = await fetch('/api/classes', {
@@ -89,7 +90,11 @@ export default function ClassesPage() {
         }),
       });
 
+      console.log('[handleCreateClass] Response status:', response.status, response.statusText);
+
       if (response.ok) {
+        const data = await response.json();
+        console.log('[handleCreateClass] Class created successfully:', data);
         toast.success('Class created successfully');
         setCreateDialogOpen(false);
         setNewClassName('');
@@ -97,12 +102,14 @@ export default function ClassesPage() {
         fetchClasses();
       } else {
         const error = await response.json();
+        console.error('[handleCreateClass] Error response:', error);
         toast.error(error.error || 'Failed to create class');
       }
     } catch (error) {
-      console.error('Error creating class:', error);
+      console.error('[handleCreateClass] Exception caught:', error);
       toast.error('Failed to create class');
     } finally {
+      console.log('[handleCreateClass] Finished, setting creating to false');
       setCreating(false);
     }
   };
