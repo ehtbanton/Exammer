@@ -936,34 +936,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }
 
       const apiOtherSubjects = await response.json();
+      // Map lightweight search results (no full hierarchy)
       const clientOtherSubjects = apiOtherSubjects.map((sub: any) => ({
         id: sub.id.toString(),
         name: sub.name,
-        syllabusContent: sub.syllabus_content || '',
+        syllabusContent: '',
         isCreator: false,
-        pastPapers: (sub.pastPapers || []).map((pp: any) => ({
-          id: pp.id.toString(),
-          name: pp.name,
-          content: pp.content
-        })),
-        paperTypes: (sub.paperTypes || []).map((pt: any) => ({
-          id: pt.id.toString(),
-          name: pt.name,
-          topics: (pt.topics || []).map((t: any) => ({
-            id: t.id.toString(),
-            name: t.name,
-            description: t.description || '',
-            examQuestions: (t.examQuestions || []).map((q: any) => ({
-              id: q.id.toString(),
-              questionText: q.question_text,
-              summary: q.summary,
-              score: q.score || (q.attempts === 0 ? 50 : 0), // Default 50% if no attempts
-              attempts: q.attempts || 0,
-              solutionObjectives: q.solutionObjectives || undefined,
-              completedObjectives: q.completedObjectives || [],
-            }))
-          }))
-        }))
+        pastPapers: [],
+        paperTypes: [], // Empty - will be loaded on demand if user adds to workspace
+        paperTypesCount: sub.paper_types_count || 0, // Store the count for display
       }));
       setOtherSubjects(clientOtherSubjects);
     } catch (error) {

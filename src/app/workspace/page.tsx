@@ -283,7 +283,7 @@ function HomePageContent() {
                       </CardHeader>
                       <CardContent className="flex-grow">
                         <p className="text-sm text-muted-foreground">
-                          {subject.paperTypes.length} paper types identified.
+                          {(subject as any).paperTypesCount || subject.paperTypes.length} paper types identified.
                         </p>
                       </CardContent>
                       <CardFooter className="flex justify-between gap-2">
