@@ -95,7 +95,7 @@ export default function InterviewPage() {
 function InterviewPageContent() {
   const params = useParams();
   const router = useRouter();
-  const { updateExamQuestionScore, loadFullQuestion, isLoading: isAppLoading } = useAppContext();
+  const { updateExamQuestionScore, loadFullQuestion, loadSubjectsList, loadPaperTypes, loadTopics, isLoading: isAppLoading } = useAppContext();
   const { toast } = useToast();
   const { data: session, status } = useSession();
 
@@ -104,6 +104,9 @@ function InterviewPageContent() {
   const topicId = decodeURIComponent(params.topicId as string);
   const questionId = decodeURIComponent(params.questionId as string);
 
+  const [subject, setSubject] = useState<import('@/app/context/AppContext').SubjectPreview | null>(null);
+  const [paperType, setPaperType] = useState<import('@/app/context/AppContext').PaperTypeWithMetrics | null>(null);
+  const [topic, setTopic] = useState<import('@/app/context/AppContext').TopicWithMetrics | null>(null);
   const [examQuestion, setExamQuestion] = useState<import('@/app/context/AppContext').FullQuestion | null>(null);
   const [chatHistory, setChatHistory] = useState<ChatHistory>([]);
   const [userInput, setUserInput] = useState('');
@@ -116,20 +119,40 @@ function InterviewPageContent() {
   const [noMarkscheme, setNoMarkscheme] = useState(false);
   const hasOriginalMarkscheme = examQuestion?.solution_objectives && examQuestion.solution_objectives.length > 0;
 
-  // Load full question on mount
+  // Load subject, paper type, topic, and full question on mount
   useEffect(() => {
-    const loadQuestion = async () => {
+    const loadData = async () => {
       try {
+        // Load subject
+        const subjectsList = await loadSubjectsList();
+        const foundSubject = subjectsList.find(s => s.id === subjectId);
+        setSubject(foundSubject || null);
+
+        // Load paper types and find the one we need
+        if (foundSubject) {
+          const paperTypesList = await loadPaperTypes(subjectId);
+          const foundPaperType = paperTypesList.find(pt => pt.id === paperTypeId);
+          setPaperType(foundPaperType || null);
+
+          // Load topics and find the one we need
+          if (foundPaperType) {
+            const topicsList = await loadTopics(paperTypeId);
+            const foundTopic = topicsList.find(t => t.id === topicId);
+            setTopic(foundTopic || null);
+          }
+        }
+
+        // Load full question
         const fullQuestion = await loadFullQuestion(questionId);
         setExamQuestion(fullQuestion);
       } catch (error) {
-        console.error('Error loading full question:', error);
+        console.error('Error loading question data:', error);
         toast({ variant: "destructive", title: "Error", description: "Failed to load question" });
       }
     };
 
-    loadQuestion();
-  }, [questionId, loadFullQuestion, toast]);
+    loadData();
+  }, [questionId, subjectId, paperTypeId, topicId, loadFullQuestion, loadSubjectsList, loadPaperTypes, loadTopics, toast]);
 
   // Compute if all objectives are completed
   const isCompleted = generatedVariant
@@ -392,7 +415,7 @@ function InterviewPageContent() {
   };
 
   const handleAcceptScore = () => {
-    if (paperType && topic && completedObjectives.length > 0 && generatedVariant) {
+    if (subject && paperType && topic && completedObjectives.length > 0 && generatedVariant && examQuestion) {
       // Calculate score out of 10 based on objectives completed
       const totalObjectives = generatedVariant.solutionObjectives.length;
       const scoreOutOf10 = (completedObjectives.length / totalObjectives) * 10;

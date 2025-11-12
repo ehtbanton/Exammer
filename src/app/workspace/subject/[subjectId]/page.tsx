@@ -75,9 +75,9 @@ function SubjectPageContent() {
     // Reset loading state on mount in case user navigated back
     if (subject) {
       setLoading(`navigate-${subject.id}`, false);
-      subject.paperTypes.forEach(pt => setLoading(`navigate-paper-${pt.id}`, false));
+      paperTypes.forEach(pt => setLoading(`navigate-paper-${pt.id}`, false));
     }
-  }, [subject, setLoading]);
+  }, [subject, paperTypes, setLoading]);
 
   useEffect(() => {
     // Auto-open paper upload dialog if redirected from syllabus upload
