@@ -24,7 +24,7 @@ export default function HomePage() {
 
 function HomePageContent() {
   const router = useRouter();
-  const { otherSubjects, isLevel3User, createSubjectFromSyllabus, deleteSubject, addSubjectToWorkspace, removeSubjectFromWorkspace, searchSubjects, loadSubjectsList, isLoading, setLoading } = useAppContext();
+  const { otherSubjects, isLevel3User, cacheVersion, createSubjectFromSyllabus, deleteSubject, addSubjectToWorkspace, removeSubjectFromWorkspace, searchSubjects, loadSubjectsList, isLoading, setLoading } = useAppContext();
   const [subjects, setSubjects] = useState<import('@/app/context/AppContext').SubjectPreview[]>([]);
   const [navigatingTo, setNavigatingTo] = useState<string | null>(null);
   const [syllabusFile, setSyllabusFile] = useState<File | null>(null);
@@ -34,7 +34,7 @@ function HomePageContent() {
   const [accessLevel, setAccessLevel] = useState<number | null>(null);
   const syllabusInputRef = useRef<HTMLInputElement>(null);
 
-  // Load subjects list on mount
+  // Load subjects list on mount and whenever cache is invalidated
   useEffect(() => {
     const loadSubjects = async () => {
       try {
@@ -46,7 +46,7 @@ function HomePageContent() {
     };
 
     loadSubjects();
-  }, [loadSubjectsList]);
+  }, [loadSubjectsList, cacheVersion]);
 
   // Fetch user's access level
   useEffect(() => {

@@ -65,12 +65,19 @@ interface AppContextType {
   subjects: Subject[];
   otherSubjects: Subject[];
   isLevel3User: boolean;
+  cacheVersion: number; // Version counter that increments when caches are invalidated
   // Lazy loading functions
   loadSubjectsList: () => Promise<SubjectPreview[]>;
   loadPaperTypes: (subjectId: string) => Promise<PaperTypeWithMetrics[]>;
   loadTopics: (paperTypeId: string) => Promise<TopicWithMetrics[]>;
   loadQuestions: (topicId: string) => Promise<QuestionPreview[]>;
   loadFullQuestion: (questionId: string) => Promise<FullQuestion>;
+  // Cache invalidation functions
+  invalidateSubjectsCache: () => void;
+  invalidatePaperTypesCache: (subjectId: string) => void;
+  invalidateTopicsCache: (paperTypeId: string) => void;
+  invalidateQuestionsCache: (topicId: string) => void;
+  invalidateFullQuestionCache: (questionId: string) => void;
   // Original functions
   createSubjectFromSyllabus: (syllabusFile: File) => Promise<void>;
   processExamPapers: (subjectId: string, examPapers: File[]) => Promise<void>;
@@ -147,6 +154,54 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const isLoading = useCallback((key: string) => !!loadingStates[key], [loadingStates]);
+
+  // NEW: Lazy loading state caches - defined early to avoid circular dependencies
+  const [subjectsListCache, setSubjectsListCache] = useState<SubjectPreview[] | null>(null);
+  const [paperTypesCache, setPaperTypesCache] = useState<Record<string, PaperTypeWithMetrics[]>>({});
+  const [topicsCache, setTopicsCache] = useState<Record<string, TopicWithMetrics[]>>({});
+  const [questionsCache, setQuestionsCache] = useState<Record<string, QuestionPreview[]>>({});
+  const [fullQuestionsCache, setFullQuestionsCache] = useState<Record<string, FullQuestion>>({});
+
+  // Cache version counter to trigger UI updates when cache changes
+  const [cacheVersion, setCacheVersion] = useState(0);
+
+  // NEW: Cache invalidation functions - defined early so they can be used in other callbacks
+  const invalidateSubjectsCache = useCallback(() => {
+    setSubjectsListCache(null);
+    setCacheVersion(v => v + 1);
+  }, []);
+
+  const invalidatePaperTypesCache = useCallback((subjectId: string) => {
+    setPaperTypesCache(prev => {
+      const newCache = { ...prev };
+      delete newCache[subjectId];
+      return newCache;
+    });
+  }, []);
+
+  const invalidateTopicsCache = useCallback((paperTypeId: string) => {
+    setTopicsCache(prev => {
+      const newCache = { ...prev };
+      delete newCache[paperTypeId];
+      return newCache;
+    });
+  }, []);
+
+  const invalidateQuestionsCache = useCallback((topicId: string) => {
+    setQuestionsCache(prev => {
+      const newCache = { ...prev };
+      delete newCache[topicId];
+      return newCache;
+    });
+  }, []);
+
+  const invalidateFullQuestionCache = useCallback((questionId: string) => {
+    setFullQuestionsCache(prev => {
+      const newCache = { ...prev };
+      delete newCache[questionId];
+      return newCache;
+    });
+  }, []);
 
   const createSubjectFromSyllabus = useCallback(async (syllabusFile: File): Promise<string | null> => {
     const loadingKey = `create-subject`;
@@ -441,6 +496,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
             };
           }));
 
+          // Invalidate caches for this subject since paper types, topics, and questions changed
+          invalidatePaperTypesCache(subjectId);
+          // Invalidate all topics and questions caches for this subject
+          updatedPaperTypes.forEach((pt: any) => {
+            invalidateTopicsCache(pt.id);
+            pt.topics.forEach((t: any) => {
+              invalidateQuestionsCache(t.id);
+            });
+          });
+
           toast({
             title: "Questions Extracted",
             description: `Saved ${batchResult.questionsSaved} questions from ${examPapers.length} paper(s) to database.`
@@ -463,7 +528,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     } finally {
       setLoading(loadingKey, false);
     }
-  }, [subjects, toast, setLoading]);
+  }, [subjects, toast, setLoading, invalidatePaperTypesCache, invalidateTopicsCache, invalidateQuestionsCache]);
 
   const processMarkschemes = useCallback(async (subjectId: string, markschemes: File[]) => {
     const loadingKey = `process-markschemes-${subjectId}`;
@@ -604,6 +669,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
             };
           }));
 
+          // Invalidate questions caches since solution objectives were added/updated
+          updatedPaperTypes.forEach((pt: any) => {
+            pt.topics.forEach((t: any) => {
+              invalidateQuestionsCache(t.id);
+              // Also invalidate full question cache for all questions in this topic
+              t.examQuestions.forEach((q: any) => {
+                invalidateFullQuestionCache(q.id);
+              });
+            });
+          });
+
           toast({
             title: "Markschemes Matched",
             description: `Updated ${matchResult.questionsUpdated} questions with solution objectives from ${markschemes.length} markscheme(s).`
@@ -622,7 +698,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     } finally {
       setLoading(loadingKey, false);
     }
-  }, [subjects, toast, setLoading]);
+  }, [subjects, toast, setLoading, invalidateQuestionsCache, invalidateFullQuestionCache]);
 
   const deleteSubject = useCallback(async (subjectId: string) => {
     try {
@@ -813,13 +889,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
       if (subject) {
         setOtherSubjects(prev => prev.filter(s => s.id !== subjectId));
         setSubjects(prev => [{ ...subject, isCreator: false }, ...prev]);
+        // Invalidate subjects cache - UI will reload automatically via cacheVersion
+        invalidateSubjectsCache();
         toast({ title: "Success", description: "Subject added to workspace" });
       }
     } catch (error: any) {
       console.error('Error adding subject to workspace:', error);
       toast({ variant: "destructive", title: "Error", description: error.message });
     }
-  }, [otherSubjects, toast]);
+  }, [otherSubjects, toast, invalidateSubjectsCache]);
 
   const removeSubjectFromWorkspace = useCallback(async (subjectId: string) => {
     try {
@@ -832,18 +910,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
         throw new Error(error.error || 'Failed to remove subject from workspace');
       }
 
-      // Move subject from subjects to otherSubjects
-      const subject = subjects.find(s => s.id === subjectId);
-      if (subject) {
-        setSubjects(prev => prev.filter(s => s.id !== subjectId));
-        setOtherSubjects(prev => [{ ...subject, isCreator: false }, ...prev]);
-        toast({ title: "Success", description: "Subject removed from workspace" });
-      }
+      // Invalidate subjects cache - UI will reload automatically via cacheVersion
+      invalidateSubjectsCache();
+      toast({ title: "Success", description: "Subject removed from workspace" });
     } catch (error: any) {
       console.error('Error removing subject from workspace:', error);
       toast({ variant: "destructive", title: "Error", description: error.message });
     }
-  }, [subjects, toast]);
+  }, [toast, invalidateSubjectsCache]);
 
   const searchSubjects = useCallback(async (query: string) => {
     const loadingKey = 'search-subjects';
@@ -900,14 +974,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, [toast, setLoading]);
 
-  // NEW: Lazy loading state caches
-  const [paperTypesCache, setPaperTypesCache] = useState<Record<string, PaperTypeWithMetrics[]>>({});
-  const [topicsCache, setTopicsCache] = useState<Record<string, TopicWithMetrics[]>>({});
-  const [questionsCache, setQuestionsCache] = useState<Record<string, QuestionPreview[]>>({});
-  const [fullQuestionsCache, setFullQuestionsCache] = useState<Record<string, FullQuestion>>({});
-
   // NEW: Lazy loading functions
   const loadSubjectsList = useCallback(async (): Promise<SubjectPreview[]> => {
+    // Return cached data if available
+    if (subjectsListCache) {
+      return subjectsListCache;
+    }
     const loadingKey = 'load-subjects-list';
     setLoading(loadingKey, true);
 
@@ -924,6 +996,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
         paperTypesCount: s.paper_types_count,
         isCreator: s.is_creator === 1,
       }));
+
+      // Cache the result
+      setSubjectsListCache(subjectsList);
 
       return subjectsList;
     } catch (error) {
@@ -971,7 +1046,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     } finally {
       setLoading(loadingKey, false);
     }
-  }, [paperTypesCache, toast, setLoading]);
+  }, [toast, setLoading]);
 
   const loadTopics = useCallback(async (paperTypeId: string): Promise<TopicWithMetrics[]> => {
     // Return cached data if available
@@ -1010,7 +1085,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     } finally {
       setLoading(loadingKey, false);
     }
-  }, [topicsCache, toast, setLoading]);
+  }, [toast, setLoading]);
 
   const loadQuestions = useCallback(async (topicId: string): Promise<QuestionPreview[]> => {
     // Return cached data if available
@@ -1048,7 +1123,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     } finally {
       setLoading(loadingKey, false);
     }
-  }, [questionsCache, toast, setLoading]);
+  }, [toast, setLoading]);
 
   const loadFullQuestion = useCallback(async (questionId: string): Promise<FullQuestion> => {
     // Return cached data if available
@@ -1094,12 +1169,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
     } finally {
       setLoading(loadingKey, false);
     }
-  }, [fullQuestionsCache, toast, setLoading]);
+  }, [toast, setLoading]);
 
   return (
     <AppContext.Provider value={{
-      subjects, otherSubjects, isLevel3User,
+      subjects, otherSubjects, isLevel3User, cacheVersion,
       loadSubjectsList, loadPaperTypes, loadTopics, loadQuestions, loadFullQuestion,
+      invalidateSubjectsCache, invalidatePaperTypesCache, invalidateTopicsCache, invalidateQuestionsCache, invalidateFullQuestionCache,
       createSubjectFromSyllabus, processExamPapers, processMarkschemes, deleteSubject, addSubjectToWorkspace, removeSubjectFromWorkspace, searchSubjects, getSubjectById, addPastPaperToSubject, updateExamQuestionScore, generateQuestionVariant, isLoading, setLoading
     }}>
       {children}
