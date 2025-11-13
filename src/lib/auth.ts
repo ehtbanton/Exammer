@@ -5,7 +5,6 @@ import GitHubProvider from 'next-auth/providers/github';
 import { compare } from 'bcryptjs';
 import { db } from '@/lib/db';
 import type { User } from '@/lib/db';
-import { syncNewUser } from '@/lib/user-access-sync';
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -35,6 +34,11 @@ export const authOptions: NextAuthOptions = {
           throw new Error('Invalid email or password');
         }
 
+        // Check if email is verified
+        if (!user.email_verified || user.email_verified === 0) {
+          throw new Error('EMAIL_NOT_VERIFIED');
+        }
+
         return {
           id: user.id.toString(),
           email: user.email,
@@ -62,9 +66,6 @@ export const authOptions: NextAuthOptions = {
         'INSERT INTO users (email, name, image, email_verified, access_level) VALUES (?, ?, ?, ?, ?)',
         [user.email, user.name || null, user.image || null, user.emailVerified ? 1 : 0, 0]
       );
-
-      // Sync new user to pending-users.json
-      await syncNewUser();
 
       return {
         id: result.lastID.toString(),

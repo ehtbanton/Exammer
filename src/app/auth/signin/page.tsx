@@ -18,11 +18,13 @@ function SignInContent() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [showResendLink, setShowResendLink] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setShowResendLink(false);
     setLoading(true);
 
     try {
@@ -36,6 +38,12 @@ function SignInContent() {
         // If email not found, redirect to signup with email pre-filled
         if (result.error === 'EMAIL_NOT_FOUND') {
           router.push(`/auth/signup?email=${encodeURIComponent(email)}`);
+          return;
+        }
+        // If email not verified, show helpful message
+        if (result.error === 'EMAIL_NOT_VERIFIED') {
+          setError('Your email is not verified. Please check your inbox or request a new verification email.');
+          setShowResendLink(true);
           return;
         }
         setError(result.error);
@@ -71,7 +79,17 @@ function SignInContent() {
           <form onSubmit={handleSubmit} className="space-y-4">
             {error && (
               <Alert variant="destructive">
-                <AlertDescription>{error}</AlertDescription>
+                <AlertDescription>
+                  {error}
+                  {showResendLink && (
+                    <>
+                      <br />
+                      <Link href="/auth/resend-verification" className="font-medium underline">
+                        Click here to resend verification email
+                      </Link>
+                    </>
+                  )}
+                </AlertDescription>
               </Alert>
             )}
 

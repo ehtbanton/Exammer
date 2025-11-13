@@ -1,5 +1,5 @@
 {
-  "currentVersion": 7,
+  "currentVersion": 9,
   "versions": {
     "0": {
       "description": "Initial schema - subjects owned by users",
@@ -286,6 +286,25 @@
             "action": "add_column",
             "table": "questions",
             "sql": "ALTER TABLE questions ADD COLUMN categorization_reasoning TEXT"
+          }
+        ]
+      }
+    },
+    "9": {
+      "description": "Add email verification system - replaces manual approval with automated email verification",
+      "schema": {
+        "users": {
+          "columns": ["id", "name", "email", "email_verified", "image", "access_level", "email_verification_sent_at", "created_at", "updated_at"],
+          "note": "email_verification_sent_at stores timestamp of last verification email sent (for rate limiting)"
+        }
+      },
+      "migration": {
+        "from": 7,
+        "steps": [
+          {
+            "action": "add_column",
+            "table": "users",
+            "sql": "ALTER TABLE users ADD COLUMN email_verification_sent_at INTEGER DEFAULT NULL"
           }
         ]
       }

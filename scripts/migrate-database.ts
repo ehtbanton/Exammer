@@ -68,6 +68,7 @@ class DatabaseMigration {
     try {
       await this.migrateToV2();
       await this.migrateToV3();
+      await this.migrateToV9();
 
       console.log('\n=== All Migrations Completed Successfully ===\n');
       this.close();
@@ -231,6 +232,41 @@ class DatabaseMigration {
 
     console.log('✓ All tables and columns verified');
     console.log('\nMigration V3 completed successfully!\n');
+  }
+
+  /**
+   * Migration to V9: Add email verification support
+   */
+  private async migrateToV9() {
+    console.log('Migration V9: Adding email verification support...');
+
+    // Check if email_verification_sent_at column already exists
+    const columns = await this.all<ColumnInfo>('PRAGMA table_info(users)');
+    const hasEmailVerificationSentAt = columns.some(col => col.name === 'email_verification_sent_at');
+
+    if (hasEmailVerificationSentAt) {
+      console.log('✓ email_verification_sent_at column already exists - skipping');
+      return;
+    }
+
+    console.log('Current users table columns:', columns.map(c => c.name).join(', '));
+
+    // Add the new column
+    console.log('\nAdding email_verification_sent_at column to users table...');
+    await this.run('ALTER TABLE users ADD COLUMN email_verification_sent_at INTEGER DEFAULT NULL');
+    console.log('✓ Added email_verification_sent_at column');
+
+    // Verify the migration
+    const updatedColumns = await this.all<ColumnInfo>('PRAGMA table_info(users)');
+    const verified = updatedColumns.some(col => col.name === 'email_verification_sent_at');
+
+    if (!verified) {
+      throw new Error('Migration verification failed: email_verification_sent_at column not found after migration');
+    }
+
+    console.log('✓ Migration verified');
+    console.log('Updated users table columns:', updatedColumns.map(c => c.name).join(', '));
+    console.log('\nMigration V9 completed successfully!\n');
   }
 
   close() {
