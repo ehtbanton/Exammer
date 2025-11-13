@@ -67,16 +67,10 @@ function TopicPageContent() {
     router.push(`/workspace/subject/${subjectId}/paper/${encodeURIComponent(paperTypeId)}/topic/${encodeURIComponent(topicId)}/question/${encodeURIComponent(questionId)}`);
   };
 
-  if (navigatingTo && isLoading(`navigate-question-${navigatingTo}`)) {
-    return <PageSpinner />;
-  }
+  const isNavigating = navigatingTo && isLoading(`navigate-question-${navigatingTo}`);
+  const isLoadingQuestions = isLoading(`load-questions-${topicId}`);
 
-  // Show loading spinner while data is being fetched
-  if (isLoading(`load-questions-${topicId}`)) {
-    return <PageSpinner />;
-  }
-
-  if (!topic) {
+  if (!topic && !isLoadingQuestions) {
     return (
       <div className="text-center">
         <h1 className="text-2xl font-bold">Topic not found</h1>
@@ -88,7 +82,9 @@ function TopicPageContent() {
   }
 
   return (
-    <div className="container mx-auto">
+    <>
+      {(isNavigating || isLoadingQuestions) && <PageSpinner />}
+      <div className="container mx-auto">
       <Button variant="ghost" onClick={() => router.push(`/workspace/subject/${subjectId}/paper/${encodeURIComponent(paperTypeId)}`)} className="mb-4">
         <ArrowLeft />
         Back to Topics
@@ -161,6 +157,7 @@ function TopicPageContent() {
             </CardContent>
           </Card>
       )}
-    </div>
+      </div>
+    </>
   );
 }

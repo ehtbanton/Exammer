@@ -137,17 +137,11 @@ function SubjectPageContent() {
     setNavigatingTo(paperTypeId);
     router.push(`/workspace/subject/${subjectId}/paper/${paperTypeId}`);
   };
-  
-  if (navigatingTo && isLoading(`navigate-paper-${navigatingTo}`)) {
-    return <PageSpinner />;
-  }
 
-  // Show loading spinner while subjects are being fetched
-  if (isLoading('fetch-subjects')) {
-    return <PageSpinner />;
-  }
+  const isNavigating = navigatingTo && isLoading(`navigate-paper-${navigatingTo}`);
+  const isFetchingSubjects = isLoading('fetch-subjects');
 
-  if (!subject) {
+  if (!subject && !isFetchingSubjects) {
     return (
       <div className="text-center">
         <h1 className="text-2xl font-bold">Subject not found</h1>
@@ -167,7 +161,9 @@ function SubjectPageContent() {
     : paperTypes;
 
   return (
-    <div className="container mx-auto">
+    <>
+      {(isNavigating || isFetchingSubjects) && <PageSpinner />}
+      <div className="container mx-auto">
       <Button variant="ghost" onClick={() => router.push('/')} className="mb-4">
         <ArrowLeft />
         Back to Subjects
@@ -409,6 +405,7 @@ function SubjectPageContent() {
           </Card>
         )}
       </div>
-    </div>
+      </div>
+    </>
   );
 }

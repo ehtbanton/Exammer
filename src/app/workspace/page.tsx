@@ -102,14 +102,13 @@ function HomePageContent() {
     return () => clearTimeout(delaySearch);
   }, [searchQuery, searchSubjects]);
 
-  if (navigatingTo && isLoading(`navigate-${navigatingTo}`)) {
-    return <PageSpinner />;
-  }
-
   const isCreatingSubject = isLoading('create-subject');
+  const isNavigating = navigatingTo && isLoading(`navigate-${navigatingTo}`);
 
   return (
-    <div className="container mx-auto">
+    <>
+      {isNavigating && <PageSpinner />}
+      <div className="container mx-auto">
       <div className="flex justify-between items-center mb-8">
         <h1 className="text-3xl font-bold font-headline">My Workspace</h1>
         {/* Only show Create button for level 2+ users (teachers and admins) */}
@@ -314,6 +313,7 @@ function HomePageContent() {
           )}
         </>
       )}
-    </div>
+      </div>
+    </>
   );
 }

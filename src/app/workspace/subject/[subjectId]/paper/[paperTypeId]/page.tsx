@@ -74,24 +74,20 @@ function PaperTypePageContent() {
     // Let the Link component handle navigation
   };
 
-  if (navigatingTo && isLoading(`navigate-topic-${navigatingTo}`)) {
-    return <PageSpinner />;
-  }
-
-  // Show loading spinner while data is being fetched
-  if (isLoading(`load-topics-${paperTypeId}`)) {
-    return <PageSpinner />;
-  }
+  const isNavigating = navigatingTo && isLoading(`navigate-topic-${navigatingTo}`);
+  const isLoadingTopics = isLoading(`load-topics-${paperTypeId}`);
 
   if (!subject || !paperType) {
-    return (
-      <div className="text-center">
-        <h1 className="text-2xl font-bold">Paper Type not found</h1>
-        <Button asChild variant="link" className="mt-4">
-          <Link href={`/workspace/subject/${subjectId}`}>Go back to subject</Link>
-        </Button>
-      </div>
-    );
+    if (!isLoadingTopics) {
+      return (
+        <div className="text-center">
+          <h1 className="text-2xl font-bold">Paper Type not found</h1>
+          <Button asChild variant="link" className="mt-4">
+            <Link href={`/workspace/subject/${subjectId}`}>Go back to subject</Link>
+          </Button>
+        </div>
+      );
+    }
   }
 
   // Filter topics based on toggle (using metrics from API)
@@ -100,7 +96,9 @@ function PaperTypePageContent() {
     : topics;
 
   return (
-    <div className="container mx-auto">
+    <>
+      {(isNavigating || isLoadingTopics) && <PageSpinner />}
+      <div className="container mx-auto">
       <Button variant="ghost" onClick={() => router.push(`/workspace/subject/${subjectId}`)} className="mb-4">
         <ArrowLeft />
         Back to Paper Types
@@ -177,6 +175,7 @@ function PaperTypePageContent() {
           </Card>
         )}
       </div>
-    </div>
+      </div>
+    </>
   );
 }
