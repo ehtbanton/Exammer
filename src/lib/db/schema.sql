@@ -6,6 +6,7 @@ CREATE TABLE IF NOT EXISTS users (
   name TEXT,
   email_verified INTEGER DEFAULT 0,
   access_level INTEGER DEFAULT 0,
+  email_verification_sent_at INTEGER DEFAULT NULL,
   image TEXT,
   created_at INTEGER DEFAULT (unixepoch()),
   updated_at INTEGER DEFAULT (unixepoch())

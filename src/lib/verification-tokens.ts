@@ -1,5 +1,5 @@
 import crypto from 'crypto';
-import { getDb } from './db';
+import { db } from './db';
 
 const TOKEN_EXPIRY_HOURS = 24;
 const RATE_LIMIT_SECONDS = 60;
@@ -16,7 +16,6 @@ export function generateVerificationToken(): string {
  * Returns the token string if successful, or null if rate limited
  */
 export async function createVerificationToken(email: string): Promise<string | null> {
-  const db = getDb();
   const now = Math.floor(Date.now() / 1000); // Unix timestamp in seconds
 
   // Check rate limiting - get user's last verification email timestamp
@@ -57,7 +56,6 @@ export async function createVerificationToken(email: string): Promise<string | n
  * Returns true if successful, false if token is invalid/expired
  */
 export async function verifyEmailToken(token: string): Promise<{ success: boolean; email?: string; error?: string }> {
-  const db = getDb();
   const now = Math.floor(Date.now() / 1000);
 
   // Find the token
@@ -95,7 +93,6 @@ export async function verifyEmailToken(token: string): Promise<{ success: boolea
  * Check if a user can request a new verification email (not rate limited)
  */
 export async function canRequestVerificationEmail(email: string): Promise<{ allowed: boolean; remainingSeconds?: number }> {
-  const db = getDb();
   const now = Math.floor(Date.now() / 1000);
 
   const user = await db.get('SELECT email_verification_sent_at FROM users WHERE email = ?', [email]);
@@ -119,7 +116,6 @@ export async function canRequestVerificationEmail(email: string): Promise<{ allo
  * Delete all expired verification tokens (cleanup function)
  */
 export async function cleanupExpiredTokens(): Promise<number> {
-  const db = getDb();
   const now = Math.floor(Date.now() / 1000);
 
   const result = await db.run('DELETE FROM verification_tokens WHERE expires < ?', [now]);
