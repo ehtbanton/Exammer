@@ -68,6 +68,7 @@ class DatabaseMigration {
     try {
       await this.migrateToV2();
       await this.migrateToV3();
+      await this.migrateToV8();
 
       console.log('\n=== All Migrations Completed Successfully ===\n');
       this.close();
@@ -231,6 +232,96 @@ class DatabaseMigration {
 
     console.log('✓ All tables and columns verified');
     console.log('\nMigration V3 completed successfully!\n');
+  }
+
+  /**
+   * Migration to V8: Add feedback system tables
+   */
+  private async migrateToV8() {
+    console.log('Migration V8: Adding feedback system...');
+
+    // Check if feedback table already exists
+    const tables = await this.all<{ name: string }>(
+      "SELECT name FROM sqlite_master WHERE type='table' AND name='feedback'"
+    );
+
+    if (tables.length > 0) {
+      console.log('✓ Feedback tables already exist - skipping V8 migration');
+      return;
+    }
+
+    // Create feedback table
+    console.log('\n1. Creating feedback table...');
+    await this.run(`
+      CREATE TABLE IF NOT EXISTS feedback (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER,
+        category TEXT NOT NULL CHECK(category IN ('bug', 'feature', 'improvement', 'question', 'other')),
+        title TEXT NOT NULL,
+        description TEXT NOT NULL,
+        url TEXT,
+        screenshot_url TEXT,
+        browser_info TEXT,
+        status TEXT NOT NULL DEFAULT 'new' CHECK(status IN ('new', 'in_progress', 'resolved', 'closed', 'archived')),
+        priority TEXT DEFAULT 'medium' CHECK(priority IN ('low', 'medium', 'high', 'critical')),
+        created_at INTEGER DEFAULT (unixepoch()),
+        updated_at INTEGER DEFAULT (unixepoch()),
+        resolved_at INTEGER,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+      )
+    `);
+    await this.run('CREATE INDEX IF NOT EXISTS idx_feedback_user_id ON feedback(user_id)');
+    await this.run('CREATE INDEX IF NOT EXISTS idx_feedback_status ON feedback(status)');
+    await this.run('CREATE INDEX IF NOT EXISTS idx_feedback_category ON feedback(category)');
+    await this.run('CREATE INDEX IF NOT EXISTS idx_feedback_created_at ON feedback(created_at)');
+    console.log('✓ Created feedback table with indexes');
+
+    // Create feedback_notes table
+    console.log('\n2. Creating feedback_notes table...');
+    await this.run(`
+      CREATE TABLE IF NOT EXISTS feedback_notes (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        feedback_id INTEGER NOT NULL,
+        admin_user_id INTEGER NOT NULL,
+        note TEXT NOT NULL,
+        is_internal BOOLEAN DEFAULT 1,
+        created_at INTEGER DEFAULT (unixepoch()),
+        FOREIGN KEY (feedback_id) REFERENCES feedback(id) ON DELETE CASCADE,
+        FOREIGN KEY (admin_user_id) REFERENCES users(id) ON DELETE CASCADE
+      )
+    `);
+    await this.run('CREATE INDEX IF NOT EXISTS idx_feedback_notes_feedback_id ON feedback_notes(feedback_id)');
+    console.log('✓ Created feedback_notes table with indexes');
+
+    // Create feedback_status_history table
+    console.log('\n3. Creating feedback_status_history table...');
+    await this.run(`
+      CREATE TABLE IF NOT EXISTS feedback_status_history (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        feedback_id INTEGER NOT NULL,
+        admin_user_id INTEGER,
+        old_status TEXT,
+        new_status TEXT NOT NULL,
+        changed_at INTEGER DEFAULT (unixepoch()),
+        FOREIGN KEY (feedback_id) REFERENCES feedback(id) ON DELETE CASCADE,
+        FOREIGN KEY (admin_user_id) REFERENCES users(id) ON DELETE SET NULL
+      )
+    `);
+    await this.run('CREATE INDEX IF NOT EXISTS idx_feedback_status_history_feedback_id ON feedback_status_history(feedback_id)');
+    console.log('✓ Created feedback_status_history table with indexes');
+
+    // Verify all tables were created
+    console.log('\n4. Verifying migration...');
+    const verifyTables = await this.all<{ name: string }>(
+      "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('feedback', 'feedback_notes', 'feedback_status_history')"
+    );
+
+    if (verifyTables.length !== 3) {
+      throw new Error('Migration verification failed: not all feedback tables were created');
+    }
+
+    console.log('✓ All feedback tables and indexes verified');
+    console.log('\nMigration V8 completed successfully!\n');
   }
 
   close() {
