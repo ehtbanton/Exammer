@@ -3,11 +3,16 @@ import { db } from '@/lib/db';
 import { requireAuth } from '@/lib/auth-helpers';
 import type { Question, UserProgress } from '@/lib/db';
 
-// GET /api/topics/[id]/questions - Get all questions for a topic with user progress (workspace members)
+// GET /api/topics/[id]/questions - Get question previews for a topic (no full content)
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const user = await requireAuth();
-    const { id: topicId } = await params;
+    const { id: topicIdStr } = await params;
+    const topicId = parseInt(topicIdStr);
+
+    if (isNaN(topicId)) {
+      return NextResponse.json({ error: 'Invalid topic ID' }, { status: 400 });
+    }
 
     // Get subject_id for this topic
     const topicInfo = await db.get<{ subject_id: number }>(
@@ -23,60 +28,64 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       return NextResponse.json({ error: 'Topic not found' }, { status: 404 });
     }
 
-    // Verify subject is in user's workspace
-    const inWorkspace = await db.get(
-      'SELECT id FROM user_workspaces WHERE user_id = ? AND subject_id = ?',
-      [user.id, topicInfo.subject_id]
+    // Verify user has access to this subject
+    const fullUser = await db.get<{ access_level: number }>(
+      'SELECT access_level FROM users WHERE id = ?',
+      [user.id]
     );
+    const accessLevel = fullUser?.access_level || 0;
 
-    if (!inWorkspace) {
-      return NextResponse.json({ error: 'Topic not found in workspace' }, { status: 404 });
+    let hasAccess = false;
+
+    if (accessLevel === 1) {
+      // Students: check if subject is in an approved class
+      const classAccess = await db.get<any>(
+        `SELECT 1 FROM subjects s
+         INNER JOIN class_subjects cs ON s.id = cs.subject_id
+         INNER JOIN class_memberships cm ON cs.class_id = cm.class_id
+         WHERE s.id = ? AND cm.user_id = ? AND cm.status = 'approved' AND cm.role = 'student'`,
+        [topicInfo.subject_id, user.id]
+      );
+      hasAccess = !!classAccess;
+    } else {
+      // Teachers: check workspace or class membership
+      const workspaceAccess = await db.get<any>(
+        'SELECT 1 FROM user_workspaces WHERE user_id = ? AND subject_id = ?',
+        [user.id, topicInfo.subject_id]
+      );
+      const classAccess = await db.get<any>(
+        `SELECT 1 FROM subjects s
+         INNER JOIN class_subjects cs ON s.id = cs.subject_id
+         INNER JOIN class_memberships cm ON cs.class_id = cm.class_id
+         WHERE s.id = ? AND cm.user_id = ? AND cm.status = 'approved'`,
+        [topicInfo.subject_id, user.id]
+      );
+      hasAccess = !!(workspaceAccess || classAccess);
     }
 
-    const questions = await db.all<Question>(
-      'SELECT * FROM questions WHERE topic_id = ? ORDER BY created_at ASC',
-      [topicId]
+    if (!hasAccess) {
+      return NextResponse.json({ error: 'Access denied' }, { status: 403 });
+    }
+
+    // Get question previews with user progress
+    // Only return: id, summary, score, attempts, has_markscheme
+    // Do NOT return: question_text, solution_objectives, diagram_mermaid
+    const questions = await db.all<any>(
+      `SELECT
+        q.id,
+        q.summary,
+        q.topic_id,
+        CASE WHEN q.solution_objectives IS NOT NULL AND q.solution_objectives != '' THEN 1 ELSE 0 END as has_markscheme,
+        COALESCE(up.score, 0) as score,
+        COALESCE(up.attempts, 0) as attempts
+       FROM questions q
+       LEFT JOIN user_progress up ON up.question_id = q.id AND up.user_id = ?
+       WHERE q.topic_id = ?
+       ORDER BY q.created_at ASC`,
+      [user.id, topicId]
     );
 
-    // For each question, fetch user progress and parse JSON fields
-    const questionsWithProgress = await Promise.all(
-      questions.map(async (question) => {
-        const progress = await db.get<UserProgress>(
-          'SELECT * FROM user_progress WHERE user_id = ? AND question_id = ?',
-          [user.id, question.id]
-        );
-
-        // Parse solution_objectives from JSON string to array
-        let solutionObjectives: string[] | undefined = undefined;
-        if (question.solution_objectives) {
-          try {
-            solutionObjectives = JSON.parse(question.solution_objectives);
-          } catch (e) {
-            console.error(`Failed to parse solution_objectives for question ${question.id}:`, e);
-          }
-        }
-
-        // Parse completed_objectives from JSON string to array
-        let completedObjectives: number[] = [];
-        if (progress?.completed_objectives) {
-          try {
-            completedObjectives = JSON.parse(progress.completed_objectives);
-          } catch (e) {
-            console.error(`Failed to parse completed_objectives for question ${question.id}:`, e);
-          }
-        }
-
-        return {
-          ...question,
-          solutionObjectives,
-          score: progress?.score || 0,
-          attempts: progress?.attempts || 0,
-          completedObjectives,
-        };
-      })
-    );
-
-    return NextResponse.json(questionsWithProgress);
+    return NextResponse.json(questions);
   } catch (error: any) {
     if (error.message === 'Unauthorized') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });

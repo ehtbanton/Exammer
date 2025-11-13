@@ -17,6 +17,7 @@ import { getScoreColorStyle, getDefaultBoxStyle, getUnattemptedBoxStyle } from '
 import { PaperType } from '@/lib/types';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
+import { UnderstandingIndicator } from '@/components/ui/understanding-indicator';
 
 export default function SubjectPage() {
   return (
@@ -30,9 +31,10 @@ function SubjectPageContent() {
   const params = useParams();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { subjects, processExamPapers, processMarkschemes, isLoading, setLoading } = useAppContext();
+  const { processExamPapers, processMarkschemes, loadSubjectsList, loadPaperTypes, isLoading, setLoading } = useAppContext();
   const subjectId = params.subjectId as string;
-  const subject = subjects.find(s => s.id === subjectId);
+  const [subject, setSubject] = useState<import('@/app/context/AppContext').SubjectPreview | null>(null);
+  const [paperTypes, setPaperTypes] = useState<import('@/app/context/AppContext').PaperTypeWithMetrics[]>([]);
   const [navigatingTo, setNavigatingTo] = useState<string | null>(null);
 
   const paperInputRef = useRef<HTMLInputElement>(null);
@@ -42,6 +44,26 @@ function SubjectPageContent() {
   const [selectedPapers, setSelectedPapers] = useState<File[]>([]);
   const [selectedMarkschemes, setSelectedMarkschemes] = useState<File[]>([]);
   const [hideEmptyPapers, setHideEmptyPapers] = useState(true);
+
+  // Load subject and paper types on mount
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        const subjectsList = await loadSubjectsList();
+        const foundSubject = subjectsList.find(s => s.id === subjectId);
+        setSubject(foundSubject || null);
+
+        if (foundSubject) {
+          const paperTypesList = await loadPaperTypes(subjectId);
+          setPaperTypes(paperTypesList);
+        }
+      } catch (error) {
+        console.error('Error loading subject data:', error);
+      }
+    };
+
+    loadData();
+  }, [subjectId, loadSubjectsList, loadPaperTypes]);
 
   // Truncate filename if longer than 43 characters: first 20 + "..." + last 20
   const truncateFilename = (filename: string) => {
@@ -53,16 +75,16 @@ function SubjectPageContent() {
     // Reset loading state on mount in case user navigated back
     if (subject) {
       setLoading(`navigate-${subject.id}`, false);
-      subject.paperTypes.forEach(pt => setLoading(`navigate-paper-${pt.id}`, false));
+      paperTypes.forEach(pt => setLoading(`navigate-paper-${pt.id}`, false));
     }
-  }, [subject, setLoading]);
+  }, [subject, paperTypes, setLoading]);
 
   useEffect(() => {
     // Auto-open paper upload dialog if redirected from syllabus upload
     if (searchParams.get('openPapers') === 'true') {
       setPaperDialogOpen(true);
       // Clean up the URL parameter
-      router.replace(`/subject/${subjectId}`);
+      router.replace(`/workspace/subject/${subjectId}`);
     }
   }, [searchParams, subjectId, router]);
 
@@ -113,7 +135,7 @@ function SubjectPageContent() {
   const handleNavigate = (paperTypeId: string) => {
     setLoading(`navigate-paper-${paperTypeId}`, true);
     setNavigatingTo(paperTypeId);
-    router.push(`/subject/${subjectId}/paper/${paperTypeId}`);
+    router.push(`/workspace/subject/${subjectId}/paper/${paperTypeId}`);
   };
   
   if (navigatingTo && isLoading(`navigate-paper-${navigatingTo}`)) {
@@ -136,40 +158,13 @@ function SubjectPageContent() {
     );
   }
 
-  const isPaperLoading = isLoading(`process-papers-${subject.id}`);
-  const isMarkschemeLoading = isLoading(`process-markschemes-${subject.id}`);
+  const isPaperLoading = isLoading(`process-papers-${subjectId}`);
+  const isMarkschemeLoading = isLoading(`process-markschemes-${subjectId}`);
 
-  // Calculate average score for a paper type based only on attempted topics
-  const getPaperTypeAverageScore = (paperType: PaperType): number | null => {
-    const topicsWithQuestions = paperType.topics.filter(t => t.examQuestions && t.examQuestions.length > 0);
-    if (topicsWithQuestions.length === 0) return null;
-
-    let topicScoresSum = 0;
-    let attemptedTopicsCount = 0;
-
-    for (const topic of topicsWithQuestions) {
-      const attemptedQuestions = topic.examQuestions.filter(q => q.attempts > 0);
-      if (attemptedQuestions.length > 0) {
-        // Calculate topic average from attempted questions only
-        const topicScore = attemptedQuestions.reduce((acc, q) => acc + q.score, 0) / attemptedQuestions.length;
-        topicScoresSum += topicScore;
-        attemptedTopicsCount++;
-      }
-    }
-
-    if (attemptedTopicsCount === 0) return null;
-    return topicScoresSum / attemptedTopicsCount;
-  };
-
-  // Check if a paper type has any questions
-  const paperTypeHasQuestions = (paperType: PaperType): boolean => {
-    return paperType.topics.some(t => t.examQuestions && t.examQuestions.length > 0);
-  };
-
-  // Filter papers based on toggle
+  // Filter papers based on toggle (now using metrics from API)
   const filteredPaperTypes = hideEmptyPapers
-    ? subject?.paperTypes.filter(paperTypeHasQuestions) || []
-    : subject?.paperTypes || [];
+    ? paperTypes.filter(pt => pt.total_questions > 0)
+    : paperTypes;
 
   return (
     <div className="container mx-auto">
@@ -178,26 +173,26 @@ function SubjectPageContent() {
         Back to Subjects
       </Button>
       <div className="flex items-center gap-2 mb-2">
-        <h1 className="text-3xl font-bold font-headline">{subject.name}</h1>
-        {subject.isCreator && (
+        <h1 className="text-3xl font-bold font-headline">{subject?.name}</h1>
+        {subject?.isCreator && (
           <span title="Created by you">
             <Crown className="h-6 w-6 text-yellow-500" />
           </span>
         )}
       </div>
       <p className="text-muted-foreground mb-8">
-        {subject.isCreator ? 'Manage your subject, syllabus, and past papers' : 'View and practice questions from this subject'}
+        {subject?.isCreator ? 'Manage your subject, syllabus, and past papers' : 'View and practice questions from this subject'}
       </p>
 
       {/* Syllabus and Past Papers Info - Only show for creators */}
-      {subject.isCreator && (
+      {subject?.isCreator && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
           <Card className="md:col-span-1">
             <CardHeader>
               <CardTitle className="flex items-center gap-2"><FileText /> Syllabus Info</CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-green-600">Syllabus uploaded and {subject.paperTypes.length} paper types identified.</p>
+              <p className="text-green-600">Syllabus uploaded and {paperTypes.length} paper types identified.</p>
             </CardContent>
           </Card>
 
@@ -360,19 +355,17 @@ function SubjectPageContent() {
         {filteredPaperTypes.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {filteredPaperTypes.map(paperType => {
-              const avgScore = getPaperTypeAverageScore(paperType);
-              const hasScore = avgScore !== null;
-              const hasQuestions = paperTypeHasQuestions(paperType);
-
-              // Calculate progress
-              const allQuestions = paperType.topics.flatMap(t => t.examQuestions || []);
-              const totalQuestions = allQuestions.length;
-              const attemptedQuestions = allQuestions.filter(q => q.attempts > 0).length;
-              const progressPercentage = totalQuestions > 0 ? (attemptedQuestions / totalQuestions) * 100 : 0;
+              // Use metrics from API (already calculated server-side)
+              const avgScore = paperType.avg_score;
+              const hasScore = avgScore !== null && paperType.attempted_questions > 0;
+              const hasQuestions = paperType.total_questions > 0;
+              const progressPercentage = paperType.total_questions > 0
+                ? (paperType.attempted_questions / paperType.total_questions) * 100
+                : 0;
 
               // Determine which style to use
               let boxStyle;
-              if (hasScore) {
+              if (hasScore && avgScore !== null) {
                 boxStyle = getScoreColorStyle(avgScore);
               } else if (hasQuestions) {
                 boxStyle = getUnattemptedBoxStyle(); // Has questions but no attempts
@@ -388,16 +381,18 @@ function SubjectPageContent() {
                   onClick={() => handleNavigate(paperType.id)}
                 >
                   <CardHeader>
-                    <CardTitle className="text-lg text-black">{paperType.name}</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <p className="text-sm text-black">{totalQuestions > 0 ? `${attemptedQuestions}/${totalQuestions} attempted` : `${paperType.topics.length} topics`}</p>
-                      {hasScore && (
-                        <p className="text-sm font-bold text-black">{avgScore.toFixed(1)}%</p>
+                    <div className="flex items-start justify-between gap-4">
+                      <CardTitle className="text-lg text-black flex-1">{paperType.name}</CardTitle>
+                      {hasScore && avgScore !== null && (
+                        <UnderstandingIndicator percentage={avgScore} size="sm" />
                       )}
                     </div>
-                    {totalQuestions > 0 && (
+                  </CardHeader>
+                  <CardContent className="space-y-2">
+                    <p className="text-sm text-black">
+                      {hasQuestions ? `${paperType.attempted_questions}/${paperType.total_questions} attempted` : 'No questions yet'}
+                    </p>
+                    {hasQuestions && (
                       <Progress value={progressPercentage} className="h-2" />
                     )}
                   </CardContent>

@@ -142,7 +142,7 @@ function InterviewPageContent() {
           description: `You scored ${res.score}/10. Redirecting back to topic...`,
         });
         setTimeout(() => {
-          router.push(`/subject/${subjectId}/paper/${encodeURIComponent(paperTypeId)}/topic/${encodeURIComponent(topicId)}`);
+          router.push(`/workspace/subject/${subjectId}/paper/${encodeURIComponent(paperTypeId)}/topic/${encodeURIComponent(topicId)}`);
         }, 3000);
       }
     } catch (e) {
@@ -160,7 +160,7 @@ function InterviewPageContent() {
       <div className="text-center">
         <h1 className="text-2xl font-bold">Content not found</h1>
         <Button asChild variant="link" className="mt-4">
-          <Link href={`/subject/${subjectId}/paper/${encodeURIComponent(paperTypeId)}/topic/${encodeURIComponent(topicId)}`}>Go back to topic</Link>
+          <Link href={`/workspace/subject/${subjectId}/paper/${encodeURIComponent(paperTypeId)}/topic/${encodeURIComponent(topicId)}`}>Go back to topic</Link>
         </Button>
       </div>
     );
@@ -168,7 +168,7 @@ function InterviewPageContent() {
 
   return (
     <div className="flex flex-col h-[calc(100vh-12rem)] md:h-[calc(100vh-11rem)] max-w-3xl mx-auto">
-        <Button variant="ghost" onClick={() => router.push(`/subject/${subjectId}/paper/${encodeURIComponent(paperTypeId)}/topic/${encodeURIComponent(topicId)}`)} className="mb-4 self-start">
+        <Button variant="ghost" onClick={() => router.push(`/workspace/subject/${subjectId}/paper/${encodeURIComponent(paperTypeId)}/topic/${encodeURIComponent(topicId)}`)} className="mb-4 self-start">
             <ArrowLeft />
             Back to Subsections
         </Button>

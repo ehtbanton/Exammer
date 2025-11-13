@@ -12,6 +12,7 @@ import { ArrowLeft, AlertCircle } from 'lucide-react';
 import PageSpinner from '@/components/PageSpinner';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { getScoreColorStyle, getUnattemptedBoxStyle } from '@/lib/utils';
+import { UnderstandingIndicator } from '@/components/ui/understanding-indicator';
 
 export default function TopicPage() {
   return (
@@ -24,48 +25,63 @@ export default function TopicPage() {
 function TopicPageContent() {
   const params = useParams();
   const router = useRouter();
-  const { subjects, isLoading, setLoading } = useAppContext();
+  const { loadTopics, loadQuestions, isLoading, setLoading } = useAppContext();
 
   const subjectId = params.subjectId as string;
   const paperTypeId = decodeURIComponent(params.paperTypeId as string);
   const topicId = decodeURIComponent(params.topicId as string);
   const [navigatingTo, setNavigatingTo] = useState<string | null>(null);
+  const [topic, setTopic] = useState<import('@/app/context/AppContext').TopicWithMetrics | null>(null);
+  const [questions, setQuestions] = useState<import('@/app/context/AppContext').QuestionPreview[]>([]);
 
-  // Directly access subjects to ensure component re-renders when subjects change
-  const subject = subjects.find(s => s.id === subjectId);
-  const paperType = subject?.paperTypes.find(pt => pt.id === paperTypeId);
-  const topic = paperType?.topics.find(t => t.id === topicId);
+  // Load data on mount
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        const topicsList = await loadTopics(paperTypeId);
+        const foundTopic = topicsList.find(t => t.id === topicId);
+        setTopic(foundTopic || null);
+
+        if (foundTopic) {
+          const questionsList = await loadQuestions(topicId);
+          setQuestions(questionsList);
+        }
+      } catch (error) {
+        console.error('Error loading topic data:', error);
+      }
+    };
+
+    loadData();
+  }, [paperTypeId, topicId, loadTopics, loadQuestions]);
 
   useEffect(() => {
     // Reset loading state on mount in case user navigated back
-    if (topic) {
-       Object.values(topic.examQuestions).forEach(q => setLoading(`navigate-question-${q.id}`, false));
-    }
-  }, [topic, setLoading]);
+    questions.forEach(q => setLoading(`navigate-question-${q.id}`, false));
+  }, [questions, setLoading]);
 
 
   const handleNavigate = (questionId: string) => {
     const loadingKey = `navigate-question-${questionId}`;
     setLoading(loadingKey, true);
     setNavigatingTo(questionId);
-    router.push(`/subject/${subjectId}/paper/${encodeURIComponent(paperTypeId)}/topic/${encodeURIComponent(topicId)}/question/${encodeURIComponent(questionId)}`);
+    router.push(`/workspace/subject/${subjectId}/paper/${encodeURIComponent(paperTypeId)}/topic/${encodeURIComponent(topicId)}/question/${encodeURIComponent(questionId)}`);
   };
 
   if (navigatingTo && isLoading(`navigate-question-${navigatingTo}`)) {
     return <PageSpinner />;
   }
 
-  // Show loading spinner while subjects are being fetched
-  if (isLoading('fetch-subjects')) {
+  // Show loading spinner while data is being fetched
+  if (isLoading(`load-questions-${topicId}`)) {
     return <PageSpinner />;
   }
 
-  if (!subject || !topic) {
+  if (!topic) {
     return (
       <div className="text-center">
         <h1 className="text-2xl font-bold">Topic not found</h1>
         <Button asChild variant="link" className="mt-4">
-          <Link href={`/subject/${subjectId}/paper/${encodeURIComponent(paperTypeId)}`}>Go back to paper</Link>
+          <Link href={`/workspace/subject/${subjectId}/paper/${encodeURIComponent(paperTypeId)}`}>Go back to paper</Link>
         </Button>
       </div>
     );
@@ -73,7 +89,7 @@ function TopicPageContent() {
 
   return (
     <div className="container mx-auto">
-      <Button variant="ghost" onClick={() => router.push(`/subject/${subjectId}/paper/${encodeURIComponent(paperTypeId)}`)} className="mb-4">
+      <Button variant="ghost" onClick={() => router.push(`/workspace/subject/${subjectId}/paper/${encodeURIComponent(paperTypeId)}`)} className="mb-4">
         <ArrowLeft />
         Back to Topics
       </Button>
@@ -90,11 +106,11 @@ function TopicPageContent() {
 
       <p className="text-muted-foreground mb-8">Select a question to start practicing.</p>
 
-      {topic.examQuestions.length > 0 ? (
+      {questions.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {topic.examQuestions.map(question => {
+          {questions.map(question => {
             const hasAttempts = question.attempts > 0;
-            const hasMarkscheme = question.solutionObjectives && question.solutionObjectives.length > 0;
+            const hasMarkscheme = question.has_markscheme === 1;
             const boxStyle = hasAttempts ? getScoreColorStyle(question.score) : getUnattemptedBoxStyle();
 
             return (
@@ -105,26 +121,25 @@ function TopicPageContent() {
                 onClick={() => handleNavigate(question.id)}
               >
                 <CardHeader>
-                  <CardTitle className="text-lg text-black flex items-center gap-2">
-                    {question.summary}
-                    {!hasMarkscheme && (
-                      <span className="inline-flex items-center text-xs font-normal px-2 py-1 bg-amber-100 dark:bg-amber-900 text-amber-800 dark:text-amber-200 rounded">
-                        No MS
-                      </span>
-                    )}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex items-center justify-between">
-                    {hasAttempts ? (
-                      <>
-                        <p className="text-sm text-black">{question.attempts} attempt{question.attempts !== 1 ? 's' : ''}</p>
-                        <p className="text-sm font-bold text-black">{question.score.toFixed(1)}%</p>
-                      </>
-                    ) : (
-                      <p className="text-sm text-gray-600">Not attempted</p>
+                  <div className="flex items-start justify-between gap-4">
+                    <CardTitle className="text-lg text-black flex items-center gap-2 flex-1">
+                      {question.summary}
+                      {!hasMarkscheme && (
+                        <span className="inline-flex items-center text-xs font-normal px-2 py-1 bg-amber-100 dark:bg-amber-900 text-amber-800 dark:text-amber-200 rounded">
+                          No MS
+                        </span>
+                      )}
+                    </CardTitle>
+                    {hasAttempts && (
+                      <UnderstandingIndicator percentage={question.score} size="sm" />
                     )}
                   </div>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-black">{question.attempts} attempt{question.attempts !== 1 ? 's' : ''}</p>
+                  {!hasAttempts && (
+                    <p className="text-sm text-gray-600">Not attempted</p>
+                  )}
                 </CardContent>
               </Card>
             );

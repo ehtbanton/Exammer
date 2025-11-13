@@ -75,8 +75,8 @@ function SignUpContent() {
         return;
       }
 
-      // Redirect to home page
-      router.push('/');
+      // Redirect to workspace
+      router.push('/workspace');
     } catch (err) {
       setError('An unexpected error occurred');
       setLoading(false);

@@ -8,10 +8,77 @@ import { decomposeSyllabus } from '@/ai/flows/decompose-syllabus-into-topics';
 import { generateSimilarQuestion } from '@/ai/flows/generate-similar-question';
 import { backgroundQueue } from '@/lib/background-queue';
 
+// New types for lazy loading
+interface SubjectPreview {
+  id: string;
+  name: string;
+  paperTypesCount: number;
+  isCreator: boolean;
+}
+
+interface PaperTypeWithMetrics {
+  id: string;
+  name: string;
+  subject_id: string;
+  total_questions: number;
+  attempted_questions: number;
+  avg_score: number | null;
+}
+
+interface TopicWithMetrics {
+  id: string;
+  name: string;
+  description: string;
+  paper_type_id: string;
+  total_questions: number;
+  attempted_questions: number;
+  avg_score: number | null;
+}
+
+interface QuestionPreview {
+  id: string;
+  summary: string;
+  topic_id: string;
+  has_markscheme: number;
+  score: number;
+  attempts: number;
+}
+
+interface FullQuestion {
+  id: string;
+  topic_id: string;
+  question_text: string;
+  summary: string;
+  solution_objectives?: string[];
+  diagram_mermaid?: string;
+  markscheme_id?: number;
+  paper_date?: string;
+  question_number?: string;
+  categorization_confidence?: number;
+  categorization_reasoning?: string;
+  score: number;
+  attempts: number;
+  completed_objectives: number[];
+}
+
 interface AppContextType {
   subjects: Subject[];
   otherSubjects: Subject[];
   isLevel3User: boolean;
+  cacheVersion: number; // Version counter that increments when caches are invalidated
+  // Lazy loading functions
+  loadSubjectsList: () => Promise<SubjectPreview[]>;
+  loadPaperTypes: (subjectId: string) => Promise<PaperTypeWithMetrics[]>;
+  loadTopics: (paperTypeId: string) => Promise<TopicWithMetrics[]>;
+  loadQuestions: (topicId: string) => Promise<QuestionPreview[]>;
+  loadFullQuestion: (questionId: string) => Promise<FullQuestion>;
+  // Cache invalidation functions
+  invalidateSubjectsCache: () => void;
+  invalidatePaperTypesCache: (subjectId: string) => void;
+  invalidateTopicsCache: (paperTypeId: string) => void;
+  invalidateQuestionsCache: (topicId: string) => void;
+  invalidateFullQuestionCache: (questionId: string) => void;
+  // Original functions
   createSubjectFromSyllabus: (syllabusFile: File) => Promise<void>;
   processExamPapers: (subjectId: string, examPapers: File[]) => Promise<void>;
   processMarkschemes: (subjectId: string, markschemes: File[]) => Promise<void>;
@@ -22,7 +89,7 @@ interface AppContextType {
   getSubjectById: (subjectId: string) => Subject | undefined;
   addPastPaperToSubject: (subjectId: string, paperFile: File) => Promise<void>;
   updateExamQuestionScore: (subjectId: string, paperTypeName: string, topicName: string, questionId: string, score: number) => void;
-  generateQuestionVariant: (subjectId: string, paperTypeId: string, topicId: string, questionId: string) => Promise<{ questionText: string; solutionObjectives: string[] }>;
+  generateQuestionVariant: (subjectId: string, paperTypeId: string, topicId: string, questionId: string) => Promise<{ questionText: string; solutionObjectives: string[]; diagramMermaid?: string }>;
   isLoading: (key: string) => boolean;
   setLoading: (key: string, value: boolean) => void;
 }
@@ -58,45 +125,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
           setIsLevel3User(accessLevel >= 3);
         }
 
-        // Fetch workspace subjects only
-        const workspaceResponse = await fetch('/api/subjects');
-        if (workspaceResponse.ok) {
-          const apiSubjects = await workspaceResponse.json();
-          const clientSubjects = apiSubjects.map((sub: any) => ({
-            id: sub.id.toString(),
-            name: sub.name,
-            syllabusContent: sub.syllabus_content || '',
-            isCreator: sub.is_creator === 1,
-            pastPapers: (sub.pastPapers || []).map((pp: any) => ({
-              id: pp.id.toString(),
-              name: pp.name,
-              content: pp.content
-            })),
-            paperTypes: (sub.paperTypes || []).map((pt: any) => ({
-              id: pt.id.toString(),
-              name: pt.name,
-              topics: (pt.topics || []).map((t: any) => ({
-                id: t.id.toString(),
-                name: t.name,
-                description: t.description || '',
-                examQuestions: (t.examQuestions || []).map((q: any) => ({
-                  id: q.id.toString(),
-                  questionText: q.question_text,
-                  summary: q.summary,
-                  score: q.score || (q.attempts === 0 ? 50 : 0), // Default 50% if no attempts
-                  attempts: q.attempts || 0,
-                  solutionObjectives: q.solutionObjectives || undefined,
-                  completedObjectives: q.completedObjectives || [],
-                }))
-              }))
-            }))
-          }));
-          setSubjects(clientSubjects);
-        }
-        // Don't fetch other subjects automatically anymore
+        // NOTE: We no longer load full subject data upfront for better performance
+        // Pages should use the new lazy loading functions: loadPaperTypes, loadTopics, loadQuestions
+        // The 'subjects' state is kept for backward compatibility with some functions that still depend on it
+        // but it will only be populated when needed (e.g., after creating/processing subjects)
+        setSubjects([]);
       } catch (error) {
-        console.error("Failed to fetch subjects:", error);
-        toast({ variant: "destructive", title: "Error", description: "Failed to load subjects" });
+        console.error("Failed to fetch user data:", error);
+        toast({ variant: "destructive", title: "Error", description: "Failed to load user data" });
       } finally {
         setLoadingStates(prev => ({ ...prev, 'fetch-subjects': false }));
       }
@@ -118,6 +154,54 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const isLoading = useCallback((key: string) => !!loadingStates[key], [loadingStates]);
+
+  // NEW: Lazy loading state caches - defined early to avoid circular dependencies
+  const [subjectsListCache, setSubjectsListCache] = useState<SubjectPreview[] | null>(null);
+  const [paperTypesCache, setPaperTypesCache] = useState<Record<string, PaperTypeWithMetrics[]>>({});
+  const [topicsCache, setTopicsCache] = useState<Record<string, TopicWithMetrics[]>>({});
+  const [questionsCache, setQuestionsCache] = useState<Record<string, QuestionPreview[]>>({});
+  const [fullQuestionsCache, setFullQuestionsCache] = useState<Record<string, FullQuestion>>({});
+
+  // Cache version counter to trigger UI updates when cache changes
+  const [cacheVersion, setCacheVersion] = useState(0);
+
+  // NEW: Cache invalidation functions - defined early so they can be used in other callbacks
+  const invalidateSubjectsCache = useCallback(() => {
+    setSubjectsListCache(null);
+    setCacheVersion(v => v + 1);
+  }, []);
+
+  const invalidatePaperTypesCache = useCallback((subjectId: string) => {
+    setPaperTypesCache(prev => {
+      const newCache = { ...prev };
+      delete newCache[subjectId];
+      return newCache;
+    });
+  }, []);
+
+  const invalidateTopicsCache = useCallback((paperTypeId: string) => {
+    setTopicsCache(prev => {
+      const newCache = { ...prev };
+      delete newCache[paperTypeId];
+      return newCache;
+    });
+  }, []);
+
+  const invalidateQuestionsCache = useCallback((topicId: string) => {
+    setQuestionsCache(prev => {
+      const newCache = { ...prev };
+      delete newCache[topicId];
+      return newCache;
+    });
+  }, []);
+
+  const invalidateFullQuestionCache = useCallback((questionId: string) => {
+    setFullQuestionsCache(prev => {
+      const newCache = { ...prev };
+      delete newCache[questionId];
+      return newCache;
+    });
+  }, []);
 
   const createSubjectFromSyllabus = useCallback(async (syllabusFile: File): Promise<string | null> => {
     const loadingKey = `create-subject`;
@@ -412,6 +496,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
             };
           }));
 
+          // Invalidate caches for this subject since paper types, topics, and questions changed
+          invalidatePaperTypesCache(subjectId);
+          // Invalidate all topics and questions caches for this subject
+          updatedPaperTypes.forEach((pt: any) => {
+            invalidateTopicsCache(pt.id);
+            pt.topics.forEach((t: any) => {
+              invalidateQuestionsCache(t.id);
+            });
+          });
+
           toast({
             title: "Questions Extracted",
             description: `Saved ${batchResult.questionsSaved} questions from ${examPapers.length} paper(s) to database.`
@@ -434,7 +528,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     } finally {
       setLoading(loadingKey, false);
     }
-  }, [subjects, toast, setLoading]);
+  }, [subjects, toast, setLoading, invalidatePaperTypesCache, invalidateTopicsCache, invalidateQuestionsCache]);
 
   const processMarkschemes = useCallback(async (subjectId: string, markschemes: File[]) => {
     const loadingKey = `process-markschemes-${subjectId}`;
@@ -575,6 +669,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
             };
           }));
 
+          // Invalidate questions caches since solution objectives were added/updated
+          updatedPaperTypes.forEach((pt: any) => {
+            pt.topics.forEach((t: any) => {
+              invalidateQuestionsCache(t.id);
+              // Also invalidate full question cache for all questions in this topic
+              t.examQuestions.forEach((q: any) => {
+                invalidateFullQuestionCache(q.id);
+              });
+            });
+          });
+
           toast({
             title: "Markschemes Matched",
             description: `Updated ${matchResult.questionsUpdated} questions with solution objectives from ${markschemes.length} markscheme(s).`
@@ -593,7 +698,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     } finally {
       setLoading(loadingKey, false);
     }
-  }, [subjects, toast, setLoading]);
+  }, [subjects, toast, setLoading, invalidateQuestionsCache, invalidateFullQuestionCache]);
 
   const deleteSubject = useCallback(async (subjectId: string) => {
     try {
@@ -754,6 +859,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       topicName: topic.name,
       topicDescription: topic.description,
       originalObjectives: question.solutionObjectives,
+      originalDiagramMermaid: question.diagramMermaid,
     });
 
     console.log(`[Process C] Question variant generated successfully with ${result.solutionObjectives.length} ${hasObjectives ? 'adapted' : 'manufactured'} objectives`);
@@ -761,6 +867,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return {
       questionText: result.questionText,
       solutionObjectives: result.solutionObjectives,
+      diagramMermaid: result.diagramMermaid,
     };
   }, [subjects]);
 
@@ -782,13 +889,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
       if (subject) {
         setOtherSubjects(prev => prev.filter(s => s.id !== subjectId));
         setSubjects(prev => [{ ...subject, isCreator: false }, ...prev]);
+        // Invalidate subjects cache - UI will reload automatically via cacheVersion
+        invalidateSubjectsCache();
         toast({ title: "Success", description: "Subject added to workspace" });
       }
     } catch (error: any) {
       console.error('Error adding subject to workspace:', error);
       toast({ variant: "destructive", title: "Error", description: error.message });
     }
-  }, [otherSubjects, toast]);
+  }, [otherSubjects, toast, invalidateSubjectsCache]);
 
   const removeSubjectFromWorkspace = useCallback(async (subjectId: string) => {
     try {
@@ -801,18 +910,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
         throw new Error(error.error || 'Failed to remove subject from workspace');
       }
 
-      // Move subject from subjects to otherSubjects
-      const subject = subjects.find(s => s.id === subjectId);
-      if (subject) {
-        setSubjects(prev => prev.filter(s => s.id !== subjectId));
-        setOtherSubjects(prev => [{ ...subject, isCreator: false }, ...prev]);
-        toast({ title: "Success", description: "Subject removed from workspace" });
-      }
+      // Invalidate subjects cache - UI will reload automatically via cacheVersion
+      invalidateSubjectsCache();
+      toast({ title: "Success", description: "Subject removed from workspace" });
     } catch (error: any) {
       console.error('Error removing subject from workspace:', error);
       toast({ variant: "destructive", title: "Error", description: error.message });
     }
-  }, [subjects, toast]);
+  }, [toast, invalidateSubjectsCache]);
 
   const searchSubjects = useCallback(async (query: string) => {
     const loadingKey = 'search-subjects';
@@ -831,34 +936,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }
 
       const apiOtherSubjects = await response.json();
+      // Map lightweight search results (no full hierarchy)
       const clientOtherSubjects = apiOtherSubjects.map((sub: any) => ({
         id: sub.id.toString(),
         name: sub.name,
-        syllabusContent: sub.syllabus_content || '',
+        syllabusContent: '',
         isCreator: false,
-        pastPapers: (sub.pastPapers || []).map((pp: any) => ({
-          id: pp.id.toString(),
-          name: pp.name,
-          content: pp.content
-        })),
-        paperTypes: (sub.paperTypes || []).map((pt: any) => ({
-          id: pt.id.toString(),
-          name: pt.name,
-          topics: (pt.topics || []).map((t: any) => ({
-            id: t.id.toString(),
-            name: t.name,
-            description: t.description || '',
-            examQuestions: (t.examQuestions || []).map((q: any) => ({
-              id: q.id.toString(),
-              questionText: q.question_text,
-              summary: q.summary,
-              score: q.score || (q.attempts === 0 ? 50 : 0), // Default 50% if no attempts
-              attempts: q.attempts || 0,
-              solutionObjectives: q.solutionObjectives || undefined,
-              completedObjectives: q.completedObjectives || [],
-            }))
-          }))
-        }))
+        pastPapers: [],
+        paperTypes: [], // Empty - will be loaded on demand if user adds to workspace
+        paperTypesCount: sub.paper_types_count || 0, // Store the count for display
       }));
       setOtherSubjects(clientOtherSubjects);
     } catch (error) {
@@ -869,8 +955,210 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, [toast, setLoading]);
 
+  // NEW: Lazy loading functions
+  const loadSubjectsList = useCallback(async (): Promise<SubjectPreview[]> => {
+    // Return cached data if available
+    if (subjectsListCache) {
+      return subjectsListCache;
+    }
+    const loadingKey = 'load-subjects-list';
+    setLoading(loadingKey, true);
+
+    try {
+      const response = await fetch('/api/subjects/list');
+      if (!response.ok) {
+        throw new Error('Failed to load subjects list');
+      }
+
+      const data = await response.json();
+      const subjectsList: SubjectPreview[] = data.map((s: any) => ({
+        id: s.id.toString(),
+        name: s.name,
+        paperTypesCount: s.paper_types_count,
+        isCreator: s.is_creator === 1,
+      }));
+
+      // Cache the result
+      setSubjectsListCache(subjectsList);
+
+      return subjectsList;
+    } catch (error) {
+      console.error('Error loading subjects list:', error);
+      toast({ variant: "destructive", title: "Error", description: "Failed to load subjects" });
+      throw error;
+    } finally {
+      setLoading(loadingKey, false);
+    }
+  }, [toast, setLoading]);
+
+  const loadPaperTypes = useCallback(async (subjectId: string): Promise<PaperTypeWithMetrics[]> => {
+    // Return cached data if available
+    if (paperTypesCache[subjectId]) {
+      return paperTypesCache[subjectId];
+    }
+
+    const loadingKey = `load-paper-types-${subjectId}`;
+    setLoading(loadingKey, true);
+
+    try {
+      const response = await fetch(`/api/subjects/${subjectId}/paper-types`);
+      if (!response.ok) {
+        throw new Error('Failed to load paper types');
+      }
+
+      const data = await response.json();
+      const paperTypes: PaperTypeWithMetrics[] = data.map((pt: any) => ({
+        id: pt.id.toString(),
+        name: pt.name,
+        subject_id: pt.subject_id.toString(),
+        total_questions: pt.total_questions,
+        attempted_questions: pt.attempted_questions,
+        avg_score: pt.avg_score,
+      }));
+
+      // Cache the result
+      setPaperTypesCache(prev => ({ ...prev, [subjectId]: paperTypes }));
+
+      return paperTypes;
+    } catch (error) {
+      console.error('Error loading paper types:', error);
+      toast({ variant: "destructive", title: "Error", description: "Failed to load paper types" });
+      throw error;
+    } finally {
+      setLoading(loadingKey, false);
+    }
+  }, [toast, setLoading]);
+
+  const loadTopics = useCallback(async (paperTypeId: string): Promise<TopicWithMetrics[]> => {
+    // Return cached data if available
+    if (topicsCache[paperTypeId]) {
+      return topicsCache[paperTypeId];
+    }
+
+    const loadingKey = `load-topics-${paperTypeId}`;
+    setLoading(loadingKey, true);
+
+    try {
+      const response = await fetch(`/api/paper-types/${paperTypeId}/topics`);
+      if (!response.ok) {
+        throw new Error('Failed to load topics');
+      }
+
+      const data = await response.json();
+      const topics: TopicWithMetrics[] = data.map((t: any) => ({
+        id: t.id.toString(),
+        name: t.name,
+        description: t.description || '',
+        paper_type_id: t.paper_type_id.toString(),
+        total_questions: t.total_questions,
+        attempted_questions: t.attempted_questions,
+        avg_score: t.avg_score,
+      }));
+
+      // Cache the result
+      setTopicsCache(prev => ({ ...prev, [paperTypeId]: topics }));
+
+      return topics;
+    } catch (error) {
+      console.error('Error loading topics:', error);
+      toast({ variant: "destructive", title: "Error", description: "Failed to load topics" });
+      throw error;
+    } finally {
+      setLoading(loadingKey, false);
+    }
+  }, [toast, setLoading]);
+
+  const loadQuestions = useCallback(async (topicId: string): Promise<QuestionPreview[]> => {
+    // Return cached data if available
+    if (questionsCache[topicId]) {
+      return questionsCache[topicId];
+    }
+
+    const loadingKey = `load-questions-${topicId}`;
+    setLoading(loadingKey, true);
+
+    try {
+      const response = await fetch(`/api/topics/${topicId}/questions`);
+      if (!response.ok) {
+        throw new Error('Failed to load questions');
+      }
+
+      const data = await response.json();
+      const questions: QuestionPreview[] = data.map((q: any) => ({
+        id: q.id.toString(),
+        summary: q.summary,
+        topic_id: q.topic_id.toString(),
+        has_markscheme: q.has_markscheme,
+        score: q.score,
+        attempts: q.attempts,
+      }));
+
+      // Cache the result
+      setQuestionsCache(prev => ({ ...prev, [topicId]: questions }));
+
+      return questions;
+    } catch (error) {
+      console.error('Error loading questions:', error);
+      toast({ variant: "destructive", title: "Error", description: "Failed to load questions" });
+      throw error;
+    } finally {
+      setLoading(loadingKey, false);
+    }
+  }, [toast, setLoading]);
+
+  const loadFullQuestion = useCallback(async (questionId: string): Promise<FullQuestion> => {
+    // Return cached data if available
+    if (fullQuestionsCache[questionId]) {
+      return fullQuestionsCache[questionId];
+    }
+
+    const loadingKey = `load-full-question-${questionId}`;
+    setLoading(loadingKey, true);
+
+    try {
+      const response = await fetch(`/api/questions/${questionId}`);
+      if (!response.ok) {
+        throw new Error('Failed to load question');
+      }
+
+      const data = await response.json();
+      const fullQuestion: FullQuestion = {
+        id: data.id.toString(),
+        topic_id: data.topic_id.toString(),
+        question_text: data.question_text,
+        summary: data.summary,
+        solution_objectives: data.solution_objectives,
+        diagram_mermaid: data.diagram_mermaid,
+        markscheme_id: data.markscheme_id,
+        paper_date: data.paper_date,
+        question_number: data.question_number,
+        categorization_confidence: data.categorization_confidence,
+        categorization_reasoning: data.categorization_reasoning,
+        score: data.score,
+        attempts: data.attempts,
+        completed_objectives: data.completed_objectives || [],
+      };
+
+      // Cache the result
+      setFullQuestionsCache(prev => ({ ...prev, [questionId]: fullQuestion }));
+
+      return fullQuestion;
+    } catch (error) {
+      console.error('Error loading full question:', error);
+      toast({ variant: "destructive", title: "Error", description: "Failed to load question" });
+      throw error;
+    } finally {
+      setLoading(loadingKey, false);
+    }
+  }, [toast, setLoading]);
+
   return (
-    <AppContext.Provider value={{ subjects, otherSubjects, isLevel3User, createSubjectFromSyllabus, processExamPapers, processMarkschemes, deleteSubject, addSubjectToWorkspace, removeSubjectFromWorkspace, searchSubjects, getSubjectById, addPastPaperToSubject, updateExamQuestionScore, generateQuestionVariant, isLoading, setLoading }}>
+    <AppContext.Provider value={{
+      subjects, otherSubjects, isLevel3User, cacheVersion,
+      loadSubjectsList, loadPaperTypes, loadTopics, loadQuestions, loadFullQuestion,
+      invalidateSubjectsCache, invalidatePaperTypesCache, invalidateTopicsCache, invalidateQuestionsCache, invalidateFullQuestionCache,
+      createSubjectFromSyllabus, processExamPapers, processMarkschemes, deleteSubject, addSubjectToWorkspace, removeSubjectFromWorkspace, searchSubjects, getSubjectById, addPastPaperToSubject, updateExamQuestionScore, generateQuestionVariant, isLoading, setLoading
+    }}>
       {children}
     </AppContext.Provider>
   );
@@ -883,3 +1171,6 @@ export function useAppContext() {
   }
   return context;
 }
+
+// Export types for use in components
+export type { SubjectPreview, PaperTypeWithMetrics, TopicWithMetrics, QuestionPreview, FullQuestion };

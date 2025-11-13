@@ -46,13 +46,53 @@ CREATE TABLE IF NOT EXISTS verification_tokens (
   PRIMARY KEY (identifier, token)
 );
 
+-- Classes table (V3: teacher-student class system)
+CREATE TABLE IF NOT EXISTS classes (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  description TEXT,
+  teacher_id INTEGER NOT NULL,
+  classroom_code TEXT UNIQUE NOT NULL,
+  created_at INTEGER DEFAULT (unixepoch()),
+  updated_at INTEGER DEFAULT (unixepoch()),
+  FOREIGN KEY (teacher_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+-- Class memberships table (V3: tracks which users are in which classes)
+CREATE TABLE IF NOT EXISTS class_memberships (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  class_id INTEGER NOT NULL,
+  user_id INTEGER NOT NULL,
+  role TEXT NOT NULL CHECK(role IN ('teacher', 'student')),
+  status TEXT NOT NULL CHECK(status IN ('pending', 'approved', 'rejected')) DEFAULT 'pending',
+  joined_at INTEGER DEFAULT (unixepoch()),
+  FOREIGN KEY (class_id) REFERENCES classes(id) ON DELETE CASCADE,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  UNIQUE(class_id, user_id)
+);
+
+-- Class subjects table (V3: tracks which subjects are assigned to which classes)
+CREATE TABLE IF NOT EXISTS class_subjects (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  class_id INTEGER NOT NULL,
+  subject_id INTEGER NOT NULL,
+  added_by_user_id INTEGER NOT NULL,
+  added_at INTEGER DEFAULT (unixepoch()),
+  FOREIGN KEY (class_id) REFERENCES classes(id) ON DELETE CASCADE,
+  FOREIGN KEY (subject_id) REFERENCES subjects(id) ON DELETE CASCADE,
+  FOREIGN KEY (added_by_user_id) REFERENCES users(id) ON DELETE CASCADE,
+  UNIQUE(class_id, subject_id)
+);
+
 -- Subjects table (V1: workspace architecture - subjects are public, users link via user_workspaces)
 CREATE TABLE IF NOT EXISTS subjects (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   name TEXT NOT NULL,
   syllabus_content TEXT,
+  class_id INTEGER DEFAULT NULL,
   created_at INTEGER DEFAULT (unixepoch()),
-  updated_at INTEGER DEFAULT (unixepoch())
+  updated_at INTEGER DEFAULT (unixepoch()),
+  FOREIGN KEY (class_id) REFERENCES classes(id) ON DELETE SET NULL
 );
 
 -- User workspaces table (V1: links users to subjects in their workspace)
@@ -116,6 +156,9 @@ CREATE TABLE IF NOT EXISTS questions (
   markscheme_id INTEGER,
   paper_date TEXT,
   question_number TEXT,
+  diagram_mermaid TEXT,
+  categorization_confidence INTEGER DEFAULT 100,
+  categorization_reasoning TEXT,
   created_at INTEGER DEFAULT (unixepoch()),
   FOREIGN KEY (topic_id) REFERENCES topics(id) ON DELETE CASCADE,
   FOREIGN KEY (markscheme_id) REFERENCES markschemes(id) ON DELETE SET NULL
@@ -140,7 +183,15 @@ CREATE TABLE IF NOT EXISTS user_progress (
 CREATE INDEX IF NOT EXISTS idx_accounts_user_id ON accounts(user_id);
 CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id);
 CREATE INDEX IF NOT EXISTS idx_sessions_token ON sessions(session_token);
+CREATE INDEX IF NOT EXISTS idx_classes_teacher_id ON classes(teacher_id);
+CREATE INDEX IF NOT EXISTS idx_classes_classroom_code ON classes(classroom_code);
+CREATE INDEX IF NOT EXISTS idx_class_memberships_class_id ON class_memberships(class_id);
+CREATE INDEX IF NOT EXISTS idx_class_memberships_user_id ON class_memberships(user_id);
+CREATE INDEX IF NOT EXISTS idx_class_memberships_status ON class_memberships(status);
+CREATE INDEX IF NOT EXISTS idx_class_subjects_class_id ON class_subjects(class_id);
+CREATE INDEX IF NOT EXISTS idx_class_subjects_subject_id ON class_subjects(subject_id);
 CREATE INDEX IF NOT EXISTS idx_subjects_name ON subjects(name);
+CREATE INDEX IF NOT EXISTS idx_subjects_class_id ON subjects(class_id);
 CREATE INDEX IF NOT EXISTS idx_user_workspaces_user_id ON user_workspaces(user_id);
 CREATE INDEX IF NOT EXISTS idx_user_workspaces_subject_id ON user_workspaces(subject_id);
 CREATE INDEX IF NOT EXISTS idx_past_papers_subject_id ON past_papers(subject_id);

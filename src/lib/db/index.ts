@@ -9,95 +9,65 @@ const DB_PATH = path.join(process.cwd(), 'db', 'exammer.db');
 class Database {
   private db: sqlite3.Database | null = null;
   private initPromise: Promise<void> | null = null;
+  private initialized = false;
 
   constructor() {
-    this.initPromise = this.initialize();
+    // Don't initialize immediately - wait for first query (lazy initialization)
   }
 
   private async initialize(): Promise<void> {
-    try {
-      console.log('Starting database initialization...');
-
-      // Check if database exists
-      const dbExists = fs.existsSync(DB_PATH);
-
-      if (!dbExists) {
-        // If database doesn't exist, let migrations handle creation
-        console.log('Database does not exist, migrations will create it...');
-      } else {
-        // Database exists, ensure schema is applied (handles any IF NOT EXISTS clauses)
-        await this.applyBaseSchema();
-      }
-
-      // Run versioned migrations (will create database if needed)
-      await this.runVersionedMigrations();
-
-      // If database was created by migrations, we need to open a connection
-      if (!dbExists && !this.db) {
-        await new Promise<void>((resolve, reject) => {
-          this.db = new sqlite3.Database(DB_PATH, (err) => {
-            if (err) {
-              console.error('Error opening database:', err);
-              reject(err);
-            } else {
-              console.log('Connected to SQLite database at', DB_PATH);
-              // Configure SQLite for better write durability
-              this.db!.run('PRAGMA journal_mode = DELETE', () => {});
-              this.db!.run('PRAGMA synchronous = FULL', () => {});
-              resolve();
-            }
-          });
-        });
-      }
-
-      // Finally, initialize user access sync
-      await this.initializeUserAccessSync();
-
-      console.log('Database initialization completed successfully');
-    } catch (error) {
-      console.error('CRITICAL: Database initialization failed:', error);
-      throw error;
+    // Prevent multiple initializations
+    if (this.initialized || this.initPromise) {
+      return this.initPromise || Promise.resolve();
     }
-  }
 
-  private applyBaseSchema(): Promise<void> {
-    return new Promise((resolve, reject) => {
-      this.db = new sqlite3.Database(DB_PATH, async (err) => {
-        if (err) {
-          console.error('Error opening database:', err);
-          reject(err);
-          return;
+    this.initPromise = (async () => {
+      try {
+        console.log('Starting database initialization...');
+
+        // Check if database exists
+        const dbExists = fs.existsSync(DB_PATH);
+
+        if (!dbExists) {
+          // If database doesn't exist, let migrations handle creation
+          console.log('Database does not exist, migrations will create it...');
         }
 
-        console.log('Connected to SQLite database at', DB_PATH);
+        // Run versioned migrations FIRST (will create database if needed, or migrate existing)
+        // This must happen before any schema application to ensure columns exist
+        await this.runVersionedMigrations();
 
-        // Configure SQLite for better write durability
-        this.db!.run('PRAGMA journal_mode = DELETE', (err) => {
-          if (err) {
-            console.error('Error setting journal mode:', err);
-          }
-        });
+        // Open database connection after migrations
+        if (!this.db) {
+          await new Promise<void>((resolve, reject) => {
+            this.db = new sqlite3.Database(DB_PATH, (err) => {
+              if (err) {
+                console.error('Error opening database:', err);
+                reject(err);
+              } else {
+                console.log('Connected to SQLite database at', DB_PATH);
+                // Configure SQLite for better write durability
+                this.db!.run('PRAGMA journal_mode = DELETE', () => {});
+                this.db!.run('PRAGMA synchronous = FULL', () => {});
+                resolve();
+              }
+            });
+          });
+        }
 
-        this.db!.run('PRAGMA synchronous = FULL', (err) => {
-          if (err) {
-            console.error('Error setting synchronous mode:', err);
-          }
-        });
+        // Finally, initialize user access sync
+        await this.initializeUserAccessSync();
 
-        const schemaPath = path.join(process.cwd(), 'src', 'lib', 'db', 'schema.sql');
-        const schema = fs.readFileSync(schemaPath, 'utf8');
+        this.initialized = true;
+        console.log('Database initialization completed successfully');
+      } catch (error) {
+        console.error('CRITICAL: Database initialization failed:', error);
+        this.initPromise = null; // Reset to allow retry
+        throw error;
+      }
+    })();
 
-        this.db!.exec(schema, (err) => {
-          if (err) {
-            console.error('Error applying base schema:', err);
-            reject(err);
-          } else {
-            console.log('Base schema applied successfully');
-            resolve();
-          }
-        });
-      });
-    });
+    return this.initPromise;
   }
 
   private async runVersionedMigrations(): Promise<void> {
@@ -163,9 +133,13 @@ class Database {
     }
   }
 
-  // Wait for initialization to complete
+  // Wait for initialization to complete (triggers lazy initialization on first call)
   async ready(): Promise<void> {
-    if (this.initPromise) {
+    if (!this.initialized && !this.initPromise) {
+      // First time being called - trigger initialization
+      await this.initialize();
+    } else if (this.initPromise) {
+      // Already initializing - wait for it
       await this.initPromise;
     }
     if (!this.db) {
@@ -312,6 +286,13 @@ export interface Question {
   topic_id: number;
   question_text: string;
   summary: string;
+  solution_objectives?: string; // JSON array of marking criteria
+  markscheme_id?: number;
+  paper_date?: string; // e.g., "2022-06"
+  question_number?: string; // e.g., "1-3-5"
+  diagram_mermaid?: string; // Mermaid diagram syntax
+  categorization_confidence?: number; // 0-100
+  categorization_reasoning?: string; // Brief explanation of categorization
   created_at: number;
 }
 

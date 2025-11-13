@@ -3,36 +3,94 @@ import { db } from '@/lib/db';
 import { requireAuth } from '@/lib/auth-helpers';
 import type { Topic } from '@/lib/db';
 
-// GET /api/paper-types/[id]/topics - Get all topics for a paper type (workspace members)
+// GET /api/paper-types/[id]/topics - Get all topics for a paper type with aggregated metrics
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const user = await requireAuth();
-    const { id: paperTypeId } = await params;
+    const { id: paperTypeIdStr } = await params;
+    const paperTypeId = parseInt(paperTypeIdStr);
 
-    // Verify subject is in user's workspace
-    const workspace = await db.get<{ subject_id: number }>(
-      `SELECT pt.subject_id
-       FROM paper_types pt
-       WHERE pt.id = ?`,
+    if (isNaN(paperTypeId)) {
+      return NextResponse.json({ error: 'Invalid paper type ID' }, { status: 400 });
+    }
+
+    // Get subject_id and verify access
+    const paperType = await db.get<{ subject_id: number }>(
+      'SELECT subject_id FROM paper_types WHERE id = ?',
       [paperTypeId]
     );
 
-    if (!workspace) {
+    if (!paperType) {
       return NextResponse.json({ error: 'Paper type not found' }, { status: 404 });
     }
 
-    const inWorkspace = await db.get(
-      'SELECT id FROM user_workspaces WHERE user_id = ? AND subject_id = ?',
-      [user.id, workspace.subject_id]
+    // Verify user has access to this subject
+    const fullUser = await db.get<{ access_level: number }>(
+      'SELECT access_level FROM users WHERE id = ?',
+      [user.id]
     );
+    const accessLevel = fullUser?.access_level || 0;
 
-    if (!inWorkspace) {
-      return NextResponse.json({ error: 'Paper type not found in workspace' }, { status: 404 });
+    let hasAccess = false;
+
+    if (accessLevel === 1) {
+      // Students: check if subject is in an approved class
+      const classAccess = await db.get<any>(
+        `SELECT 1 FROM subjects s
+         INNER JOIN class_subjects cs ON s.id = cs.subject_id
+         INNER JOIN class_memberships cm ON cs.class_id = cm.class_id
+         WHERE s.id = ? AND cm.user_id = ? AND cm.status = 'approved' AND cm.role = 'student'`,
+        [paperType.subject_id, user.id]
+      );
+      hasAccess = !!classAccess;
+    } else {
+      // Teachers: check workspace or class membership
+      const workspaceAccess = await db.get<any>(
+        'SELECT 1 FROM user_workspaces WHERE user_id = ? AND subject_id = ?',
+        [user.id, paperType.subject_id]
+      );
+      const classAccess = await db.get<any>(
+        `SELECT 1 FROM subjects s
+         INNER JOIN class_subjects cs ON s.id = cs.subject_id
+         INNER JOIN class_memberships cm ON cs.class_id = cm.class_id
+         WHERE s.id = ? AND cm.user_id = ? AND cm.status = 'approved'`,
+        [paperType.subject_id, user.id]
+      );
+      hasAccess = !!(workspaceAccess || classAccess);
     }
 
-    const topics = await db.all<Topic>(
-      'SELECT * FROM topics WHERE paper_type_id = ?',
-      [paperTypeId]
+    if (!hasAccess) {
+      return NextResponse.json({ error: 'Access denied' }, { status: 403 });
+    }
+
+    // Get topics with aggregated metrics
+    const topics = await db.all<any>(
+      `SELECT
+        t.id,
+        t.name,
+        t.description,
+        t.paper_type_id,
+        (
+          SELECT COUNT(*)
+          FROM questions q
+          WHERE q.topic_id = t.id
+        ) as total_questions,
+        (
+          SELECT COUNT(*)
+          FROM questions q
+          LEFT JOIN user_progress up ON up.question_id = q.id AND up.user_id = ?
+          WHERE q.topic_id = t.id AND COALESCE(up.attempts, 0) > 0
+        ) as attempted_questions,
+        (
+          SELECT AVG(COALESCE(up.score, 0))
+          FROM questions q
+          LEFT JOIN user_progress up ON up.question_id = q.id AND up.user_id = ?
+          WHERE q.topic_id = t.id AND COALESCE(up.attempts, 0) > 0
+        ) as avg_score
+       FROM topics t
+       WHERE t.paper_type_id = ?
+       ORDER BY t.id`,
+      [user.id, user.id, paperTypeId]
     );
 
     return NextResponse.json(topics);

@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { useAppContext } from '@/app/context/AppContext';
 import { AuthGuard } from '@/components/AuthGuard';
 import { aiPoweredInterview, generateQuestion } from '@/ai/flows/ai-powered-interview';
+import { generateSimilarQuestion } from '@/ai/flows/generate-similar-question';
 import { executeDevCommand } from '@/ai/flows/dev-commands';
 import { isDevCommand } from '@/lib/dev-commands-helpers';
 import type { ChatHistory } from '@/lib/types';
@@ -14,7 +15,7 @@ import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import LoadingSpinner from '@/components/LoadingSpinner';
-import { Send, User, Bot, ArrowLeft, MessageSquare, PenTool, Terminal, Check } from 'lucide-react';
+import { Send, User, Bot, ArrowLeft, MessageSquare, PenTool, Terminal, Check, Mic } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
@@ -22,8 +23,66 @@ import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import PageSpinner from '@/components/PageSpinner';
 import { Whiteboard } from '@/components/whiteboard';
+import { VoiceInterviewLive } from '@/components/voice-interview-live';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useSession } from 'next-auth/react';
+import { LatexRenderer } from '@/components/latex-renderer';
+import mermaid from 'mermaid';
+
+// Initialize mermaid
+if (typeof window !== 'undefined') {
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: 'default',
+    securityLevel: 'loose',
+  });
+}
+
+// Mermaid diagram component
+function MermaidDiagram({ chart }: { chart: string }) {
+  const mermaidRef = useRef<HTMLDivElement>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const renderDiagram = async () => {
+      if (!mermaidRef.current) return;
+
+      try {
+        setError(null);
+        // Generate a unique ID for this diagram
+        const id = `mermaid-${Math.random().toString(36).substr(2, 9)}`;
+
+        // Clear previous content
+        mermaidRef.current.innerHTML = '';
+
+        // Render the diagram
+        const { svg } = await mermaid.render(id, chart);
+        mermaidRef.current.innerHTML = svg;
+      } catch (err: any) {
+        console.error('Mermaid rendering error:', err);
+        setError(err?.message || 'Failed to render diagram');
+      }
+    };
+
+    renderDiagram();
+  }, [chart]);
+
+  if (error) {
+    return (
+      <div className="p-4 bg-destructive/10 border border-destructive/20 rounded-lg">
+        <p className="text-sm font-semibold text-destructive mb-2">⚠️ Diagram rendering failed</p>
+        <p className="text-xs text-muted-foreground">{error}</p>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      ref={mermaidRef}
+      className="flex justify-center items-center p-4 bg-muted/30 rounded-lg border"
+    />
+  );
+}
 
 export default function InterviewPage() {
   return (
@@ -36,7 +95,7 @@ export default function InterviewPage() {
 function InterviewPageContent() {
   const params = useParams();
   const router = useRouter();
-  const { getSubjectById, updateExamQuestionScore, generateQuestionVariant, isLoading: isAppLoading } = useAppContext();
+  const { updateExamQuestionScore, loadFullQuestion, loadSubjectsList, loadPaperTypes, loadTopics, isLoading: isAppLoading } = useAppContext();
   const { toast } = useToast();
   const { data: session, status } = useSession();
 
@@ -45,21 +104,55 @@ function InterviewPageContent() {
   const topicId = decodeURIComponent(params.topicId as string);
   const questionId = decodeURIComponent(params.questionId as string);
 
-  const subject = getSubjectById(subjectId);
-  const paperType = subject?.paperTypes.find(p => p.id === paperTypeId);
-  const topic = paperType?.topics.find(t => t.id === topicId);
-  const examQuestion = topic?.examQuestions.find(q => q.id === questionId);
-
+  const [subject, setSubject] = useState<import('@/app/context/AppContext').SubjectPreview | null>(null);
+  const [paperType, setPaperType] = useState<import('@/app/context/AppContext').PaperTypeWithMetrics | null>(null);
+  const [topic, setTopic] = useState<import('@/app/context/AppContext').TopicWithMetrics | null>(null);
+  const [examQuestion, setExamQuestion] = useState<import('@/app/context/AppContext').FullQuestion | null>(null);
   const [chatHistory, setChatHistory] = useState<ChatHistory>([]);
   const [userInput, setUserInput] = useState('');
   const [isLoading, setIsLoading] = useState(true);
-  const [generatedVariant, setGeneratedVariant] = useState<{questionText: string; solutionObjectives: string[]} | null>(null);
-  const [inputMode, setInputMode] = useState<'text' | 'whiteboard'>('text');
+  const [generatedVariant, setGeneratedVariant] = useState<{questionText: string; solutionObjectives: string[]; diagramMermaid?: string} | null>(null);
+  const [inputMode, setInputMode] = useState<'text' | 'whiteboard' | 'voice'>('text');
   const [accessLevel, setAccessLevel] = useState<number | null>(null);
   const [completedObjectives, setCompletedObjectives] = useState<number[]>([]);
   const [showExitDialog, setShowExitDialog] = useState(false);
   const [noMarkscheme, setNoMarkscheme] = useState(false);
-  const hasOriginalMarkscheme = examQuestion?.solutionObjectives && examQuestion.solutionObjectives.length > 0;
+  const hasOriginalMarkscheme = examQuestion?.solution_objectives && examQuestion.solution_objectives.length > 0;
+
+  // Load subject, paper type, topic, and full question on mount
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        // Load subject
+        const subjectsList = await loadSubjectsList();
+        const foundSubject = subjectsList.find(s => s.id === subjectId);
+        setSubject(foundSubject || null);
+
+        // Load paper types and find the one we need
+        if (foundSubject) {
+          const paperTypesList = await loadPaperTypes(subjectId);
+          const foundPaperType = paperTypesList.find(pt => pt.id === paperTypeId);
+          setPaperType(foundPaperType || null);
+
+          // Load topics and find the one we need
+          if (foundPaperType) {
+            const topicsList = await loadTopics(paperTypeId);
+            const foundTopic = topicsList.find(t => t.id === topicId);
+            setTopic(foundTopic || null);
+          }
+        }
+
+        // Load full question
+        const fullQuestion = await loadFullQuestion(questionId);
+        setExamQuestion(fullQuestion);
+      } catch (error) {
+        console.error('Error loading question data:', error);
+        toast({ variant: "destructive", title: "Error", description: "Failed to load question" });
+      }
+    };
+
+    loadData();
+  }, [questionId, subjectId, paperTypeId, topicId, loadFullQuestion, loadSubjectsList, loadPaperTypes, loadTopics, toast]);
 
   // Compute if all objectives are completed
   const isCompleted = generatedVariant
@@ -95,15 +188,15 @@ function InterviewPageContent() {
   }, [chatHistory]);
 
   useEffect(() => {
-    console.log('=== useEffect triggered ===', { subjectId: subject?.id, questionId: examQuestion?.id });
+    console.log('=== useEffect triggered ===', { questionId: examQuestion?.id });
 
-    if (!subject || !examQuestion || !paperType || !topic) {
-      console.log('Early return - no subject or exam question');
+    if (!examQuestion) {
+      console.log('Early return - no exam question loaded yet');
       return;
     }
 
     // Create a unique key for this question to track if we've already initialized
-    const questionKey = `${subject.id}-${examQuestion.id}`;
+    const questionKey = `${questionId}`;
 
     // Check both if we've already initialized AND if we're currently initializing
     if (hasInitialized.current === questionKey) {
@@ -122,9 +215,15 @@ function InterviewPageContent() {
       hasInitialized.current = questionKey;
       setIsLoading(true);
       try {
-        // Generate a fresh variant EVERY time
+        // Generate a fresh variant using the loaded question data
         console.log('Generating question variant with adapted objectives...');
-        const variantData = await generateQuestionVariant(subject.id, paperType.id, topic.id, examQuestion.id);
+        const variantData = await generateSimilarQuestion({
+          originalQuestionText: examQuestion.question_text,
+          topicName: '', // Not used in variant generation
+          topicDescription: '', // Not used in variant generation
+          originalObjectives: examQuestion.solution_objectives,
+          originalDiagramMermaid: examQuestion.diagram_mermaid,
+        });
         setGeneratedVariant(variantData);
         console.log('Question variant generated successfully with', variantData.solutionObjectives.length, 'objectives');
 
@@ -155,7 +254,45 @@ function InterviewPageContent() {
     };
     startInterview();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [subject?.id, examQuestion?.id]);
+  }, [examQuestion?.id, toast]);
+
+  const handleVoiceMessage = (role: 'user' | 'assistant', content: string) => {
+    setChatHistory(prev => [...prev, { role, content }]);
+  };
+
+  const handleVoiceEvaluation = async (userAnswer: string) => {
+    if (!generatedVariant || !examQuestion) return;
+
+    try {
+      console.log('Evaluating voice answer against objectives...');
+
+      // Call aiPoweredInterview with the voice transcription
+      // Note: We don't update chatHistory here - VoiceInterviewLive already handles that
+      const res = await aiPoweredInterview({
+        subsection: examQuestion.summary,
+        userAnswer,
+        previousChatHistory: chatHistory,
+        question: generatedVariant.questionText,
+        solutionObjectives: generatedVariant.solutionObjectives,
+        previouslyCompletedObjectives: completedObjectives,
+      });
+
+      // Update objectives (merge with existing)
+      setCompletedObjectives(prevCompleted => {
+        const newSet = new Set([...prevCompleted, ...res.completedObjectives]);
+        const updated = Array.from(newSet).sort((a, b) => a - b);
+        console.log('Objectives updated from voice:', {
+          previous: prevCompleted,
+          new: res.completedObjectives,
+          merged: updated
+        });
+        return updated;
+      });
+    } catch (e) {
+      console.error('Voice evaluation error:', e);
+      // Don't show toast for voice errors - evaluation happens in background
+    }
+  };
 
   const handleSendMessage = async (imageData?: string) => {
     if ((!userInput.trim() && !imageData) || !subject || !examQuestion || isLoading || !generatedVariant) return;
@@ -250,7 +387,7 @@ function InterviewPageContent() {
       <div className="text-center">
         <h1 className="text-2xl font-bold">Question not found</h1>
         <Button asChild variant="link" className="mt-4">
-          <Link href={`/subject/${subjectId}/paper/${encodeURIComponent(paperTypeId)}/topic/${encodeURIComponent(topicId)}`}>Go back to topic</Link>
+          <Link href={`/workspace/subject/${subjectId}/paper/${encodeURIComponent(paperTypeId)}/topic/${encodeURIComponent(topicId)}`}>Go back to topic</Link>
         </Button>
       </div>
     );
@@ -273,12 +410,12 @@ function InterviewPageContent() {
     if (chatHistory.length > 1) { // Has started answering
       setShowExitDialog(true);
     } else {
-      router.push(`/subject/${subjectId}/paper/${encodeURIComponent(paperTypeId)}/topic/${encodeURIComponent(topicId)}`);
+      router.push(`/workspace/subject/${subjectId}/paper/${encodeURIComponent(paperTypeId)}/topic/${encodeURIComponent(topicId)}`);
     }
   };
 
   const handleAcceptScore = () => {
-    if (paperType && topic && completedObjectives.length > 0 && generatedVariant) {
+    if (subject && paperType && topic && completedObjectives.length > 0 && generatedVariant && examQuestion) {
       // Calculate score out of 10 based on objectives completed
       const totalObjectives = generatedVariant.solutionObjectives.length;
       const scoreOutOf10 = (completedObjectives.length / totalObjectives) * 10;
@@ -288,11 +425,11 @@ function InterviewPageContent() {
         description: `Completed ${completedObjectives.length}/${totalObjectives} objectives.`,
       });
     }
-    router.push(`/subject/${subjectId}/paper/${encodeURIComponent(paperTypeId)}/topic/${encodeURIComponent(topicId)}`);
+    router.push(`/workspace/subject/${subjectId}/paper/${encodeURIComponent(paperTypeId)}/topic/${encodeURIComponent(topicId)}`);
   };
 
   const handleDiscardProgress = () => {
-    router.push(`/subject/${subjectId}/paper/${encodeURIComponent(paperTypeId)}/topic/${encodeURIComponent(topicId)}`);
+    router.push(`/workspace/subject/${subjectId}/paper/${encodeURIComponent(paperTypeId)}/topic/${encodeURIComponent(topicId)}`);
   };
 
   return (
@@ -365,9 +502,15 @@ function InterviewPageContent() {
                     <>
                       <ScrollArea className="flex-1 p-6 overflow-auto">
                         <div className="prose prose-base max-w-none dark:prose-invert">
-                          <div className="text-base leading-relaxed whitespace-pre-wrap break-words font-normal">
+                          <LatexRenderer className="text-base leading-relaxed whitespace-pre-wrap break-words font-normal">
                             {formatQuestionText(generatedVariant.questionText)}
-                          </div>
+                          </LatexRenderer>
+                          {/* Mermaid diagram display */}
+                          {generatedVariant.diagramMermaid && (
+                            <div className="mt-6">
+                              <MermaidDiagram chart={generatedVariant.diagramMermaid} />
+                            </div>
+                          )}
                         </div>
                         {accessLevel !== null && accessLevel >= 3 && (
                           <div className="mt-6 p-4 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg">
@@ -455,8 +598,8 @@ function InterviewPageContent() {
                 </div>
               </ScrollArea>
               <div className="p-4 border-t shrink-0">
-                <Tabs value={inputMode} onValueChange={(v) => setInputMode(v as 'text' | 'whiteboard')}>
-                  <TabsList className="grid w-full grid-cols-2 mb-3">
+                <Tabs value={inputMode} onValueChange={(v) => setInputMode(v as 'text' | 'whiteboard' | 'voice')}>
+                  <TabsList className="grid w-full grid-cols-3 mb-3">
                     <TabsTrigger value="text" disabled={isLoading || isCompleted}>
                       <MessageSquare className="h-4 w-4 mr-2" />
                       Text
@@ -464,6 +607,10 @@ function InterviewPageContent() {
                     <TabsTrigger value="whiteboard" disabled={isLoading || isCompleted}>
                       <PenTool className="h-4 w-4 mr-2" />
                       Whiteboard
+                    </TabsTrigger>
+                    <TabsTrigger value="voice" disabled={isLoading || isCompleted}>
+                      <Mic className="h-4 w-4 mr-2" />
+                      Talk
                     </TabsTrigger>
                   </TabsList>
                   <TabsContent value="text" className="mt-0">
@@ -494,6 +641,15 @@ function InterviewPageContent() {
                     <Whiteboard
                       onSubmit={handleSendMessage}
                       disabled={isLoading || isCompleted}
+                    />
+                  </TabsContent>
+                  <TabsContent value="voice" className="mt-0">
+                    <VoiceInterviewLive
+                      question={generatedVariant?.questionText || ''}
+                      solutionObjectives={generatedVariant?.solutionObjectives || []}
+                      subsection={examQuestion?.summary || ''}
+                      onAddMessage={handleVoiceMessage}
+                      onEvaluateAnswer={handleVoiceEvaluation}
                     />
                   </TabsContent>
                 </Tabs>

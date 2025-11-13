@@ -13,7 +13,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 function SignInContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const callbackUrl = searchParams.get('callbackUrl') || '/';
+  const callbackUrl = searchParams.get('callbackUrl') || '/workspace';
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
