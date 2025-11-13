@@ -119,6 +119,15 @@ function InterviewPageContent() {
   const [noMarkscheme, setNoMarkscheme] = useState(false);
   const hasOriginalMarkscheme = examQuestion?.solution_objectives && examQuestion.solution_objectives.length > 0;
 
+  // Hide page-level scrollbar on mount
+  useEffect(() => {
+    document.documentElement.classList.add('hide-page-scrollbar');
+
+    return () => {
+      document.documentElement.classList.remove('hide-page-scrollbar');
+    };
+  }, []);
+
   // Load subject, paper type, topic, and full question on mount
   useEffect(() => {
     const loadData = async () => {
@@ -501,7 +510,7 @@ function InterviewPageContent() {
                   {generatedVariant ? (
                     <>
                       <ScrollArea className="flex-1 p-6 overflow-auto">
-                        <div className="prose prose-base max-w-none dark:prose-invert">
+                        <div className="prose prose-base max-w-none dark:prose-invert break-words overflow-wrap-anywhere">
                           <LatexRenderer className="text-base leading-relaxed whitespace-pre-wrap break-words font-normal">
                             {formatQuestionText(generatedVariant.questionText)}
                           </LatexRenderer>

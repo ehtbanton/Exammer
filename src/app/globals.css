@@ -86,3 +86,8 @@ body {
     @apply bg-background text-foreground;
   }
 }
+
+/* Hide scrollbar for question page only */
+.hide-page-scrollbar main {
+  overflow-y: hidden !important;
+}
