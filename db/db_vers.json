@@ -1,5 +1,5 @@
 {
-  "currentVersion": 9,
+  "currentVersion": 10,
   "versions": {
     "0": {
       "description": "Initial schema - subjects owned by users",
@@ -290,7 +290,82 @@
         ]
       }
     },
+    "8": {
+      "description": "Add user feedback system with admin dashboard",
+      "schema": {
+        "feedback": {
+          "columns": ["id", "user_id", "category", "title", "description", "url", "screenshot_url", "browser_info", "status", "priority", "created_at", "updated_at", "resolved_at"],
+          "note": "Main feedback table storing bug reports, feature requests, and user inquiries"
+        },
+        "feedback_notes": {
+          "columns": ["id", "feedback_id", "admin_user_id", "note", "is_internal", "created_at"],
+          "note": "Admin notes on feedback items"
+        },
+        "feedback_status_history": {
+          "columns": ["id", "feedback_id", "admin_user_id", "old_status", "new_status", "changed_at"],
+          "note": "Tracks status changes for audit trail"
+        }
+      },
+      "migration": {
+        "from": 7,
+        "steps": [
+          {
+            "action": "create_table",
+            "table": "feedback",
+            "sql": "CREATE TABLE IF NOT EXISTS feedback (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, category TEXT NOT NULL CHECK(category IN ('bug', 'feature', 'improvement', 'question', 'other')), title TEXT NOT NULL, description TEXT NOT NULL, url TEXT, screenshot_url TEXT, browser_info TEXT, status TEXT NOT NULL DEFAULT 'new' CHECK(status IN ('new', 'in_progress', 'resolved', 'closed', 'archived')), priority TEXT DEFAULT 'medium' CHECK(priority IN ('low', 'medium', 'high', 'critical')), created_at INTEGER DEFAULT (unixepoch()), updated_at INTEGER DEFAULT (unixepoch()), resolved_at INTEGER, FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL)"
+          },
+          {
+            "action": "create_index",
+            "table": "feedback",
+            "sql": "CREATE INDEX IF NOT EXISTS idx_feedback_user_id ON feedback(user_id)"
+          },
+          {
+            "action": "create_index",
+            "table": "feedback",
+            "sql": "CREATE INDEX IF NOT EXISTS idx_feedback_status ON feedback(status)"
+          },
+          {
+            "action": "create_index",
+            "table": "feedback",
+            "sql": "CREATE INDEX IF NOT EXISTS idx_feedback_category ON feedback(category)"
+          },
+          {
+            "action": "create_index",
+            "table": "feedback",
+            "sql": "CREATE INDEX IF NOT EXISTS idx_feedback_created_at ON feedback(created_at)"
+          },
+          {
+            "action": "create_table",
+            "table": "feedback_notes",
+            "sql": "CREATE TABLE IF NOT EXISTS feedback_notes (id INTEGER PRIMARY KEY AUTOINCREMENT, feedback_id INTEGER NOT NULL, admin_user_id INTEGER NOT NULL, note TEXT NOT NULL, is_internal BOOLEAN DEFAULT 1, created_at INTEGER DEFAULT (unixepoch()), FOREIGN KEY (feedback_id) REFERENCES feedback(id) ON DELETE CASCADE, FOREIGN KEY (admin_user_id) REFERENCES users(id) ON DELETE CASCADE)"
+          },
+          {
+            "action": "create_index",
+            "table": "feedback_notes",
+            "sql": "CREATE INDEX IF NOT EXISTS idx_feedback_notes_feedback_id ON feedback_notes(feedback_id)"
+          },
+          {
+            "action": "create_table",
+            "table": "feedback_status_history",
+            "sql": "CREATE TABLE IF NOT EXISTS feedback_status_history (id INTEGER PRIMARY KEY AUTOINCREMENT, feedback_id INTEGER NOT NULL, admin_user_id INTEGER, old_status TEXT, new_status TEXT NOT NULL, changed_at INTEGER DEFAULT (unixepoch()), FOREIGN KEY (feedback_id) REFERENCES feedback(id) ON DELETE CASCADE, FOREIGN KEY (admin_user_id) REFERENCES users(id) ON DELETE SET NULL)"
+          },
+          {
+            "action": "create_index",
+            "table": "feedback_status_history",
+            "sql": "CREATE INDEX IF NOT EXISTS idx_feedback_status_history_feedback_id ON feedback_status_history(feedback_id)"
+          }
+        ]
+      }
+    },
     "9": {
+      "description": "Transition version - no migration needed (feedback system already applied)",
+      "schema": {},
+      "migration": {
+        "from": 8,
+        "steps": []
+      }
+    },
+    "10": {
       "description": "Add email verification system - replaces manual approval with automated email verification",
       "schema": {
         "users": {
@@ -299,7 +374,7 @@
         }
       },
       "migration": {
-        "from": 7,
+        "from": 9,
         "steps": [
           {
             "action": "add_column",
