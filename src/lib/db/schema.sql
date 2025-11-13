@@ -151,6 +151,28 @@ CREATE INDEX IF NOT EXISTS idx_questions_topic_id ON questions(topic_id);
 CREATE INDEX IF NOT EXISTS idx_user_progress_user_id ON user_progress(user_id);
 CREATE INDEX IF NOT EXISTS idx_user_progress_question_id ON user_progress(question_id);
 
+-- Donations table
+CREATE TABLE IF NOT EXISTS donations (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER,
+  amount REAL NOT NULL,
+  currency_code TEXT DEFAULT 'USD',
+  donor_name TEXT,
+  donor_email TEXT,
+  donor_message TEXT,
+  paypal_invoice_id TEXT,
+  paypal_invoice_url TEXT,
+  invoice_status TEXT DEFAULT 'DRAFT',
+  created_at INTEGER DEFAULT (unixepoch()),
+  updated_at INTEGER DEFAULT (unixepoch()),
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+);
+
+-- Create indexes for donations table
+CREATE INDEX IF NOT EXISTS idx_donations_user_id ON donations(user_id);
+CREATE INDEX IF NOT EXISTS idx_donations_status ON donations(invoice_status);
+CREATE INDEX IF NOT EXISTS idx_donations_created_at ON donations(created_at);
+
 -- Database version tracking table
 CREATE TABLE IF NOT EXISTS db_version (
   id INTEGER PRIMARY KEY AUTOINCREMENT,

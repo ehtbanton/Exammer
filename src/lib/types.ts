@@ -49,3 +49,33 @@ export interface Subject {
   markschemes: Markscheme[];
   paperTypes: PaperType[];
 }
+
+export interface Donation {
+  id: string;
+  userId?: string | null;
+  amount: number;
+  currencyCode: string;
+  donorName?: string | null;
+  donorEmail?: string | null;
+  donorMessage?: string | null;
+  paypalInvoiceId?: string | null;
+  paypalInvoiceUrl?: string | null;
+  invoiceStatus: 'DRAFT' | 'SENT' | 'PAID' | 'CANCELLED' | 'REFUNDED';
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface CreateDonationRequest {
+  amount: number;
+  currencyCode?: string;
+  donorName?: string;
+  donorEmail?: string;
+  donorMessage?: string;
+}
+
+export interface CreateDonationResponse {
+  success: boolean;
+  donation?: Donation;
+  invoiceUrl?: string;
+  error?: string;
+}
