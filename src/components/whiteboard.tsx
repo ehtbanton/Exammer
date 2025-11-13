@@ -3,7 +3,12 @@
 import React, { useRef, useState } from "react";
 import { ReactSketchCanvas, ReactSketchCanvasRef } from "react-sketch-canvas";
 import { Button } from "@/components/ui/button";
-import { Eraser, Pen, Trash2, Send } from "lucide-react";
+import { Eraser, Pen, Trash2, Send, MoreVertical } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface WhiteboardProps {
   onSubmit: (imageData: string) => void;
@@ -75,39 +80,55 @@ export function Whiteboard({ onSubmit, disabled = false }: WhiteboardProps) {
             <Eraser className="h-4 w-4" />
           </Button>
 
-          {/* Color Palette */}
+          {/* Drawing Options Dropdown */}
           {!eraserMode && (
-            <div className="flex space-x-1 ml-2">
-              {colors.map((color) => (
-                <button
-                  key={color}
-                  className={`w-6 h-6 rounded-full border-2 transition-all ${
-                    strokeColor === color
-                      ? "border-primary scale-110"
-                      : "border-gray-300"
-                  }`}
-                  style={{ backgroundColor: color }}
-                  onClick={() => setStrokeColor(color)}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  size="sm"
+                  variant="outline"
                   disabled={disabled}
-                />
-              ))}
-            </div>
-          )}
+                  className="ml-2"
+                >
+                  <MoreVertical className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent className="w-64 p-4">
+                {/* Color Palette */}
+                <div className="space-y-3">
+                  <label className="text-sm font-medium">Color:</label>
+                  <div className="flex space-x-2">
+                    {colors.map((color) => (
+                      <button
+                        key={color}
+                        className={`w-8 h-8 rounded-full border-2 transition-all ${
+                          strokeColor === color
+                            ? "border-primary scale-110"
+                            : "border-gray-300"
+                        }`}
+                        style={{ backgroundColor: color }}
+                        onClick={() => setStrokeColor(color)}
+                        disabled={disabled}
+                      />
+                    ))}
+                  </div>
 
-          {/* Stroke Width */}
-          {!eraserMode && (
-            <div className="flex items-center space-x-2 ml-2">
-              <label className="text-sm">Size:</label>
-              <input
-                type="range"
-                min="1"
-                max="10"
-                value={strokeWidth}
-                onChange={(e) => setStrokeWidth(Number(e.target.value))}
-                className="w-20"
-                disabled={disabled}
-              />
-            </div>
+                  {/* Stroke Width Slider */}
+                  <div className="space-y-2 pt-2">
+                    <label className="text-sm font-medium">Size: {strokeWidth}px</label>
+                    <input
+                      type="range"
+                      min="1"
+                      max="10"
+                      value={strokeWidth}
+                      onChange={(e) => setStrokeWidth(Number(e.target.value))}
+                      className="w-full"
+                      disabled={disabled}
+                    />
+                  </div>
+                </div>
+              </DropdownMenuContent>
+            </DropdownMenu>
           )}
         </div>
 
