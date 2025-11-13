@@ -52,3 +52,87 @@ export interface Subject {
   markschemes: Markscheme[];
   paperTypes: PaperType[];
 }
+// Feedback System Types
+export type FeedbackCategory = 'bug' | 'feature' | 'improvement' | 'question' | 'other';
+export type FeedbackStatus = 'new' | 'in_progress' | 'resolved' | 'closed' | 'archived';
+export type FeedbackPriority = 'low' | 'medium' | 'high' | 'critical';
+
+export interface Feedback {
+  id: string;
+  userId?: string | null;
+  category: FeedbackCategory;
+  title: string;
+  description: string;
+  url?: string | null;
+  screenshotUrl?: string | null;
+  browserInfo?: string | null;
+  status: FeedbackStatus;
+  priority: FeedbackPriority;
+  createdAt: number;
+  updatedAt: number;
+  resolvedAt?: number | null;
+}
+
+export interface FeedbackNote {
+  id: string;
+  feedbackId: string;
+  adminUserId: string;
+  adminUserName?: string; // Joined from users table
+  note: string;
+  isInternal: boolean;
+  createdAt: number;
+}
+
+export interface FeedbackStatusHistory {
+  id: string;
+  feedbackId: string;
+  adminUserId?: string | null;
+  adminUserName?: string | null; // Joined from users table
+  oldStatus?: FeedbackStatus | null;
+  newStatus: FeedbackStatus;
+  changedAt: number;
+}
+
+export interface CreateFeedbackRequest {
+  category: FeedbackCategory;
+  title: string;
+  description: string;
+  url?: string;
+  screenshotUrl?: string;
+  browserInfo?: string;
+}
+
+export interface CreateFeedbackResponse {
+  success: boolean;
+  feedback?: Feedback;
+  error?: string;
+}
+
+export interface UpdateFeedbackRequest {
+  status?: FeedbackStatus;
+  priority?: FeedbackPriority;
+}
+
+export interface UpdateFeedbackResponse {
+  success: boolean;
+  feedback?: Feedback;
+  error?: string;
+}
+
+export interface CreateFeedbackNoteRequest {
+  note: string;
+  isInternal?: boolean;
+}
+
+export interface CreateFeedbackNoteResponse {
+  success: boolean;
+  note?: FeedbackNote;
+  error?: string;
+}
+
+export interface FeedbackWithDetails extends Feedback {
+  notes?: FeedbackNote[];
+  statusHistory?: FeedbackStatusHistory[];
+  userName?: string | null; // User who submitted feedback
+  userEmail?: string | null;
+}

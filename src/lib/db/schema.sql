@@ -202,6 +202,56 @@ CREATE INDEX IF NOT EXISTS idx_questions_topic_id ON questions(topic_id);
 CREATE INDEX IF NOT EXISTS idx_user_progress_user_id ON user_progress(user_id);
 CREATE INDEX IF NOT EXISTS idx_user_progress_question_id ON user_progress(question_id);
 
+
+CREATE TABLE IF NOT EXISTS feedback (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER,
+  category TEXT NOT NULL CHECK(category IN ('bug', 'feature', 'improvement', 'question', 'other')),
+  title TEXT NOT NULL,
+  description TEXT NOT NULL,
+  url TEXT,
+  screenshot_url TEXT,
+  browser_info TEXT,
+  status TEXT NOT NULL DEFAULT 'new' CHECK(status IN ('new', 'in_progress', 'resolved', 'closed', 'archived')),
+  priority TEXT DEFAULT 'medium' CHECK(priority IN ('low', 'medium', 'high', 'critical')),
+  created_at INTEGER DEFAULT (unixepoch()),
+  updated_at INTEGER DEFAULT (unixepoch()),
+  resolved_at INTEGER,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+);
+
+-- Feedback notes table (admin notes on feedback)
+CREATE TABLE IF NOT EXISTS feedback_notes (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  feedback_id INTEGER NOT NULL,
+  admin_user_id INTEGER NOT NULL,
+  note TEXT NOT NULL,
+  is_internal BOOLEAN DEFAULT 1,
+  created_at INTEGER DEFAULT (unixepoch()),
+  FOREIGN KEY (feedback_id) REFERENCES feedback(id) ON DELETE CASCADE,
+  FOREIGN KEY (admin_user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+-- Feedback status history table (tracks status changes)
+CREATE TABLE IF NOT EXISTS feedback_status_history (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  feedback_id INTEGER NOT NULL,
+  admin_user_id INTEGER,
+  old_status TEXT,
+  new_status TEXT NOT NULL,
+  changed_at INTEGER DEFAULT (unixepoch()),
+  FOREIGN KEY (feedback_id) REFERENCES feedback(id) ON DELETE CASCADE,
+  FOREIGN KEY (admin_user_id) REFERENCES users(id) ON DELETE SET NULL
+);
+
+-- Create indexes for feedback tables
+CREATE INDEX IF NOT EXISTS idx_feedback_user_id ON feedback(user_id);
+CREATE INDEX IF NOT EXISTS idx_feedback_status ON feedback(status);
+CREATE INDEX IF NOT EXISTS idx_feedback_category ON feedback(category);
+CREATE INDEX IF NOT EXISTS idx_feedback_created_at ON feedback(created_at);
+CREATE INDEX IF NOT EXISTS idx_feedback_notes_feedback_id ON feedback_notes(feedback_id);
+CREATE INDEX IF NOT EXISTS idx_feedback_status_history_feedback_id ON feedback_status_history(feedback_id);
+
 -- Database version tracking table
 CREATE TABLE IF NOT EXISTS db_version (
   id INTEGER PRIMARY KEY AUTOINCREMENT,

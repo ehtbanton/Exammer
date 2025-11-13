@@ -17,6 +17,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { LogOut, User, Terminal, ArrowLeft, Users, Home } from 'lucide-react';
 import { ThemeToggle } from './theme-toggle';
+import FeedbackButton from './FeedbackButton';
 
 export default function Header() {
   const { data: session, status } = useSession();
@@ -91,6 +92,7 @@ export default function Header() {
 
           <div className="flex items-center gap-4">
             <ThemeToggle />
+            <FeedbackButton variant="outline" size="sm" />
             {status === 'loading' ? (
               <div className="h-8 w-8 rounded-full bg-gray-200 animate-pulse" />
             ) : session ? (
