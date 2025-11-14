@@ -115,7 +115,7 @@ function InterviewPageContent() {
   const [inputMode, setInputMode] = useState<'text' | 'whiteboard' | 'voice'>('text');
   const [accessLevel, setAccessLevel] = useState<number | null>(null);
   const [completedObjectives, setCompletedObjectives] = useState<number[]>([]);
-  const [showExitDialog, setShowExitDialog] = useState(false);
+  const [showFinishDialog, setShowFinishDialog] = useState(false);
   const [noMarkscheme, setNoMarkscheme] = useState(false);
   const hasOriginalMarkscheme = examQuestion?.solution_objectives && examQuestion.solution_objectives.length > 0;
 
@@ -215,29 +215,42 @@ function InterviewPageContent() {
       hasInitialized.current = questionKey;
       setIsLoading(true);
       try {
-        // Generate a fresh variant using the loaded question data
-        console.log('Generating question variant with adapted objectives...');
-        const variantData = await generateSimilarQuestion({
-          originalQuestionText: examQuestion.question_text,
-          topicName: '', // Not used in variant generation
-          topicDescription: '', // Not used in variant generation
-          originalObjectives: examQuestion.solution_objectives,
-          originalDiagramMermaid: examQuestion.diagram_mermaid,
-        });
-        setGeneratedVariant(variantData);
-        console.log('Question variant generated successfully with', variantData.solutionObjectives.length, 'objectives');
+        // Check if there's in-progress state saved
+        const savedProgressKey = `question-progress-${questionId}`;
+        const savedProgress = localStorage.getItem(savedProgressKey);
 
-        // Start the interview with the generated variant and objectives
-        console.log('Calling aiPoweredInterview with generated variant and objectives...');
-        const res = await aiPoweredInterview({
-          subsection: examQuestion.summary,
-          question: variantData.questionText,
-          solutionObjectives: variantData.solutionObjectives,
-          previouslyCompletedObjectives: [],
-        });
-        console.log('Interview started, chat history:', res.chatHistory);
-        setChatHistory(res.chatHistory);
-        setCompletedObjectives(res.completedObjectives || []);
+        if (savedProgress) {
+          console.log('Found saved progress, restoring...');
+          const { variant, chatHistory: savedChatHistory, completedObjectives: savedObjectives } = JSON.parse(savedProgress);
+          setGeneratedVariant(variant);
+          setChatHistory(savedChatHistory);
+          setCompletedObjectives(savedObjectives);
+          console.log('Restored in-progress question with', savedObjectives.length, 'completed objectives');
+        } else {
+          // Generate a fresh variant using the loaded question data
+          console.log('Generating question variant with adapted objectives...');
+          const variantData = await generateSimilarQuestion({
+            originalQuestionText: examQuestion.question_text,
+            topicName: '', // Not used in variant generation
+            topicDescription: '', // Not used in variant generation
+            originalObjectives: examQuestion.solution_objectives,
+            originalDiagramMermaid: examQuestion.diagram_mermaid,
+          });
+          setGeneratedVariant(variantData);
+          console.log('Question variant generated successfully with', variantData.solutionObjectives.length, 'objectives');
+
+          // Start the interview with the generated variant and objectives
+          console.log('Calling aiPoweredInterview with generated variant and objectives...');
+          const res = await aiPoweredInterview({
+            subsection: examQuestion.summary,
+            question: variantData.questionText,
+            solutionObjectives: variantData.solutionObjectives,
+            previouslyCompletedObjectives: [],
+          });
+          console.log('Interview started, chat history:', res.chatHistory);
+          setChatHistory(res.chatHistory);
+          setCompletedObjectives(res.completedObjectives || []);
+        }
       } catch (e: any) {
         if (e.message?.includes('no solution objectives')) {
           setNoMarkscheme(true);
@@ -407,14 +420,23 @@ function InterviewPageContent() {
   };
 
   const handleBackClick = () => {
-    if (chatHistory.length > 1) { // Has started answering
-      setShowExitDialog(true);
-    } else {
-      router.push(`/workspace/subject/${subjectId}/paper/${encodeURIComponent(paperTypeId)}/topic/${encodeURIComponent(topicId)}`);
+    // Save in-progress state before leaving
+    if (generatedVariant && chatHistory.length > 1) {
+      localStorage.setItem(`question-progress-${questionId}`, JSON.stringify({
+        variant: generatedVariant,
+        chatHistory,
+        completedObjectives,
+        timestamp: Date.now(),
+      }));
     }
+    router.push(`/workspace/subject/${subjectId}/paper/${encodeURIComponent(paperTypeId)}/topic/${encodeURIComponent(topicId)}`);
   };
 
-  const handleAcceptScore = () => {
+  const handleFinishQuestion = () => {
+    setShowFinishDialog(true);
+  };
+
+  const handleSaveProgress = () => {
     if (subject && paperType && topic && completedObjectives.length > 0 && generatedVariant && examQuestion) {
       // Calculate score out of 10 based on objectives completed
       const totalObjectives = generatedVariant.solutionObjectives.length;
@@ -425,10 +447,16 @@ function InterviewPageContent() {
         description: `Completed ${completedObjectives.length}/${totalObjectives} objectives.`,
       });
     }
+    // Clear the in-progress state
+    localStorage.removeItem(`question-progress-${questionId}`);
+    setShowFinishDialog(false);
     router.push(`/workspace/subject/${subjectId}/paper/${encodeURIComponent(paperTypeId)}/topic/${encodeURIComponent(topicId)}`);
   };
 
   const handleDiscardProgress = () => {
+    // Clear the in-progress state
+    localStorage.removeItem(`question-progress-${questionId}`);
+    setShowFinishDialog(false);
     router.push(`/workspace/subject/${subjectId}/paper/${encodeURIComponent(paperTypeId)}/topic/${encodeURIComponent(topicId)}`);
   };
 
@@ -445,8 +473,8 @@ function InterviewPageContent() {
         </div>
       </div>
 
-      {/* Exit Confirmation Dialog */}
-      <AlertDialog open={showExitDialog} onOpenChange={setShowExitDialog}>
+      {/* Finish Question Dialog */}
+      <AlertDialog open={showFinishDialog} onOpenChange={setShowFinishDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Save Your Progress?</AlertDialogTitle>
@@ -460,7 +488,7 @@ function InterviewPageContent() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel onClick={handleDiscardProgress}>Discard</AlertDialogCancel>
-            <AlertDialogAction onClick={handleAcceptScore}>Save Progress</AlertDialogAction>
+            <AlertDialogAction onClick={handleSaveProgress}>Save Progress</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -495,7 +523,26 @@ function InterviewPageContent() {
                       )}
                     </div>
                     {generatedVariant && (
-                      <Progress value={(completedObjectives.length / generatedVariant.solutionObjectives.length) * 100} className="h-2" />
+                      <div className="flex items-center gap-2">
+                        <Progress value={(completedObjectives.length / generatedVariant.solutionObjectives.length) * 100} className="h-2 flex-1" />
+                        <Button
+                          onClick={handleFinishQuestion}
+                          size="sm"
+                          disabled={chatHistory.length <= 1}
+                          className={cn(
+                            "shrink-0",
+                            (() => {
+                              const currentScore = examQuestion?.score || 0;
+                              const newScore = (completedObjectives.length / generatedVariant.solutionObjectives.length) * 10;
+                              if (newScore > currentScore) return "bg-green-600 hover:bg-green-700";
+                              if (newScore < currentScore) return "bg-red-600 hover:bg-red-700";
+                              return "bg-amber-600 hover:bg-amber-700";
+                            })()
+                          )}
+                        >
+                          Finish Question
+                        </Button>
+                      </div>
                     )}
                   </div>
                   {generatedVariant ? (
