@@ -94,6 +94,7 @@ export default function AdminFeedbackPage() {
   const [isUpdating, setIsUpdating] = useState(false);
   const [noteText, setNoteText] = useState('');
   const [noteInternal, setNoteInternal] = useState(true);
+  const [accessLevel, setAccessLevel] = useState<number | null>(null);
 
   // Filters
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -101,17 +102,43 @@ export default function AdminFeedbackPage() {
   const [priorityFilter, setPriorityFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
 
+  // Check authentication
   useEffect(() => {
     if (status === 'unauthenticated') {
       router.push('/auth/signin');
     }
   }, [status, router]);
 
+  // Fetch access level and check authorization
   useEffect(() => {
     if (status === 'authenticated') {
+      const fetchAccessLevel = async () => {
+        try {
+          const response = await fetch('/api/auth/access-level');
+          if (response.ok) {
+            const data = await response.json();
+            setAccessLevel(data.accessLevel);
+
+            // Only level 3 users can access this page
+            if (data.accessLevel !== 3) {
+              router.push('/home');
+            }
+          }
+        } catch (error) {
+          console.error('Error fetching access level:', error);
+          router.push('/home');
+        }
+      };
+
+      fetchAccessLevel();
+    }
+  }, [status, router]);
+
+  useEffect(() => {
+    if (status === 'authenticated' && accessLevel === 3) {
       fetchFeedback();
     }
-  }, [status]);
+  }, [status, accessLevel]);
 
   // Apply filters
   useEffect(() => {
