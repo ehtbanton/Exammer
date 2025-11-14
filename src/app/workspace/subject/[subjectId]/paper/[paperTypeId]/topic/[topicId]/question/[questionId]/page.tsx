@@ -301,11 +301,11 @@ function InterviewPageContent() {
     const currentInput = userInput;
     setUserInput('');
 
-    // Check if this is a dev command (level 3 users only)
-    if (accessLevel === 3 && !imageData && isDevCommand(currentInput)) {
+    // Check if this is a cheat command (level 2+ users only)
+    if (accessLevel !== null && accessLevel >= 2 && !imageData && isDevCommand(currentInput)) {
       try {
         toast({
-          title: "Dev Command Detected",
+          title: "Cheat Command Detected",
           description: `Executing: ${currentInput}`,
         });
 
@@ -337,7 +337,7 @@ function InterviewPageContent() {
         setChatHistory(res.chatHistory);
         setCompletedObjectives(res.completedObjectives || []);
       } catch (e) {
-        toast({ variant: 'destructive', title: 'Dev Command Error', description: 'Failed to execute dev command.' });
+        toast({ variant: 'destructive', title: 'Cheat Command Error', description: 'Failed to execute cheat command.' });
         console.error(e);
         setChatHistory(chatHistory);
       } finally {
@@ -512,7 +512,7 @@ function InterviewPageContent() {
                             </div>
                           )}
                         </div>
-                        {accessLevel !== null && accessLevel >= 3 && (
+                        {accessLevel !== null && accessLevel >= 2 && (
                           <div className="mt-6 p-4 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg">
                             <h3 className="text-sm font-semibold mb-2 text-blue-800 dark:text-blue-200">📋 All Solution Objectives:</h3>
                             <ul className="space-y-1">
@@ -615,21 +615,21 @@ function InterviewPageContent() {
                   </TabsList>
                   <TabsContent value="text" className="mt-0">
                     <div className="space-y-2">
-                      {accessLevel === 3 && (
+                      {accessLevel !== null && accessLevel >= 2 && (
                         <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted/50 px-2 py-1 rounded">
                           <Terminal className="h-3 w-3" />
-                          <span>Dev commands enabled: <code className="bg-background px-1 rounded">fullans</code>, <code className="bg-background px-1 rounded">objans</code></span>
+                          <span>Cheat commands enabled: <code className="bg-background px-1 rounded">fullans</code>, <code className="bg-background px-1 rounded">objans</code></span>
                         </div>
                       )}
                       <div className="flex items-center gap-2">
                         <Input
-                          placeholder={accessLevel === 3 ? "Type your answer or dev command..." : "Type your answer..."}
+                          placeholder={accessLevel !== null && accessLevel >= 2 ? "Type your answer or cheat command..." : "Type your answer..."}
                           value={userInput}
                           onChange={(e) => setUserInput(e.target.value)}
                           onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
                           onPaste={(e) => e.preventDefault()}
                           disabled={isLoading || isCompleted}
-                          className={accessLevel === 3 && isDevCommand(userInput) ? "text-blue-600 font-bold dark:text-blue-400" : ""}
+                          className={accessLevel !== null && accessLevel >= 2 && isDevCommand(userInput) ? "text-blue-600 font-bold dark:text-blue-400" : ""}
                         />
                         <Button onClick={() => handleSendMessage()} disabled={isLoading || isCompleted || !userInput.trim()}>
                           {isLoading ? <LoadingSpinner /> : <Send />}

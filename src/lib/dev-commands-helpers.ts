@@ -1,16 +1,16 @@
 /**
- * Client-side helper functions for dev commands
+ * Client-side helper functions for cheat commands
  */
 
 /**
- * Check if a message is a dev command
+ * Check if a message is a cheat command
  */
 export function isDevCommand(message: string): boolean {
   const trimmed = message.trim().toLowerCase();
-  const devCommands = ['fullans'];
+  const cheatCommands = ['fullans'];
 
   // Check exact matches
-  if (devCommands.includes(trimmed)) {
+  if (cheatCommands.includes(trimmed)) {
     return true;
   }
 
@@ -23,7 +23,7 @@ export function isDevCommand(message: string): boolean {
 }
 
 /**
- * Get the list of available dev commands
+ * Get the list of available cheat commands
  */
 export function getAvailableDevCommands(): Array<{command: string; description: string}> {
   return [
