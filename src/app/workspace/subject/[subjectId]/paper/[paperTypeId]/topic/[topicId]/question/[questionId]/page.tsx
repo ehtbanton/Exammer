@@ -95,7 +95,7 @@ export default function InterviewPage() {
 function InterviewPageContent() {
   const params = useParams();
   const router = useRouter();
-  const { updateExamQuestionScore, loadFullQuestion, loadSubjectsList, loadPaperTypes, loadTopics, isLoading: isAppLoading } = useAppContext();
+  const { updateExamQuestionScore, loadFullQuestion, loadSubjectsList, loadPaperTypes, loadTopics, isLoading: isAppLoading, cacheVersion } = useAppContext();
   const { toast } = useToast();
   const { data: session, status } = useSession();
 
@@ -152,7 +152,7 @@ function InterviewPageContent() {
     };
 
     loadData();
-  }, [questionId, subjectId, paperTypeId, topicId, loadFullQuestion, loadSubjectsList, loadPaperTypes, loadTopics, toast]);
+  }, [questionId, subjectId, paperTypeId, topicId, loadFullQuestion, loadSubjectsList, loadPaperTypes, loadTopics, toast, cacheVersion]);
 
   // Compute if all objectives are completed
   const isCompleted = generatedVariant

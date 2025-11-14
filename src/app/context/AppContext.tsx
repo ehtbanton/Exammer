@@ -710,13 +710,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
         throw new Error('Failed to delete subject');
       }
 
-      setSubjects(prev => prev.filter(subject => subject.id !== subjectId));
+      // Invalidate subjects cache - UI will reload automatically via cacheVersion
+      invalidateSubjectsCache();
       toast({ title: "Success", description: "Subject deleted." });
     } catch (error) {
       console.error('Error deleting subject:', error);
       toast({ variant: "destructive", title: "Error", description: "Failed to delete subject." });
     }
-  }, [toast]);
+  }, [toast, invalidateSubjectsCache]);
 
   const getSubjectById = useCallback((subjectId: string) => {
     return subjects.find(subject => subject.id === subjectId);
