@@ -177,6 +177,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       delete newCache[subjectId];
       return newCache;
     });
+    setCacheVersion(v => v + 1);
   }, []);
 
   const invalidateTopicsCache = useCallback((paperTypeId: string) => {
@@ -185,6 +186,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       delete newCache[paperTypeId];
       return newCache;
     });
+    setCacheVersion(v => v + 1);
   }, []);
 
   const invalidateQuestionsCache = useCallback((topicId: string) => {
@@ -193,6 +195,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       delete newCache[topicId];
       return newCache;
     });
+    setCacheVersion(v => v + 1);
   }, []);
 
   const invalidateFullQuestionCache = useCallback((questionId: string) => {
@@ -201,6 +204,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       delete newCache[questionId];
       return newCache;
     });
+    setCacheVersion(v => v + 1);
   }, []);
 
   const createSubjectFromSyllabus = useCallback(async (syllabusFile: File): Promise<string | null> => {
