@@ -107,7 +107,7 @@ export default function Header() {
                       </Link>
                     </Button>
                     <Button variant="outline" size="sm" asChild>
-                      <Link href={accessLevel === 1 ? "/workspace/classes/join" : "/workspace/classes"}>
+                      <Link href={accessLevel === 1 ? "/classes/join" : "/classes"}>
                         <Users className="h-4 w-4 mr-2" />
                         Classes
                       </Link>
