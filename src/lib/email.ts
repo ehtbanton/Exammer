@@ -6,47 +6,84 @@ interface EmailOptions {
 }
 
 /**
- * Send an email using the custom email API endpoint
+ * Send an email using Resend API
+ * Set EMAIL_API_KEY (Resend API key) and EMAIL_FROM in .env
+ * Or use EMAIL_API_URL for custom email service
  */
 export async function sendEmail({ to, subject, text, html }: EmailOptions): Promise<void> {
-  // Check if email API is configured
-  const emailApiUrl = process.env.EMAIL_API_URL;
   const emailApiKey = process.env.EMAIL_API_KEY;
   const emailFrom = process.env.EMAIL_FROM;
+  const customApiUrl = process.env.EMAIL_API_URL;
 
-  if (!emailApiUrl || !emailFrom) {
-    console.warn('Email API not configured. Skipping email send.');
-    console.log(`Would have sent email to ${to}:`);
-    console.log(`Subject: ${subject}`);
-    console.log(`Text: ${text}`);
+  // Development mode: log to console if no email config
+  if (!emailApiKey && !customApiUrl) {
+    console.warn('⚠️  Email API not configured. Skipping email send.');
+    console.log(`📧 Would have sent email to ${to}:`);
+    console.log(`   Subject: ${subject}`);
+    console.log(`   Text: ${text}`);
     return;
   }
 
-  try {
-    // Call custom email API
-    const response = await fetch(emailApiUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(emailApiKey && { 'Authorization': `Bearer ${emailApiKey}` }),
-      },
-      body: JSON.stringify({
-        from: emailFrom,
-        to,
-        subject,
-        text,
-        html: html || text,
-      }),
-    });
+  if (!emailFrom) {
+    console.error('❌ EMAIL_FROM not set in environment variables');
+    throw new Error('Email sender address not configured');
+  }
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Email API returned ${response.status}: ${errorText}`);
+  try {
+    // Use Resend API (default)
+    if (emailApiKey && !customApiUrl) {
+      const response = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${emailApiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          from: emailFrom,
+          to: [to],
+          subject,
+          text,
+          html: html || text,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(`Resend API error ${response.status}: ${JSON.stringify(errorData)}`);
+      }
+
+      console.log(`✅ Email sent successfully to ${to} via Resend`);
+      return;
     }
 
-    console.log(`Email sent successfully to ${to}`);
+    // Use custom email API
+    if (customApiUrl) {
+      const response = await fetch(customApiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(emailApiKey && { 'Authorization': `Bearer ${emailApiKey}` }),
+        },
+        body: JSON.stringify({
+          from: emailFrom,
+          to,
+          subject,
+          text,
+          html: html || text,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Email API returned ${response.status}: ${errorText}`);
+      }
+
+      console.log(`✅ Email sent successfully to ${to} via custom API`);
+      return;
+    }
+
   } catch (error) {
-    console.error('Error sending email:', error);
+    console.error('❌ Error sending email:', error);
     throw new Error('Failed to send email');
   }
 }

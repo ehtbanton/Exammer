@@ -40,10 +40,10 @@ export async function POST(req: NextRequest) {
     // Hash password
     const hashedPassword = await hash(password, 12);
 
-    // Create user with email NOT verified (NULL/0)
+    // Create user with email NOT verified (NULL/0) but with level 1 access (student)
     const result = await db.run(
-      'INSERT INTO users (email, password_hash, name, email_verified) VALUES (?, ?, ?, ?)',
-      [email, hashedPassword, name || null, 0]
+      'INSERT INTO users (email, password_hash, name, email_verified, access_level) VALUES (?, ?, ?, ?, ?)',
+      [email, hashedPassword, name || null, 0, 1]
     );
 
     // Create verification token
