@@ -58,7 +58,7 @@ export default function Header() {
     return 'U';
   };
 
-  const isDebugPage = pathname === '/t';
+  const isAdminPage = pathname?.startsWith('/admin');
 
   return (
     <header className="bg-card border-b sticky top-0 z-10">
@@ -70,9 +70,9 @@ export default function Header() {
               <span>Exammer</span>
             </Link>
 
-            {/* Debug/Back button for level 3 users - moved to left */}
+            {/* Admin button for level 3 users */}
             {status === 'authenticated' && accessLevel === 3 && (
-              isDebugPage ? (
+              isAdminPage ? (
                 <Button variant="ghost" size="sm" asChild>
                   <Link href="/">
                     <ArrowLeft className="h-4 w-4 mr-2" />
@@ -81,9 +81,9 @@ export default function Header() {
                 </Button>
               ) : (
                 <Button variant="ghost" size="sm" asChild>
-                  <Link href="/t">
+                  <Link href="/admin">
                     <Terminal className="h-4 w-4 mr-2" />
-                    Logs
+                    Admin
                   </Link>
                 </Button>
               )
