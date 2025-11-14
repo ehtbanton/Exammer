@@ -25,7 +25,7 @@ export default function TopicPage() {
 function TopicPageContent() {
   const params = useParams();
   const router = useRouter();
-  const { loadTopics, loadQuestions, isLoading, setLoading } = useAppContext();
+  const { loadTopics, loadQuestions, isLoading, setLoading, cacheVersion } = useAppContext();
 
   const subjectId = params.subjectId as string;
   const paperTypeId = decodeURIComponent(params.paperTypeId as string);
@@ -52,7 +52,7 @@ function TopicPageContent() {
     };
 
     loadData();
-  }, [paperTypeId, topicId, loadTopics, loadQuestions]);
+  }, [paperTypeId, topicId, loadTopics, loadQuestions, cacheVersion]);
 
   useEffect(() => {
     // Reset loading state on mount in case user navigated back

@@ -27,7 +27,7 @@ export default function PaperTypePage() {
 function PaperTypePageContent() {
   const params = useParams();
   const router = useRouter();
-  const { loadSubjectsList, loadPaperTypes, loadTopics, isLoading, setLoading } = useAppContext();
+  const { loadSubjectsList, loadPaperTypes, loadTopics, isLoading, setLoading, cacheVersion } = useAppContext();
 
   const subjectId = params.subjectId as string;
   const paperTypeId = decodeURIComponent(params.paperTypeId as string);
@@ -60,7 +60,7 @@ function PaperTypePageContent() {
     };
 
     loadData();
-  }, [subjectId, paperTypeId, loadSubjectsList, loadPaperTypes, loadTopics]);
+  }, [subjectId, paperTypeId, loadSubjectsList, loadPaperTypes, loadTopics, cacheVersion]);
 
   useEffect(() => {
     // Reset loading state on mount in case user navigated back

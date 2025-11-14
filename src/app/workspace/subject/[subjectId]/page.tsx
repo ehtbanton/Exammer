@@ -31,7 +31,7 @@ function SubjectPageContent() {
   const params = useParams();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { processExamPapers, processMarkschemes, loadSubjectsList, loadPaperTypes, isLoading, setLoading } = useAppContext();
+  const { processExamPapers, processMarkschemes, loadSubjectsList, loadPaperTypes, isLoading, setLoading, cacheVersion } = useAppContext();
   const subjectId = params.subjectId as string;
   const [subject, setSubject] = useState<import('@/app/context/AppContext').SubjectPreview | null>(null);
   const [paperTypes, setPaperTypes] = useState<import('@/app/context/AppContext').PaperTypeWithMetrics[]>([]);
@@ -63,7 +63,7 @@ function SubjectPageContent() {
     };
 
     loadData();
-  }, [subjectId, loadSubjectsList, loadPaperTypes]);
+  }, [subjectId, loadSubjectsList, loadPaperTypes, cacheVersion]);
 
   // Truncate filename if longer than 43 characters: first 20 + "..." + last 20
   const truncateFilename = (filename: string) => {

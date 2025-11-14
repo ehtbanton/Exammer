@@ -43,13 +43,18 @@ export async function decomposeSyllabus(
   const startTime = Date.now();
   console.log('[Syllabus Processing] Started decomposing syllabus...');
 
-  // Use the global API key manager to execute this flow
-  const result = await executeWithManagedKey(async (ai, flowInput) => {
-    const prompt = ai.definePrompt({
-      name: 'decomposeSyllabusPrompt',
-      input: {schema: DecomposeSyllabusInputSchema},
-      output: {schema: DecomposeSyllabusOutputSchema},
-      prompt: `Extract the structure from this exam syllabus:
+  const MAX_RETRIES = 3;
+  let lastError: Error | null = null;
+
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      // Use the global API key manager to execute this flow
+      const result = await executeWithManagedKey(async (ai, flowInput) => {
+        const prompt = ai.definePrompt({
+          name: 'decomposeSyllabusPrompt',
+          input: {schema: DecomposeSyllabusInputSchema},
+          output: {schema: DecomposeSyllabusOutputSchema},
+          prompt: `Extract the structure from this exam syllabus:
 
 1. Subject name
 2. Paper types (e.g., "Paper 1", "Paper 2")
@@ -59,24 +64,54 @@ export async function decomposeSyllabus(
 Syllabus: {{media url=syllabusDataUri}}
 
 Keep descriptions concise - just enough to categorize exam questions later.`,
-    });
+        });
 
-    const response = await prompt(flowInput, {
-      model: 'googleai/gemini-2.5-flash-lite',
-    });
-    const output = response.output;
+        const response = await prompt(flowInput, {
+          model: 'googleai/gemini-2.5-flash-lite',
+        });
+        const output = response.output;
 
-    // Ensure that the output always has required fields.
-    const subjectName = output?.subjectName ?? 'Untitled Subject';
-    const paperTypes = output?.paperTypes ?? [];
+        // Ensure that the output always has required fields.
+        const subjectName = output?.subjectName ?? 'Untitled Subject';
+        const paperTypes = output?.paperTypes ?? [];
 
-    return { subjectName, paperTypes };
-  }, input);
+        return { subjectName, paperTypes };
+      }, input);
 
-  const endTime = Date.now();
-  const duration = ((endTime - startTime) / 1000).toFixed(2);
-  console.log(`[Syllabus Processing] Completed in ${duration}s`);
-  console.log(`[Syllabus Processing] Found ${result.paperTypes.length} paper type(s) with ${result.paperTypes.reduce((acc, pt) => acc + pt.topics.length, 0)} total topics`);
+      const endTime = Date.now();
+      const duration = ((endTime - startTime) / 1000).toFixed(2);
+      console.log(`[Syllabus Processing] Completed in ${duration}s`);
+      console.log(`[Syllabus Processing] Found ${result.paperTypes.length} paper type(s) with ${result.paperTypes.reduce((acc, pt) => acc + pt.topics.length, 0)} total topics`);
 
-  return result;
+      return result;
+    } catch (error: any) {
+      lastError = error;
+      const errorMessage = error?.message || String(error);
+
+      console.error(`[Syllabus Processing] ⚠ Attempt ${attempt}/${MAX_RETRIES} failed:`, errorMessage);
+
+      // Check if it's a "No valid candidates" error
+      if (errorMessage.includes('No valid candidates') || errorMessage.includes('FAILED_PRECONDITION')) {
+        if (attempt < MAX_RETRIES) {
+          console.log(`[Syllabus Processing] Retrying in 2 seconds...`);
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          continue;
+        } else {
+          // On final attempt, throw a more helpful error
+          throw new Error(
+            'Failed to process syllabus after multiple attempts. This may be due to: ' +
+            '(1) Content safety filters blocking the response, ' +
+            '(2) Invalid or corrupted PDF file, or ' +
+            '(3) Temporary API issues. Please try with a different PDF or try again later.'
+          );
+        }
+      }
+
+      // For other errors, rethrow immediately
+      throw error;
+    }
+  }
+
+  // This should never be reached, but TypeScript needs it
+  throw lastError || new Error('Unknown error during syllabus processing');
 }

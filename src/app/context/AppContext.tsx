@@ -177,6 +177,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       delete newCache[subjectId];
       return newCache;
     });
+    setCacheVersion(v => v + 1);
   }, []);
 
   const invalidateTopicsCache = useCallback((paperTypeId: string) => {
@@ -185,6 +186,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       delete newCache[paperTypeId];
       return newCache;
     });
+    setCacheVersion(v => v + 1);
   }, []);
 
   const invalidateQuestionsCache = useCallback((topicId: string) => {
@@ -193,6 +195,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       delete newCache[topicId];
       return newCache;
     });
+    setCacheVersion(v => v + 1);
   }, []);
 
   const invalidateFullQuestionCache = useCallback((questionId: string) => {
@@ -201,6 +204,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       delete newCache[questionId];
       return newCache;
     });
+    setCacheVersion(v => v + 1);
   }, []);
 
   const createSubjectFromSyllabus = useCallback(async (syllabusFile: File): Promise<string | null> => {
@@ -710,13 +714,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
         throw new Error('Failed to delete subject');
       }
 
-      setSubjects(prev => prev.filter(subject => subject.id !== subjectId));
+      // Invalidate subjects cache - UI will reload automatically via cacheVersion
+      invalidateSubjectsCache();
       toast({ title: "Success", description: "Subject deleted." });
     } catch (error) {
       console.error('Error deleting subject:', error);
       toast({ variant: "destructive", title: "Error", description: "Failed to delete subject." });
     }
-  }, [toast]);
+  }, [toast, invalidateSubjectsCache]);
 
   const getSubjectById = useCallback((subjectId: string) => {
     return subjects.find(subject => subject.id === subjectId);
