@@ -33,6 +33,16 @@ function TopicPageContent() {
   const [navigatingTo, setNavigatingTo] = useState<string | null>(null);
   const [topic, setTopic] = useState<import('@/app/context/AppContext').TopicWithMetrics | null>(null);
   const [questions, setQuestions] = useState<import('@/app/context/AppContext').QuestionPreview[]>([]);
+  const [inProgressQuestions, setInProgressQuestions] = useState<Set<string>>(new Set());
+
+  // Check which questions are in progress
+  const checkInProgressQuestions = () => {
+    const cache = localStorage.getItem('question-progress-cache');
+    if (cache) {
+      const cacheData = JSON.parse(cache);
+      setInProgressQuestions(new Set(Object.keys(cacheData)));
+    }
+  };
 
   // Load data on mount
   useEffect(() => {
@@ -52,6 +62,7 @@ function TopicPageContent() {
     };
 
     loadData();
+    checkInProgressQuestions();
   }, [paperTypeId, topicId, loadTopics, loadQuestions]);
 
   useEffect(() => {
@@ -111,7 +122,13 @@ function TopicPageContent() {
           {questions.map(question => {
             const hasAttempts = question.attempts > 0;
             const hasMarkscheme = question.has_markscheme === 1;
-            const boxStyle = hasAttempts ? getScoreColorStyle(question.score) : getUnattemptedBoxStyle();
+            const isInProgress = inProgressQuestions.has(question.id);
+            const baseBoxStyle = hasAttempts ? getScoreColorStyle(question.score) : getUnattemptedBoxStyle();
+
+            // Override border color for in-progress questions
+            const boxStyle = isInProgress
+              ? { ...baseBoxStyle, borderColor: 'rgb(59, 130, 246)', borderWidth: '4px' }
+              : baseBoxStyle;
 
             return (
               <Card
@@ -136,10 +153,19 @@ function TopicPageContent() {
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-sm text-black">{question.attempts} attempt{question.attempts !== 1 ? 's' : ''}</p>
-                  {!hasAttempts && (
-                    <p className="text-sm text-gray-600">Not attempted</p>
-                  )}
+                  <div className="flex items-end justify-between">
+                    <div>
+                      <p className="text-sm text-black">{question.attempts} attempt{question.attempts !== 1 ? 's' : ''}</p>
+                      {!hasAttempts && !isInProgress && (
+                        <p className="text-sm text-gray-600">Not attempted</p>
+                      )}
+                    </div>
+                    {isInProgress && (
+                      <span className="text-xs font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wide">
+                        In Progress
+                      </span>
+                    )}
+                  </div>
                 </CardContent>
               </Card>
             );
