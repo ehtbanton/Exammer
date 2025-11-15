@@ -16,7 +16,13 @@ const GenerateSimilarQuestionInputSchema = z.object({
   topicName: z.string().describe('The name of the topic this question covers.'),
   topicDescription: z.string().describe('The description of what this topic covers.'),
   originalObjectives: z.array(z.string()).optional().describe('The marking objectives from the original question markscheme. If not provided, objectives will be manufactured from the question text.'),
-  originalDiagramMermaid: z.string().optional().describe('If the original question had a diagram, this contains the mermaid syntax. Should be adapted for the variant question.'),
+  originalDiagramGeogebra: z.array(z.string()).optional().describe('If the original question had a geometric diagram, this contains the GeoGebra commands array. Should be adapted for the variant question with new measurements/positions.'),
+  originalDiagramBounds: z.object({
+    xmin: z.number(),
+    xmax: z.number(),
+    ymin: z.number(),
+    ymax: z.number(),
+  }).optional().describe('The coordinate bounds for the original diagram, if present.'),
 });
 export type GenerateSimilarQuestionInput = z.infer<typeof GenerateSimilarQuestionInputSchema>;
 
@@ -24,7 +30,13 @@ const GenerateSimilarQuestionOutputSchema = z.object({
   questionText: z.string().describe('The generated question variant that is similar but not identical to the original.'),
   summary: z.string().describe('A brief one-sentence summary of what this question variant is about.'),
   solutionObjectives: z.array(z.string()).describe('The marking objectives for this specific variant question, adapted from the original objectives to match the new question details.'),
-  diagramMermaid: z.string().optional().describe('If the original question had a diagram, provide an adapted mermaid diagram syntax that matches the variant question changes. Must be consistent with variant values.'),
+  diagramGeogebra: z.array(z.string()).optional().describe('If the original question had a geometric diagram, provide adapted GeoGebra commands that match the variant question with new measurements/positions. Must be consistent with variant values. Use same command format as original.'),
+  diagramBounds: z.object({
+    xmin: z.number(),
+    xmax: z.number(),
+    ymin: z.number(),
+    ymax: z.number(),
+  }).optional().describe('Updated coordinate bounds for the variant diagram, ensuring all objects are visible with padding.'),
   validationError: z.string().optional().describe('If the generated solution objectives do not logically correspond to the variant question, describe the mismatch here. Otherwise, omit this field.'),
 });
 export type GenerateSimilarQuestionOutput = z.infer<typeof GenerateSimilarQuestionOutputSchema>;
@@ -172,9 +184,14 @@ Topic Description: {{topicDescription}}
 Original Question:
 {{originalQuestionText}}
 
-{{#if originalDiagramMermaid}}
-Original Diagram (Mermaid Syntax):
-{{originalDiagramMermaid}}
+{{#if originalDiagramGeogebra}}
+Original Diagram (GeoGebra Commands):
+{{#each originalDiagramGeogebra}}
+  {{this}}
+{{/each}}
+{{#if originalDiagramBounds}}
+Diagram Bounds: xmin={{originalDiagramBounds.xmin}}, xmax={{originalDiagramBounds.xmax}}, ymin={{originalDiagramBounds.ymin}}, ymax={{originalDiagramBounds.ymax}}
+{{/if}}
 {{/if}}
 
 {{#if originalObjectives}}
@@ -245,22 +262,24 @@ Examples of proper variations:
 - If the original describes a pendulum experiment → variant describes a similar but different pendulum setup
 - If the original asks to "calculate velocity at 5 seconds" → variant asks to "calculate velocity at 8 seconds"
 
-{{#if originalDiagramMermaid}}
-After generating the question, ADAPT the mermaid diagram syntax:
-- Update ALL measurements, values, and labels in the mermaid code to match your variant question
-- Keep the same diagram type and structure (e.g., if it's a flowchart, keep it as a flowchart)
+{{#if originalDiagramGeogebra}}
+After generating the question, ADAPT the GeoGebra diagram commands:
+- Update ALL coordinates, measurements, and labels to match your variant question
+- Keep the same diagram structure (e.g., if it's a triangle, keep it as a triangle)
 - Maintain the same level of detail and clarity
-- If you changed numbers in the question (e.g., 3 cm → 6 cm), update them in the mermaid syntax
-- If you changed the scenario/context, adapt the mermaid diagram accordingly
+- If you changed numbers in the question (e.g., 3 cm → 6 cm), update coordinates/measurements accordingly
+- If you changed the scenario/context, adapt point positions and labels
 - The diagram must represent YOUR variant question, not the original
-- Use proper mermaid syntax (graph, flowchart, sequenceDiagram, classDiagram, etc.)
+- Use proper GeoGebra syntax - ALWAYS define points BEFORE using them
+- Update diagram bounds if the new coordinates extend beyond the original bounds
 
-Examples of proper mermaid diagram adaptation:
-- Original: graph LR; A[3 cm] --> B → Variant: graph LR; A[6 cm] --> B
-- Original: graph TD; Force["Force = 10 N"] → Variant: graph TD; Force["Force = 15 N"]
-- For geometric diagrams, consider using flowchart with styled nodes
-- For process flows, use flowchart or sequenceDiagram
-- For relationships, use graph or classDiagram
+Examples of proper GeoGebra diagram adaptation:
+- Original triangle 3-4-5: ["A=(0,0)", "B=(3,0)", "C=(3,4)", "Polygon(A,B,C)"]
+  → Variant triangle 6-8-10: ["A=(0,0)", "B=(6,0)", "C=(6,8)", "Polygon(A,B,C)"]
+- Original circle radius 2: ["O=(0,0)", "Circle(O, 2)"]
+  → Variant circle radius 5: ["O=(0,0)", "Circle(O, 5)"]
+- Original segment labeled "3 cm": ["A=(0,0)", "B=(3,0)", "Segment(A,B)", "Text(\\"3 cm\\", Midpoint(A,B))"]
+  → Variant segment labeled "7 cm": ["A=(0,0)", "B=(7,0)", "Segment(A,B)", "Text(\\"7 cm\\", Midpoint(A,B))"]
 {{/if}}
 
 {{#if originalObjectives}}

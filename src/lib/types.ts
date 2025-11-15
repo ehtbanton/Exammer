@@ -25,7 +25,8 @@ export interface ExamQuestion {
   markschemeId?: string | null; // Reference to the markscheme used
   paperDate?: string | null; // Exam date (e.g., '2022-06')
   questionNumber?: string | null; // Question identifier (e.g., '1-3-5')
-  diagramMermaid?: string; // Optional mermaid diagram syntax for rendering diagrams
+  diagramGeogebra?: string; // Optional GeoGebra commands as JSON array for rendering geometric diagrams
+  diagramBounds?: string; // Optional JSON object with coordinate bounds (xmin, xmax, ymin, ymax)
   categorizationConfidence?: number; // Confidence score (0-100) for AI categorization decision
   categorizationReasoning?: string; // Brief explanation of why this question was categorized into this topic
 }

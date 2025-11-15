@@ -290,7 +290,8 @@ export interface Question {
   markscheme_id?: number;
   paper_date?: string; // e.g., "2022-06"
   question_number?: string; // e.g., "1-3-5"
-  diagram_mermaid?: string; // Mermaid diagram syntax
+  diagram_geogebra?: string; // GeoGebra commands as JSON array
+  diagram_bounds?: string; // JSON object with xmin, xmax, ymin, ymax
   categorization_confidence?: number; // 0-100
   categorization_reasoning?: string; // Brief explanation of categorization
   created_at: number;

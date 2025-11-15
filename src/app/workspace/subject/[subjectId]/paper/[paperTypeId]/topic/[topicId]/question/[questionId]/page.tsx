@@ -27,62 +27,7 @@ import { VoiceInterviewLive } from '@/components/voice-interview-live';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useSession } from 'next-auth/react';
 import { LatexRenderer } from '@/components/latex-renderer';
-import mermaid from 'mermaid';
-
-// Initialize mermaid
-if (typeof window !== 'undefined') {
-  mermaid.initialize({
-    startOnLoad: true,
-    theme: 'default',
-    securityLevel: 'loose',
-  });
-}
-
-// Mermaid diagram component
-function MermaidDiagram({ chart }: { chart: string }) {
-  const mermaidRef = useRef<HTMLDivElement>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    const renderDiagram = async () => {
-      if (!mermaidRef.current) return;
-
-      try {
-        setError(null);
-        // Generate a unique ID for this diagram
-        const id = `mermaid-${Math.random().toString(36).substr(2, 9)}`;
-
-        // Clear previous content
-        mermaidRef.current.innerHTML = '';
-
-        // Render the diagram
-        const { svg } = await mermaid.render(id, chart);
-        mermaidRef.current.innerHTML = svg;
-      } catch (err: any) {
-        console.error('Mermaid rendering error:', err);
-        setError(err?.message || 'Failed to render diagram');
-      }
-    };
-
-    renderDiagram();
-  }, [chart]);
-
-  if (error) {
-    return (
-      <div className="p-4 bg-destructive/10 border border-destructive/20 rounded-lg">
-        <p className="text-sm font-semibold text-destructive mb-2">⚠️ Diagram rendering failed</p>
-        <p className="text-xs text-muted-foreground">{error}</p>
-      </div>
-    );
-  }
-
-  return (
-    <div
-      ref={mermaidRef}
-      className="flex justify-center items-center p-4 bg-muted/30 rounded-lg border"
-    />
-  );
-}
+import { GeoGebraDiagram } from '@/components/GeoGebraDiagram';
 
 export default function InterviewPage() {
   return (
@@ -111,7 +56,7 @@ function InterviewPageContent() {
   const [chatHistory, setChatHistory] = useState<ChatHistory>([]);
   const [userInput, setUserInput] = useState('');
   const [isLoading, setIsLoading] = useState(true);
-  const [generatedVariant, setGeneratedVariant] = useState<{questionText: string; solutionObjectives: string[]; diagramMermaid?: string} | null>(null);
+  const [generatedVariant, setGeneratedVariant] = useState<{questionText: string; solutionObjectives: string[]; diagramGeogebra?: string[]; diagramBounds?: {xmin: number; xmax: number; ymin: number; ymax: number}} | null>(null);
   const [inputMode, setInputMode] = useState<'text' | 'whiteboard' | 'voice'>('text');
   const [accessLevel, setAccessLevel] = useState<number | null>(null);
   const [completedObjectives, setCompletedObjectives] = useState<number[]>([]);
@@ -272,7 +217,8 @@ function InterviewPageContent() {
         topicName: '', // Not used in variant generation
         topicDescription: '', // Not used in variant generation
         originalObjectives: examQuestion.solution_objectives,
-        originalDiagramMermaid: examQuestion.diagram_mermaid,
+        originalDiagramGeogebra: examQuestion.diagram_geogebra ? JSON.parse(examQuestion.diagram_geogebra) : undefined,
+        originalDiagramBounds: examQuestion.diagram_bounds ? JSON.parse(examQuestion.diagram_bounds) : undefined,
       });
       setGeneratedVariant(variantData);
       console.log('Question variant generated successfully with', variantData.solutionObjectives.length, 'objectives');
@@ -656,10 +602,16 @@ function InterviewPageContent() {
                           <LatexRenderer className="text-base leading-relaxed whitespace-pre-wrap break-words font-normal">
                             {formatQuestionText(generatedVariant.questionText)}
                           </LatexRenderer>
-                          {/* Mermaid diagram display */}
-                          {generatedVariant.diagramMermaid && (
+                          {/* GeoGebra diagram display */}
+                          {generatedVariant.diagramGeogebra && generatedVariant.diagramGeogebra.length > 0 && (
                             <div className="mt-6">
-                              <MermaidDiagram chart={generatedVariant.diagramMermaid} />
+                              <GeoGebraDiagram
+                                commands={generatedVariant.diagramGeogebra}
+                                bounds={generatedVariant.diagramBounds}
+                                width={600}
+                                height={400}
+                                interactive={false}
+                              />
                             </div>
                           )}
                         </div>

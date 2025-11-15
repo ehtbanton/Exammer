@@ -51,7 +51,13 @@ const PaperQuestionSchema = z.object({
   topicIndex: z.number().describe('The 0-based index of the topic this question belongs to (from the topics array). Choose based on content analysis, not header text.'),
   categorizationConfidence: z.number().min(0).max(100).describe('Your confidence score (0-100) that this question belongs to the chosen topic. Use 100 for obvious matches, 70-90 for good matches, 50-70 for uncertain matches, below 50 for very uncertain matches.'),
   categorizationReasoning: z.string().describe('A brief 1-2 sentence explanation of why you chose this topic for this question based on the question content and topic description.'),
-  diagramMermaid: z.string().optional().describe('If this question includes a diagram, graph, figure, or visual element, provide mermaid diagram syntax to represent it. Use appropriate mermaid diagram types (graph, flowchart, sequenceDiagram, etc.). Include all measurements, labels, and relationships from the original. Omit if question is text-only.'),
+  diagramGeogebra: z.array(z.string()).optional().describe('If this question includes a GEOMETRIC diagram (shapes, triangles, circles, angles, coordinates), provide GeoGebra construction commands as a JSON array of strings. Each command should be a valid GeoGebra syntax. IMPORTANT: Define points before using them. Examples: ["A=(0,0)", "B=(3,0)", "C=(3,4)", "poly=Polygon(A,B,C)", "Text(\\"3 cm\\", Midpoint(A,B))"] for a right triangle. Common commands: Point notation A=(x,y), Segment(A,B) for line segments, Circle(center, radius), Polygon(A,B,C,...), Angle(A,B,C), Midpoint(A,B), Text("label", position). Omit entirely if question has no geometric diagram.'),
+  diagramBounds: z.object({
+    xmin: z.number(),
+    xmax: z.number(),
+    ymin: z.number(),
+    ymax: z.number(),
+  }).optional().describe('If a geometric diagram is provided, specify the coordinate bounds for proper viewing. Example: {xmin: -1, xmax: 5, ymin: -1, ymax: 5} for a diagram that fits in that range. Ensure all diagram objects fit within these bounds with some padding.'),
 });
 
 const ExtractPaperQuestionsOutputSchema = z.object({
@@ -177,13 +183,22 @@ CRITICAL INSTRUCTIONS - READ CAREFULLY:
    - topicIndex: The 0-based index from the topics array (based on content analysis)
    - categorizationConfidence: 0-100 score for topic match confidence
    - categorizationReasoning: 1-2 sentences explaining why you chose this topic
-   - diagramMermaid (OPTIONAL): If the question includes a diagram, graph, chart, figure, or any visual element:
-     * Provide valid mermaid diagram syntax to represent the visual element
-     * Use appropriate mermaid types: graph/flowchart (for general diagrams), sequenceDiagram (for sequences), classDiagram (for relationships), etc.
-     * Include all measurements, labels, and relationships from the original diagram
-     * Include specific values, angles, dimensions shown in the diagram
-     * Example for a triangle: "graph TD\\n    A[\\"Point A\\"] ---|[\\"3 cm\\"]| B[\\"Point B\\"]\\n    B ---|[\\"4 cm\\"]| C[\\"Point C\\"]\\n    C ---|[\\"5 cm\\"]| A"
-     * If question is text-only with no visual elements, OMIT this field entirely
+   - diagramGeogebra (OPTIONAL): If the question includes a GEOMETRIC diagram (shapes, triangles, circles, angles, coordinate planes):
+     * Provide an array of GeoGebra construction commands as strings
+     * Use proper GeoGebra syntax - ALWAYS define points BEFORE using them in other objects
+     * Common commands:
+       - Points: A=(x,y) or A=(0,0)
+       - Segments: Segment(A,B) or just Segment[A,B]
+       - Circles: Circle(centerPoint, radius) or Circle((0,0), 5)
+       - Polygons: Polygon(A,B,C) for triangles, Polygon(A,B,C,D) for quadrilaterals
+       - Angles: Angle(A,B,C) shows angle at vertex B
+       - Labels: Text("3 cm", Midpoint(A,B)) to label segments
+     * Example for a right triangle with sides 3,4,5: ["A=(0,0)", "B=(3,0)", "C=(3,4)", "poly=Polygon(A,B,C)", "Text(\\"3 cm\\", Midpoint(A,B))", "Text(\\"4 cm\\", Midpoint(B,C))"]
+     * If question is text-only with no geometric diagram, OMIT this field entirely
+   - diagramBounds (OPTIONAL): If diagramGeogebra is provided, specify viewing bounds:
+     * Provide {xmin, xmax, ymin, ymax} to ensure all objects are visible
+     * Add padding around objects (e.g., if triangle spans 0-5 on x-axis, use xmin:-1, xmax:6)
+     * Example: {xmin: -1, xmax: 6, ymin: -1, ymax: 5}
 
 5. YEAR AND MONTH EXTRACTION
 

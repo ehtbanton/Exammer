@@ -50,7 +50,8 @@ interface FullQuestion {
   question_text: string;
   summary: string;
   solution_objectives?: string[];
-  diagram_mermaid?: string;
+  diagram_geogebra?: string;
+  diagram_bounds?: string;
   markscheme_id?: number;
   paper_date?: string;
   question_number?: string;
@@ -1133,7 +1134,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
         question_text: data.question_text,
         summary: data.summary,
         solution_objectives: data.solution_objectives,
-        diagram_mermaid: data.diagram_mermaid,
+        diagram_geogebra: data.diagram_geogebra,
+        diagram_bounds: data.diagram_bounds,
         markscheme_id: data.markscheme_id,
         paper_date: data.paper_date,
         question_number: data.question_number,

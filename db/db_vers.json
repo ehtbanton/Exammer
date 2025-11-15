@@ -1,5 +1,5 @@
 {
-  "currentVersion": 8,
+  "currentVersion": 9,
   "versions": {
     "0": {
       "description": "Initial schema - subjects owned by users",
@@ -353,6 +353,40 @@
             "action": "create_index",
             "table": "feedback_status_history",
             "sql": "CREATE INDEX IF NOT EXISTS idx_feedback_status_history_feedback_id ON feedback_status_history(feedback_id)"
+          }
+        ]
+      }
+    },
+    "9": {
+      "description": "Replace Mermaid diagrams with GeoGebra for geometric diagrams - rename diagram_mermaid to diagram_geogebra and add diagram_bounds",
+      "schema": {
+        "questions": {
+          "columns": ["id", "topic_id", "question_text", "summary", "solution_objectives", "markscheme_id", "paper_date", "question_number", "diagram_geogebra", "diagram_bounds", "categorization_confidence", "categorization_reasoning", "created_at"],
+          "note": "diagram_geogebra stores GeoGebra commands as JSON array, diagram_bounds stores coordinate bounds as JSON object {xmin, xmax, ymin, ymax}"
+        }
+      },
+      "migration": {
+        "from": 8,
+        "steps": [
+          {
+            "action": "drop_column_simulation",
+            "description": "SQLite doesn't support RENAME COLUMN directly, so we recreate the table",
+            "steps": [
+              "CREATE TABLE questions_new (id INTEGER PRIMARY KEY AUTOINCREMENT, topic_id INTEGER NOT NULL, question_text TEXT NOT NULL, summary TEXT NOT NULL, solution_objectives TEXT, markscheme_id INTEGER, paper_date TEXT, question_number TEXT, diagram_geogebra TEXT, diagram_bounds TEXT, categorization_confidence INTEGER DEFAULT 100, categorization_reasoning TEXT, created_at INTEGER DEFAULT (unixepoch()), FOREIGN KEY (topic_id) REFERENCES topics(id) ON DELETE CASCADE, FOREIGN KEY (markscheme_id) REFERENCES markschemes(id) ON DELETE SET NULL)",
+              "INSERT INTO questions_new (id, topic_id, question_text, summary, solution_objectives, markscheme_id, paper_date, question_number, diagram_geogebra, categorization_confidence, categorization_reasoning, created_at) SELECT id, topic_id, question_text, summary, solution_objectives, markscheme_id, paper_date, question_number, NULL, categorization_confidence, categorization_reasoning, created_at FROM questions",
+              "DROP TABLE questions",
+              "ALTER TABLE questions_new RENAME TO questions"
+            ]
+          },
+          {
+            "action": "recreate_indexes",
+            "description": "Recreate indexes after table recreation",
+            "sql": "CREATE INDEX IF NOT EXISTS idx_questions_topic_id ON questions(topic_id)"
+          },
+          {
+            "action": "recreate_indexes",
+            "description": "Recreate paper_date index for faster paper-based queries",
+            "sql": "CREATE INDEX IF NOT EXISTS idx_questions_paper_date ON questions(paper_date)"
           }
         ]
       }
