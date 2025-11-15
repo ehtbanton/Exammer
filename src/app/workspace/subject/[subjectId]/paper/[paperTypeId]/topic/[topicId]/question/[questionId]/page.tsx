@@ -624,29 +624,17 @@ function InterviewPageContent() {
                 </div>
               ) : (
                 <>
-                  <div className="p-6 pb-4 border-b space-y-2">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <h2 className="text-sm font-semibold text-muted-foreground uppercase">Question</h2>
-                        {!hasOriginalMarkscheme && (
-                          <span className="inline-flex items-center text-xs px-2 py-1 bg-amber-100 dark:bg-amber-900 text-amber-800 dark:text-amber-200 rounded">
-                            No Markscheme
-                          </span>
-                        )}
-                      </div>
-                      {generatedVariant && (
-                        <span className="text-sm font-bold">{completedObjectives.length}/{generatedVariant.solutionObjectives.length} objectives</span>
-                      )}
-                    </div>
+                  <div className="p-4 pb-3 border-b">
                     {generatedVariant && (
                       <div className="flex items-center gap-2">
+                        <span className="text-sm font-semibold text-muted-foreground shrink-0">{completedObjectives.length}/{generatedVariant.solutionObjectives.length} Objectives</span>
                         <Progress value={(completedObjectives.length / generatedVariant.solutionObjectives.length) * 100} className="h-2 flex-1" />
                         <Button
                           onClick={handleFinishQuestion}
                           size="sm"
                           disabled={chatHistory.length <= 1}
                           className={cn(
-                            "shrink-0",
+                            "shrink-0 font-bold",
                             (() => {
                               const currentScore = examQuestion?.score || 0; // 0-100 from database
                               const newScore = (completedObjectives.length / generatedVariant.solutionObjectives.length) * 100; // Convert to 0-100
@@ -677,7 +665,14 @@ function InterviewPageContent() {
                         </div>
                         {accessLevel !== null && accessLevel >= 2 && (
                           <div className="mt-6 p-4 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg">
-                            <h3 className="text-sm font-semibold mb-2 text-blue-800 dark:text-blue-200">📋 All Solution Objectives:</h3>
+                            <div className="flex items-center gap-2 mb-2">
+                              <h3 className="text-sm font-semibold text-blue-800 dark:text-blue-200">📋 All Solution Objectives:</h3>
+                              {!hasOriginalMarkscheme && (
+                                <span className="inline-flex items-center text-xs px-2 py-1 bg-amber-100 dark:bg-amber-900 text-amber-800 dark:text-amber-200 rounded">
+                                  No MS
+                                </span>
+                              )}
+                            </div>
                             <ul className="space-y-1">
                               {generatedVariant.solutionObjectives.map((objective, idx) => {
                                 const isCompleted = completedObjectives.includes(idx);
@@ -695,9 +690,6 @@ function InterviewPageContent() {
                           </div>
                         )}
                       </ScrollArea>
-                      <div className="p-4 border-t shrink-0">
-                        <p className="text-xs text-muted-foreground italic">✨ Similar question generated for practice</p>
-                      </div>
                     </>
                   ) : (
                     <div className="flex items-center justify-center gap-3 flex-1 overflow-hidden">
