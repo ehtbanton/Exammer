@@ -634,7 +634,7 @@ function InterviewPageContent() {
                           size="sm"
                           disabled={chatHistory.length <= 1}
                           className={cn(
-                            "shrink-0 font-bold",
+                            "shrink-0 font-bold text-white",
                             (() => {
                               const currentScore = examQuestion?.score || 0; // 0-100 from database
                               const newScore = (completedObjectives.length / generatedVariant.solutionObjectives.length) * 100; // Convert to 0-100
