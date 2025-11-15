@@ -1,8 +1,6 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { useSession } from 'next-auth/react';
-import { useRouter } from 'next/navigation';
 import {
   MessageSquare,
   Bug,
@@ -16,6 +14,7 @@ import {
   Calendar,
   User,
   Image as ImageIcon,
+  Trash2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -43,6 +42,16 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import type {
@@ -84,8 +93,6 @@ const PRIORITY_COLORS = {
 };
 
 export default function AdminFeedbackPage() {
-  const { data: session, status } = useSession();
-  const router = useRouter();
   const [feedbackList, setFeedbackList] = useState<FeedbackWithDetails[]>([]);
   const [filteredList, setFilteredList] = useState<FeedbackWithDetails[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -94,7 +101,8 @@ export default function AdminFeedbackPage() {
   const [isUpdating, setIsUpdating] = useState(false);
   const [noteText, setNoteText] = useState('');
   const [noteInternal, setNoteInternal] = useState(true);
-  const [accessLevel, setAccessLevel] = useState<number | null>(null);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Filters
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -102,43 +110,9 @@ export default function AdminFeedbackPage() {
   const [priorityFilter, setPriorityFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Check authentication
   useEffect(() => {
-    if (status === 'unauthenticated') {
-      router.push('/auth/signin');
-    }
-  }, [status, router]);
-
-  // Fetch access level and check authorization
-  useEffect(() => {
-    if (status === 'authenticated') {
-      const fetchAccessLevel = async () => {
-        try {
-          const response = await fetch('/api/auth/access-level');
-          if (response.ok) {
-            const data = await response.json();
-            setAccessLevel(data.accessLevel);
-
-            // Only level 3 users can access this page
-            if (data.accessLevel !== 3) {
-              router.push('/home');
-            }
-          }
-        } catch (error) {
-          console.error('Error fetching access level:', error);
-          router.push('/home');
-        }
-      };
-
-      fetchAccessLevel();
-    }
-  }, [status, router]);
-
-  useEffect(() => {
-    if (status === 'authenticated' && accessLevel === 3) {
-      fetchFeedback();
-    }
-  }, [status, accessLevel]);
+    fetchFeedback();
+  }, []);
 
   // Apply filters
   useEffect(() => {
@@ -251,11 +225,36 @@ export default function AdminFeedbackPage() {
     }
   };
 
+  const deleteFeedback = async () => {
+    if (!selectedFeedback) return;
+
+    setIsDeleting(true);
+    try {
+      const response = await fetch(`/api/feedback/${selectedFeedback.id}`, {
+        method: 'DELETE',
+      });
+
+      if (response.ok) {
+        setIsDetailModalOpen(false);
+        setShowDeleteDialog(false);
+        setSelectedFeedback(null);
+        // Refresh feedback list
+        await fetchFeedback();
+      } else {
+        console.error('Failed to delete feedback');
+      }
+    } catch (error) {
+      console.error('Error deleting feedback:', error);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   const formatDate = (timestamp: number) => {
     return new Date(timestamp * 1000).toLocaleString();
   };
 
-  if (status === 'loading' || isLoading) {
+  if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <LoadingSpinner />
@@ -583,11 +582,41 @@ export default function AdminFeedbackPage() {
             </div>
 
             <DialogFooter>
+              <Button
+                variant="destructive"
+                onClick={() => setShowDeleteDialog(true)}
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Delete Feedback
+              </Button>
               <Button onClick={() => setIsDetailModalOpen(false)}>Close</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
       )}
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Feedback</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this feedback? This action cannot be undone.
+              All associated notes and history will also be deleted.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={deleteFeedback}
+              disabled={isDeleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDeleting ? 'Deleting...' : 'Delete'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

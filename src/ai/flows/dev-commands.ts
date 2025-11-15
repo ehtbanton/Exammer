@@ -1,14 +1,14 @@
 'use server';
 
 /**
- * @fileOverview Dev commands for level 3 access users to test and debug the AI interview system.
+ * @fileOverview Cheat commands for level 2+ access users to quickly generate answers during testing.
  */
 
 import {z} from 'genkit';
 import {executeWithManagedKey} from '@/ai/genkit';
 
 const DevCommandInputSchema = z.object({
-  command: z.string().describe('The dev command to execute (e.g., "fullans", "objans", "objans 2")'),
+  command: z.string().describe('The cheat command to execute (e.g., "fullans", "objans", "objans 2")'),
   question: z.string().describe('The exam question being worked on'),
   subsection: z.string().describe('The topic/subsection context'),
   solutionObjectives: z.array(z.string()).optional().describe('The solution objectives for this question'),
@@ -18,12 +18,12 @@ export type DevCommandInput = z.infer<typeof DevCommandInputSchema>;
 
 const DevCommandOutputSchema = z.object({
   generatedAnswer: z.string().describe('The AI-generated answer to the question'),
-  isDevCommand: z.boolean().describe('Flag indicating this was a dev command execution'),
+  isDevCommand: z.boolean().describe('Flag indicating this was a cheat command execution'),
 });
 export type DevCommandOutput = z.infer<typeof DevCommandOutputSchema>;
 
 /**
- * Execute a dev command
+ * Execute a cheat command
  * Currently supports:
  * - "fullans": Generate a complete answer to the question
  * - "objans": Generate an answer for the lowest unachieved objective
@@ -156,6 +156,6 @@ Provide a concise answer that specifically addresses this objective. Focus only 
     }, input);
   }
 
-  throw new Error(`Unknown dev command: ${command}`);
+  throw new Error(`Unknown cheat command: ${command}`);
 }
 

@@ -289,3 +289,77 @@ export async function PATCH(
     );
   }
 }
+
+// DELETE /api/feedback/[id] - Delete feedback (admin only)
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: { id: string } }
+): Promise<NextResponse> {
+  try {
+    const user = await getCurrentUser();
+
+    if (!user) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      );
+    }
+
+    // Check admin permission
+    const fullUser = await getUserWithAccessLevel(user.id);
+    const isAdmin = fullUser?.access_level === 3;
+
+    if (!isAdmin) {
+      return NextResponse.json(
+        { error: 'Forbidden - Admin access required' },
+        { status: 403 }
+      );
+    }
+
+    const feedbackId = params.id;
+
+    // Check if feedback exists
+    const existingFeedback = await db.get<any>(
+      'SELECT * FROM feedback WHERE id = ?',
+      [feedbackId]
+    );
+
+    if (!existingFeedback) {
+      return NextResponse.json(
+        { error: 'Feedback not found' },
+        { status: 404 }
+      );
+    }
+
+    // Delete associated notes
+    await db.run(
+      'DELETE FROM feedback_notes WHERE feedback_id = ?',
+      [feedbackId]
+    );
+
+    // Delete associated status history
+    await db.run(
+      'DELETE FROM feedback_status_history WHERE feedback_id = ?',
+      [feedbackId]
+    );
+
+    // Delete the feedback
+    await db.run(
+      'DELETE FROM feedback WHERE id = ?',
+      [feedbackId]
+    );
+
+    return NextResponse.json({
+      success: true,
+      message: 'Feedback deleted successfully'
+    });
+  } catch (error) {
+    console.error('Error deleting feedback:', error);
+    return NextResponse.json(
+      {
+        error: error instanceof Error ? error.message : 'Failed to delete feedback'
+      },
+      { status: 500 }
+    );
+  }
+}

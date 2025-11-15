@@ -115,9 +115,52 @@ function InterviewPageContent() {
   const [inputMode, setInputMode] = useState<'text' | 'whiteboard' | 'voice'>('text');
   const [accessLevel, setAccessLevel] = useState<number | null>(null);
   const [completedObjectives, setCompletedObjectives] = useState<number[]>([]);
-  const [showExitDialog, setShowExitDialog] = useState(false);
+  const [showFinishDialog, setShowFinishDialog] = useState(false);
   const [noMarkscheme, setNoMarkscheme] = useState(false);
   const hasOriginalMarkscheme = examQuestion?.solution_objectives && examQuestion.solution_objectives.length > 0;
+  const [showCacheLimitWarning, setShowCacheLimitWarning] = useState(false);
+  const [oldestCachedQuestion, setOldestCachedQuestion] = useState<{id: string; timestamp: number} | null>(null);
+  const [pendingQuestionGeneration, setPendingQuestionGeneration] = useState<(() => Promise<void>) | null>(null);
+
+  // Cache management functions
+  const CACHE_KEY = 'question-progress-cache';
+  const MAX_CACHED_QUESTIONS = 5;
+
+  const getQuestionCache = () => {
+    const cache = localStorage.getItem(CACHE_KEY);
+    return cache ? JSON.parse(cache) : {};
+  };
+
+  const saveToCache = (questionId: string, data: any) => {
+    const cache = getQuestionCache();
+    cache[questionId] = { ...data, timestamp: Date.now() };
+    localStorage.setItem(CACHE_KEY, JSON.stringify(cache));
+  };
+
+  const removeFromCache = (questionId: string) => {
+    const cache = getQuestionCache();
+    delete cache[questionId];
+    localStorage.setItem(CACHE_KEY, JSON.stringify(cache));
+  };
+
+  const getOldestCachedQuestion = () => {
+    const cache = getQuestionCache();
+    const entries = Object.entries(cache);
+    if (entries.length === 0) return null;
+
+    let oldest = entries[0];
+    for (const entry of entries) {
+      if ((entry[1] as any).timestamp < (oldest[1] as any).timestamp) {
+        oldest = entry;
+      }
+    }
+    return { id: oldest[0], timestamp: (oldest[1] as any).timestamp };
+  };
+
+  const canAddToCache = () => {
+    const cache = getQuestionCache();
+    return Object.keys(cache).length < MAX_CACHED_QUESTIONS;
+  };
 
   // Load subject, paper type, topic, and full question on mount
   useEffect(() => {
@@ -181,6 +224,19 @@ function InterviewPageContent() {
     }
   }, [status]);
 
+  // Auto-save progress to cache whenever objectives are completed
+  useEffect(() => {
+    // Only save if we have a generated variant and some progress
+    if (generatedVariant && chatHistory.length > 1) {
+      saveToCache(questionId, {
+        variant: generatedVariant,
+        chatHistory,
+        completedObjectives,
+      });
+      console.log('Auto-saved progress to cache:', completedObjectives.length, 'objectives completed');
+    }
+  }, [completedObjectives, chatHistory, generatedVariant, questionId]);
+
   useEffect(() => {
     if (scrollAreaViewport.current) {
       scrollAreaViewport.current.scrollTo({ top: scrollAreaViewport.current.scrollHeight, behavior: 'smooth' });
@@ -209,35 +265,61 @@ function InterviewPageContent() {
       return;
     }
 
+    const generateNewQuestion = async () => {
+      console.log('Generating question variant with adapted objectives...');
+      const variantData = await generateSimilarQuestion({
+        originalQuestionText: examQuestion.question_text,
+        topicName: '', // Not used in variant generation
+        topicDescription: '', // Not used in variant generation
+        originalObjectives: examQuestion.solution_objectives,
+        originalDiagramMermaid: examQuestion.diagram_mermaid,
+      });
+      setGeneratedVariant(variantData);
+      console.log('Question variant generated successfully with', variantData.solutionObjectives.length, 'objectives');
+
+      // Start the interview with the generated variant and objectives
+      console.log('Calling aiPoweredInterview with generated variant and objectives...');
+      const res = await aiPoweredInterview({
+        subsection: examQuestion.summary,
+        question: variantData.questionText,
+        solutionObjectives: variantData.solutionObjectives,
+        previouslyCompletedObjectives: [],
+      });
+      console.log('Interview started, chat history:', res.chatHistory);
+      setChatHistory(res.chatHistory);
+      setCompletedObjectives(res.completedObjectives || []);
+    };
+
     const startInterview = async () => {
       console.log('Starting interview...');
       isInitializing.current = true;
       hasInitialized.current = questionKey;
       setIsLoading(true);
       try {
-        // Generate a fresh variant using the loaded question data
-        console.log('Generating question variant with adapted objectives...');
-        const variantData = await generateSimilarQuestion({
-          originalQuestionText: examQuestion.question_text,
-          topicName: '', // Not used in variant generation
-          topicDescription: '', // Not used in variant generation
-          originalObjectives: examQuestion.solution_objectives,
-          originalDiagramMermaid: examQuestion.diagram_mermaid,
-        });
-        setGeneratedVariant(variantData);
-        console.log('Question variant generated successfully with', variantData.solutionObjectives.length, 'objectives');
+        // Check if there's cached progress for this question
+        const cache = getQuestionCache();
+        const cachedData = cache[questionId];
 
-        // Start the interview with the generated variant and objectives
-        console.log('Calling aiPoweredInterview with generated variant and objectives...');
-        const res = await aiPoweredInterview({
-          subsection: examQuestion.summary,
-          question: variantData.questionText,
-          solutionObjectives: variantData.solutionObjectives,
-          previouslyCompletedObjectives: [],
-        });
-        console.log('Interview started, chat history:', res.chatHistory);
-        setChatHistory(res.chatHistory);
-        setCompletedObjectives(res.completedObjectives || []);
+        if (cachedData) {
+          console.log('Found cached progress, restoring...');
+          setGeneratedVariant(cachedData.variant);
+          setChatHistory(cachedData.chatHistory);
+          setCompletedObjectives(cachedData.completedObjectives);
+          console.log('Restored in-progress question with', cachedData.completedObjectives.length, 'completed objectives');
+        } else {
+          // Check if cache is full before generating new question
+          if (!canAddToCache()) {
+            const oldest = getOldestCachedQuestion();
+            setOldestCachedQuestion(oldest);
+            setPendingQuestionGeneration(() => generateNewQuestion);
+            setShowCacheLimitWarning(true);
+            setIsLoading(false);
+            isInitializing.current = false;
+            return;
+          }
+
+          await generateNewQuestion();
+        }
       } catch (e: any) {
         if (e.message?.includes('no solution objectives')) {
           setNoMarkscheme(true);
@@ -301,11 +383,11 @@ function InterviewPageContent() {
     const currentInput = userInput;
     setUserInput('');
 
-    // Check if this is a dev command (level 3 users only)
-    if (accessLevel === 3 && !imageData && isDevCommand(currentInput)) {
+    // Check if this is a cheat command (level 2+ users only)
+    if (accessLevel !== null && accessLevel >= 2 && !imageData && isDevCommand(currentInput)) {
       try {
         toast({
-          title: "Dev Command Detected",
+          title: "Cheat Command Detected",
           description: `Executing: ${currentInput}`,
         });
 
@@ -337,7 +419,7 @@ function InterviewPageContent() {
         setChatHistory(res.chatHistory);
         setCompletedObjectives(res.completedObjectives || []);
       } catch (e) {
-        toast({ variant: 'destructive', title: 'Dev Command Error', description: 'Failed to execute dev command.' });
+        toast({ variant: 'destructive', title: 'Cheat Command Error', description: 'Failed to execute cheat command.' });
         console.error(e);
         setChatHistory(chatHistory);
       } finally {
@@ -407,14 +489,15 @@ function InterviewPageContent() {
   };
 
   const handleBackClick = () => {
-    if (chatHistory.length > 1) { // Has started answering
-      setShowExitDialog(true);
-    } else {
-      router.push(`/workspace/subject/${subjectId}/paper/${encodeURIComponent(paperTypeId)}/topic/${encodeURIComponent(topicId)}`);
-    }
+    // Progress is already auto-saved via useEffect
+    router.push(`/workspace/subject/${subjectId}/paper/${encodeURIComponent(paperTypeId)}/topic/${encodeURIComponent(topicId)}`);
   };
 
-  const handleAcceptScore = () => {
+  const handleFinishQuestion = () => {
+    setShowFinishDialog(true);
+  };
+
+  const handleSaveProgress = () => {
     if (subject && paperType && topic && completedObjectives.length > 0 && generatedVariant && examQuestion) {
       // Calculate score out of 10 based on objectives completed
       const totalObjectives = generatedVariant.solutionObjectives.length;
@@ -425,10 +508,55 @@ function InterviewPageContent() {
         description: `Completed ${completedObjectives.length}/${totalObjectives} objectives.`,
       });
     }
+    // Remove from cache
+    removeFromCache(questionId);
+    setShowFinishDialog(false);
     router.push(`/workspace/subject/${subjectId}/paper/${encodeURIComponent(paperTypeId)}/topic/${encodeURIComponent(topicId)}`);
   };
 
   const handleDiscardProgress = () => {
+    // Remove from cache
+    removeFromCache(questionId);
+    setShowFinishDialog(false);
+    router.push(`/workspace/subject/${subjectId}/paper/${encodeURIComponent(paperTypeId)}/topic/${encodeURIComponent(topicId)}`);
+  };
+
+  const handleConfirmCacheOverwrite = async () => {
+    if (oldestCachedQuestion && pendingQuestionGeneration) {
+      // Remove the oldest question from cache
+      removeFromCache(oldestCachedQuestion.id);
+      toast({
+        title: "Cache Updated",
+        description: "Oldest in-progress question was removed to make room.",
+      });
+
+      setShowCacheLimitWarning(false);
+      setOldestCachedQuestion(null);
+
+      // Now generate the new question
+      setIsLoading(true);
+      try {
+        await pendingQuestionGeneration();
+      } catch (e: any) {
+        if (e.message?.includes('no solution objectives')) {
+          setNoMarkscheme(true);
+          toast({ variant: 'destructive', title: 'No Markscheme', description: 'This question has no markscheme objectives.' });
+        } else {
+          toast({ variant: 'destructive', title: 'AI Error', description: 'Could not start the interview.' });
+        }
+        console.error(e);
+      } finally {
+        setIsLoading(false);
+        setPendingQuestionGeneration(null);
+      }
+    }
+  };
+
+  const handleCancelCacheOverwrite = () => {
+    setShowCacheLimitWarning(false);
+    setOldestCachedQuestion(null);
+    setPendingQuestionGeneration(null);
+    // Go back to topic
     router.push(`/workspace/subject/${subjectId}/paper/${encodeURIComponent(paperTypeId)}/topic/${encodeURIComponent(topicId)}`);
   };
 
@@ -445,8 +573,8 @@ function InterviewPageContent() {
         </div>
       </div>
 
-      {/* Exit Confirmation Dialog */}
-      <AlertDialog open={showExitDialog} onOpenChange={setShowExitDialog}>
+      {/* Finish Question Dialog */}
+      <AlertDialog open={showFinishDialog} onOpenChange={setShowFinishDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Save Your Progress?</AlertDialogTitle>
@@ -460,7 +588,23 @@ function InterviewPageContent() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel onClick={handleDiscardProgress}>Discard</AlertDialogCancel>
-            <AlertDialogAction onClick={handleAcceptScore}>Save Progress</AlertDialogAction>
+            <AlertDialogAction onClick={handleSaveProgress}>Save Progress</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Cache Limit Warning Dialog */}
+      <AlertDialog open={showCacheLimitWarning} onOpenChange={setShowCacheLimitWarning}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>In-Progress Question Limit Reached</AlertDialogTitle>
+            <AlertDialogDescription>
+              You have 5 questions in progress already. Starting this new question will remove your progress on the oldest in-progress question. Do you want to continue?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={handleCancelCacheOverwrite}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmCacheOverwrite}>Continue</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -480,22 +624,29 @@ function InterviewPageContent() {
                 </div>
               ) : (
                 <>
-                  <div className="p-6 pb-4 border-b space-y-2">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <h2 className="text-sm font-semibold text-muted-foreground uppercase">Question</h2>
-                        {!hasOriginalMarkscheme && (
-                          <span className="inline-flex items-center text-xs px-2 py-1 bg-amber-100 dark:bg-amber-900 text-amber-800 dark:text-amber-200 rounded">
-                            No Markscheme
-                          </span>
-                        )}
-                      </div>
-                      {generatedVariant && (
-                        <span className="text-sm font-bold">{completedObjectives.length}/{generatedVariant.solutionObjectives.length} objectives</span>
-                      )}
-                    </div>
+                  <div className="p-4 pb-3 border-b">
                     {generatedVariant && (
-                      <Progress value={(completedObjectives.length / generatedVariant.solutionObjectives.length) * 100} className="h-2" />
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-semibold text-muted-foreground shrink-0">{completedObjectives.length}/{generatedVariant.solutionObjectives.length} Objectives</span>
+                        <Progress value={(completedObjectives.length / generatedVariant.solutionObjectives.length) * 100} className="h-2 flex-1" />
+                        <Button
+                          onClick={handleFinishQuestion}
+                          size="sm"
+                          disabled={chatHistory.length <= 1}
+                          className={cn(
+                            "shrink-0 font-bold",
+                            (() => {
+                              const currentScore = examQuestion?.score || 0; // 0-100 from database
+                              const newScore = (completedObjectives.length / generatedVariant.solutionObjectives.length) * 100; // Convert to 0-100
+                              if (newScore > currentScore) return "bg-green-600 hover:bg-green-700";
+                              if (newScore < currentScore) return "bg-red-600 hover:bg-red-700";
+                              return "bg-amber-600 hover:bg-amber-700";
+                            })()
+                          )}
+                        >
+                          Finish Question
+                        </Button>
+                      </div>
                     )}
                   </div>
                   {generatedVariant ? (
@@ -512,9 +663,16 @@ function InterviewPageContent() {
                             </div>
                           )}
                         </div>
-                        {accessLevel !== null && accessLevel >= 3 && (
+                        {accessLevel !== null && accessLevel >= 2 && (
                           <div className="mt-6 p-4 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg">
-                            <h3 className="text-sm font-semibold mb-2 text-blue-800 dark:text-blue-200">📋 All Solution Objectives:</h3>
+                            <div className="flex items-center gap-2 mb-2">
+                              <h3 className="text-sm font-semibold text-blue-800 dark:text-blue-200">📋 All Solution Objectives:</h3>
+                              {!hasOriginalMarkscheme && (
+                                <span className="inline-flex items-center text-xs px-2 py-1 bg-amber-100 dark:bg-amber-900 text-amber-800 dark:text-amber-200 rounded">
+                                  No MS
+                                </span>
+                              )}
+                            </div>
                             <ul className="space-y-1">
                               {generatedVariant.solutionObjectives.map((objective, idx) => {
                                 const isCompleted = completedObjectives.includes(idx);
@@ -532,9 +690,6 @@ function InterviewPageContent() {
                           </div>
                         )}
                       </ScrollArea>
-                      <div className="p-4 border-t shrink-0">
-                        <p className="text-xs text-muted-foreground italic">✨ Similar question generated for practice</p>
-                      </div>
                     </>
                   ) : (
                     <div className="flex items-center justify-center gap-3 flex-1 overflow-hidden">
@@ -615,21 +770,21 @@ function InterviewPageContent() {
                   </TabsList>
                   <TabsContent value="text" className="mt-0">
                     <div className="space-y-2">
-                      {accessLevel === 3 && (
+                      {accessLevel !== null && accessLevel >= 2 && (
                         <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted/50 px-2 py-1 rounded">
                           <Terminal className="h-3 w-3" />
-                          <span>Dev commands enabled: <code className="bg-background px-1 rounded">fullans</code>, <code className="bg-background px-1 rounded">objans</code></span>
+                          <span>Cheat commands enabled: <code className="bg-background px-1 rounded">fullans</code>, <code className="bg-background px-1 rounded">objans</code></span>
                         </div>
                       )}
                       <div className="flex items-center gap-2">
                         <Input
-                          placeholder={accessLevel === 3 ? "Type your answer or dev command..." : "Type your answer..."}
+                          placeholder={accessLevel !== null && accessLevel >= 2 ? "Type your answer or cheat command..." : "Type your answer..."}
                           value={userInput}
                           onChange={(e) => setUserInput(e.target.value)}
                           onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
                           onPaste={(e) => e.preventDefault()}
                           disabled={isLoading || isCompleted}
-                          className={accessLevel === 3 && isDevCommand(userInput) ? "text-blue-600 font-bold dark:text-blue-400" : ""}
+                          className={accessLevel !== null && accessLevel >= 2 && isDevCommand(userInput) ? "text-blue-600 font-bold dark:text-blue-400" : ""}
                         />
                         <Button onClick={() => handleSendMessage()} disabled={isLoading || isCompleted || !userInput.trim()}>
                           {isLoading ? <LoadingSpinner /> : <Send />}

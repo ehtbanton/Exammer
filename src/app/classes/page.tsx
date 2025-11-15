@@ -212,7 +212,7 @@ export default function ClassesPage() {
             <Card
               key={cls.id}
               className="hover:shadow-lg transition-shadow cursor-pointer"
-              onClick={() => router.push(`/workspace/classes/${cls.id}`)}
+              onClick={() => router.push(`/classes/${cls.id}`)}
             >
               <CardHeader>
                 <CardTitle>{cls.name}</CardTitle>

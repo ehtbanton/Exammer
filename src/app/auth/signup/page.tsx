@@ -2,7 +2,7 @@
 
 import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { signIn } from 'next-auth/react';
+import { signIn, useSession } from 'next-auth/react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,6 +13,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 function SignUpContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { data: session, status } = useSession();
 
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -20,6 +21,13 @@ function SignUpContent() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  // Redirect if already signed in
+  useEffect(() => {
+    if (status === 'authenticated') {
+      router.push('/workspace');
+    }
+  }, [status, router]);
 
   // Pre-fill email from query parameter
   useEffect(() => {
@@ -82,6 +90,20 @@ function SignUpContent() {
       setLoading(false);
     }
   };
+
+  // Show loading while checking auth status
+  if (status === 'loading') {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  // Don't render the form if already authenticated (will redirect)
+  if (status === 'authenticated') {
+    return null;
+  }
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4 py-12 sm:px-6 lg:px-8">

@@ -1,9 +1,6 @@
 'use client';
 
-import { useSession } from 'next-auth/react';
-import { useRouter } from 'next/navigation';
 import { useEffect, useState, useRef } from 'react';
-import PageSpinner from '@/components/PageSpinner';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Terminal, Trash2, Pause, Play } from 'lucide-react';
@@ -13,58 +10,15 @@ interface LogEntry {
   timestamp: Date;
 }
 
-export default function DebugTerminalPage() {
-  const { data: session, status } = useSession();
-  const router = useRouter();
-  const [accessLevel, setAccessLevel] = useState<number | null>(null);
-  const [isCheckingAccess, setIsCheckingAccess] = useState(true);
+export default function AdminLogsPage() {
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [isPaused, setIsPaused] = useState(false);
   const [autoScroll, setAutoScroll] = useState(true);
   const terminalEndRef = useRef<HTMLDivElement>(null);
   const logContainerRef = useRef<HTMLDivElement>(null);
 
-  // Check authentication and access level
-  useEffect(() => {
-    if (status === 'unauthenticated') {
-      router.push('/auth/signin');
-    }
-  }, [status, router]);
-
-  useEffect(() => {
-    if (status === 'authenticated') {
-      const fetchAccessLevel = async () => {
-        try {
-          const response = await fetch('/api/auth/access-level');
-          if (response.ok) {
-            const data = await response.json();
-            setAccessLevel(data.accessLevel);
-
-            // Redirect if not admin (access level 3)
-            if (data.accessLevel !== 3) {
-              router.push('/');
-            }
-          } else {
-            setAccessLevel(0);
-            router.push('/');
-          }
-        } catch (error) {
-          console.error('Error fetching access level:', error);
-          setAccessLevel(0);
-          router.push('/');
-        } finally {
-          setIsCheckingAccess(false);
-        }
-      };
-
-      fetchAccessLevel();
-    }
-  }, [status, router]);
-
   // Connect to log stream
   useEffect(() => {
-    if (accessLevel !== 3) return;
-
     const eventSource = new EventSource('/api/debug/logs');
 
     eventSource.onmessage = (event) => {
@@ -93,7 +47,7 @@ export default function DebugTerminalPage() {
     return () => {
       eventSource.close();
     };
-  }, [accessLevel, isPaused]);
+  }, [isPaused]);
 
   // Auto-scroll to bottom when new logs are added
   useEffect(() => {
@@ -124,14 +78,6 @@ export default function DebugTerminalPage() {
   const togglePause = () => {
     setIsPaused(prev => !prev);
   };
-
-  if (status === 'loading' || isCheckingAccess) {
-    return <PageSpinner />;
-  }
-
-  if (accessLevel !== 3) {
-    return <PageSpinner />;
-  }
 
   return (
     <div className="container mx-auto py-8">
