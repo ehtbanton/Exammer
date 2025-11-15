@@ -154,6 +154,12 @@ export async function generateSimilarQuestion(
   const hasObjectives = input.originalObjectives && input.originalObjectives.length > 0;
   console.log('[Process C] Starting similar question generation...');
   console.log(`[Process C] Mode: ${hasObjectives ? 'WITH solution objectives' : 'WITHOUT solution objectives (will manufacture)'}`);
+  console.log('[Process C] Has diagram:', {
+    hasDiagramGeogebra: !!input.originalDiagramGeogebra,
+    commandCount: input.originalDiagramGeogebra?.length,
+    hasBounds: !!input.originalDiagramBounds,
+    bounds: input.originalDiagramBounds,
+  });
   console.log('[Process C] ========== DEBUG: ORIGINAL QUESTION ==========');
   console.log(input.originalQuestionText);
   if (hasObjectives) {
@@ -206,6 +212,8 @@ MODE: No Markscheme - You must manufacture appropriate marking objectives from s
 {{/if}}
 
 CRITICAL REQUIREMENT: The variant question MUST be similar but NOT the same as the original. You MUST change specific details, numbers, scenarios, or contexts.
+
+IMPORTANT: If the original question contains diagram code like Asymptote ([asy]...[/asy]) or TikZ, REMOVE it from the question text. Do not include any diagram code in questionText - only include descriptive text like "The diagram shows...". Any diagrams should be represented in the diagramGeogebra field if provided.
 
 Guidelines for generating the similar question:
 1. MAINTAIN the same structure and format as the original (e.g., if it has parts a, b, c, keep that structure)
@@ -312,24 +320,33 @@ Examples of manufactured objectives for different question types:
 {{/if}}
 
 VALIDATION STEP (MANDATORY):
-After generating the question, objectives{{#if originalDiagramMermaid}}, and mermaid diagram{{/if}}:
+After generating the question, objectives{{#if originalDiagramGeogebra}}, and GeoGebra diagram{{/if}}:
 1. Check if your solution objectives logically correspond to your variant question
 2. Verify that any numeric answers in objectives match the numbers/context in your question
 3. Verify that any formulas or calculations in objectives use the correct values from your question
-{{#if originalDiagramMermaid}}
-4. Verify that your mermaid diagram syntax is valid and matches the values in your variant question (not the original)
-5. Ensure all measurements, labels, and values in the mermaid diagram are consistent with your variant
+{{#if originalDiagramGeogebra}}
+4. Verify that your GeoGebra commands are valid and match the values in your variant question (not the original)
+5. Ensure all measurements, labels, and coordinates in the GeoGebra diagram are consistent with your variant
+6. If diagramBounds are provided, ensure they include all objects with padding (bounds are optional)
 {{/if}}
-6. If you detect ANY mismatch or inconsistency, populate the validationError field with a description
-7. If everything perfectly corresponds, leave validationError empty/omitted
+7. If you detect ANY mismatch or inconsistency, populate the validationError field with a description
+8. If everything perfectly corresponds, leave validationError empty/omitted
 
-Generate the similar question, adapted marking objectives{{#if originalDiagramMermaid}}, adapted mermaid diagram{{/if}}, and perform validation.`,
+Generate the similar question, adapted marking objectives{{#if originalDiagramGeogebra}}, adapted GeoGebra diagram{{/if}}, and perform validation.`,
     });
 
     const response = await prompt(flowInput, {
       model: 'googleai/gemini-2.5-flash-lite',
     });
     const output = response.output;
+
+    console.log('[Process C] AI Response received:', {
+      hasOutput: !!output,
+      hasDiagramGeogebra: !!output?.diagramGeogebra,
+      diagramGeogebraLength: output?.diagramGeogebra?.length,
+      hasDiagramBounds: !!output?.diagramBounds,
+      validationError: output?.validationError,
+    });
 
     if (!output) {
       throw new Error('Failed to generate similar question - no output received');
@@ -358,7 +375,8 @@ Generate the similar question, adapted marking objectives{{#if originalDiagramMe
       questionText: latexValidation.correctedText,
       summary: output.summary,
       solutionObjectives: output.solutionObjectives,
-      diagramMermaid: output.diagramMermaid,
+      diagramGeogebra: output.diagramGeogebra,
+      diagramBounds: output.diagramBounds,
     };
   }, input);
 

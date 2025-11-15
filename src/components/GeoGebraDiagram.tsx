@@ -39,7 +39,11 @@ export function GeoGebraDiagram({
   const appletIdRef = useRef(`ggb-${Math.random().toString(36).substr(2, 9)}`);
 
   useEffect(() => {
+    console.log('[GeoGebra] Component mounted with commands:', commands);
+    console.log('[GeoGebra] Bounds:', bounds);
+
     if (!commands || commands.length === 0) {
+      console.log('[GeoGebra] No commands provided, skipping render');
       setIsLoading(false);
       return;
     }
@@ -97,16 +101,21 @@ export function GeoGebraDiagram({
               }
 
               // Execute GeoGebra commands
+              console.log(`[GeoGebra] Executing ${commands.length} commands...`);
               for (const cmd of commands) {
                 try {
+                  console.log(`[GeoGebra] Executing: ${cmd}`);
                   const success = api.evalCommand(cmd);
                   if (!success) {
-                    console.warn(`GeoGebra command failed: ${cmd}`);
+                    console.warn(`[GeoGebra] Command failed: ${cmd}`);
+                  } else {
+                    console.log(`[GeoGebra] Command succeeded: ${cmd}`);
                   }
                 } catch (cmdError) {
-                  console.error(`Error executing command "${cmd}":`, cmdError);
+                  console.error(`[GeoGebra] Error executing command "${cmd}":`, cmdError);
                 }
               }
+              console.log('[GeoGebra] All commands executed');
 
               // Make static if not interactive
               if (!interactive) {

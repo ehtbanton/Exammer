@@ -212,14 +212,41 @@ function InterviewPageContent() {
 
     const generateNewQuestion = async () => {
       console.log('Generating question variant with adapted objectives...');
+      console.log('[DEBUG] Original question data:', {
+        has_diagram_geogebra: !!examQuestion.diagram_geogebra,
+        has_diagram_bounds: !!examQuestion.diagram_bounds,
+        diagram_geogebra_value: examQuestion.diagram_geogebra,
+        diagram_bounds_value: examQuestion.diagram_bounds,
+      });
+
+      const parsedDiagramGeogebra = examQuestion.diagram_geogebra ? JSON.parse(examQuestion.diagram_geogebra) : undefined;
+      const parsedDiagramBounds = examQuestion.diagram_bounds ? JSON.parse(examQuestion.diagram_bounds) : undefined;
+
+      // If we have GeoGebra commands but no bounds, provide default bounds
+      const defaultBounds = parsedDiagramGeogebra && !parsedDiagramBounds ? {
+        xmin: -2,
+        xmax: 10,
+        ymin: -2,
+        ymax: 10
+      } : parsedDiagramBounds;
+
       const variantData = await generateSimilarQuestion({
         originalQuestionText: examQuestion.question_text,
         topicName: '', // Not used in variant generation
         topicDescription: '', // Not used in variant generation
         originalObjectives: examQuestion.solution_objectives,
-        originalDiagramGeogebra: examQuestion.diagram_geogebra ? JSON.parse(examQuestion.diagram_geogebra) : undefined,
-        originalDiagramBounds: examQuestion.diagram_bounds ? JSON.parse(examQuestion.diagram_bounds) : undefined,
+        originalDiagramGeogebra: parsedDiagramGeogebra,
+        originalDiagramBounds: defaultBounds,
       });
+
+      console.log('[DEBUG] Generated variant data:', {
+        has_diagram: !!variantData.diagramGeogebra,
+        diagram_length: variantData.diagramGeogebra?.length,
+        has_bounds: !!variantData.diagramBounds,
+        diagram_commands: variantData.diagramGeogebra,
+        bounds: variantData.diagramBounds,
+      });
+
       setGeneratedVariant(variantData);
       console.log('Question variant generated successfully with', variantData.solutionObjectives.length, 'objectives');
 

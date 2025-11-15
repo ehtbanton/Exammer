@@ -176,9 +176,29 @@ CRITICAL INSTRUCTIONS - READ CAREFULLY:
       - Typical exam papers contain 5-15 questions
       - If numbering contains gaps or appears incorrect, re-examine the document
 
-4. FOR EACH QUESTION OUTPUT:
+4. DIAGRAM HANDLING - CRITICAL INSTRUCTIONS:
+
+   When examining questions in the PDF, look for GEOMETRIC DIAGRAMS (shapes, triangles, circles, angles, graphs, etc.):
+
+   a) VISUAL DIAGRAMS: If you see a geometric diagram rendered in the PDF:
+      - Analyze the diagram and create GeoGebra commands to recreate it
+      - Include descriptive text like "The diagram shows..." in questionText
+      - Put GeoGebra commands in diagramGeogebra field
+      - Set appropriate diagramBounds
+
+   b) ASYMPTOTE CODE: Some PDFs may contain diagram source code (marked with [asy]...[/asy]):
+      - REMOVE the entire code block from questionText (including [asy] and [/asy] markers)
+      - CONVERT the Asymptote code to equivalent GeoGebra commands
+      - Example conversion:
+        * Asymptote: pair A, B, C; A=(0,0); B=(3,0); C=(3,4); draw(A--B--C--cycle);
+        * GeoGebra: ["A=(0,0)", "B=(3,0)", "C=(3,4)", "poly=Polygon(A,B,C)"]
+      - Include "The diagram shows..." text, but NO code in questionText
+
+   c) NO DIAGRAM: If the question has no geometric diagram, omit diagramGeogebra entirely
+
+5. FOR EACH QUESTION OUTPUT:
    - questionNumber: Just the number (e.g., 1, 2, 3)
-   - questionText: Complete text including all sub-parts
+   - questionText: Complete text including all sub-parts, BUT EXCLUDING any diagram code (Asymptote, TikZ, etc.)
    - summary: Single sentence description
    - topicIndex: The 0-based index from the topics array (based on content analysis)
    - categorizationConfidence: 0-100 score for topic match confidence
@@ -193,14 +213,16 @@ CRITICAL INSTRUCTIONS - READ CAREFULLY:
        - Polygons: Polygon(A,B,C) for triangles, Polygon(A,B,C,D) for quadrilaterals
        - Angles: Angle(A,B,C) shows angle at vertex B
        - Labels: Text("3 cm", Midpoint(A,B)) to label segments
+       - Angle marks: Can use arc or Text to indicate angles
      * Example for a right triangle with sides 3,4,5: ["A=(0,0)", "B=(3,0)", "C=(3,4)", "poly=Polygon(A,B,C)", "Text(\\"3 cm\\", Midpoint(A,B))", "Text(\\"4 cm\\", Midpoint(B,C))"]
+     * IMPORTANT: If the PDF contains Asymptote code, convert it to GeoGebra commands here
      * If question is text-only with no geometric diagram, OMIT this field entirely
    - diagramBounds (OPTIONAL): If diagramGeogebra is provided, specify viewing bounds:
      * Provide {xmin, xmax, ymin, ymax} to ensure all objects are visible
      * Add padding around objects (e.g., if triangle spans 0-5 on x-axis, use xmin:-1, xmax:6)
      * Example: {xmin: -1, xmax: 6, ymin: -1, ymax: 5}
 
-5. YEAR AND MONTH EXTRACTION
+6. YEAR AND MONTH EXTRACTION
 
    - Locate the exam date in the document (usually at the top)
    - Extract year as 4-digit number (e.g., 2022)
@@ -216,12 +238,13 @@ OUTPUT STRUCTURE:
   "questions": [
     {
       "questionNumber": <integer>,
-      "questionText": "<complete text>",
+      "questionText": "<complete text WITHOUT any Asymptote/TikZ/diagram code>",
       "summary": "<single sentence>",
       "topicIndex": <0-based index from topics array>,
       "categorizationConfidence": <0-100>,
       "categorizationReasoning": "<1-2 sentence explanation>",
-      "diagramMermaid": "<optional: mermaid syntax if visual element present>"
+      "diagramGeogebra": ["<GeoGebra command 1>", "<GeoGebra command 2>", ...],  // OPTIONAL - only if geometric diagram present
+      "diagramBounds": {"xmin": <number>, "xmax": <number>, "ymin": <number>, "ymax": <number>}  // OPTIONAL - only if diagramGeogebra present
     }
   ]
 }
@@ -237,8 +260,13 @@ Before generating output, verify the following:
 - Multi-part questions (1a, 1b, 1c) are combined under a single main number
 - All confidence scores are between 0 and 100
 - Categorization reasoning explains the content match, not just restates the topic name
+- All Asymptote code blocks ([asy]...[/asy]) have been REMOVED from questionText
+- Geometric diagrams have been converted to GeoGebra commands in diagramGeogebra field
+- If diagramGeogebra is provided, diagramBounds is also provided
 
-REMEMBER: Use CONTENT ANALYSIS, not string matching or header text matching!`,
+REMEMBER:
+1. Use CONTENT ANALYSIS, not string matching or header text matching!
+2. REMOVE all diagram code from questionText and convert to GeoGebra commands!`,
       });
 
       const flow = aiInstance.defineFlow(
