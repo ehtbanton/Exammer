@@ -118,6 +118,49 @@ function InterviewPageContent() {
   const [showFinishDialog, setShowFinishDialog] = useState(false);
   const [noMarkscheme, setNoMarkscheme] = useState(false);
   const hasOriginalMarkscheme = examQuestion?.solution_objectives && examQuestion.solution_objectives.length > 0;
+  const [showCacheLimitWarning, setShowCacheLimitWarning] = useState(false);
+  const [oldestCachedQuestion, setOldestCachedQuestion] = useState<{id: string; timestamp: number} | null>(null);
+  const [pendingQuestionGeneration, setPendingQuestionGeneration] = useState<(() => Promise<void>) | null>(null);
+
+  // Cache management functions
+  const CACHE_KEY = 'question-progress-cache';
+  const MAX_CACHED_QUESTIONS = 5;
+
+  const getQuestionCache = () => {
+    const cache = localStorage.getItem(CACHE_KEY);
+    return cache ? JSON.parse(cache) : {};
+  };
+
+  const saveToCache = (questionId: string, data: any) => {
+    const cache = getQuestionCache();
+    cache[questionId] = { ...data, timestamp: Date.now() };
+    localStorage.setItem(CACHE_KEY, JSON.stringify(cache));
+  };
+
+  const removeFromCache = (questionId: string) => {
+    const cache = getQuestionCache();
+    delete cache[questionId];
+    localStorage.setItem(CACHE_KEY, JSON.stringify(cache));
+  };
+
+  const getOldestCachedQuestion = () => {
+    const cache = getQuestionCache();
+    const entries = Object.entries(cache);
+    if (entries.length === 0) return null;
+
+    let oldest = entries[0];
+    for (const entry of entries) {
+      if ((entry[1] as any).timestamp < (oldest[1] as any).timestamp) {
+        oldest = entry;
+      }
+    }
+    return { id: oldest[0], timestamp: (oldest[1] as any).timestamp };
+  };
+
+  const canAddToCache = () => {
+    const cache = getQuestionCache();
+    return Object.keys(cache).length < MAX_CACHED_QUESTIONS;
+  };
 
   // Load subject, paper type, topic, and full question on mount
   useEffect(() => {
@@ -209,47 +252,60 @@ function InterviewPageContent() {
       return;
     }
 
+    const generateNewQuestion = async () => {
+      console.log('Generating question variant with adapted objectives...');
+      const variantData = await generateSimilarQuestion({
+        originalQuestionText: examQuestion.question_text,
+        topicName: '', // Not used in variant generation
+        topicDescription: '', // Not used in variant generation
+        originalObjectives: examQuestion.solution_objectives,
+        originalDiagramMermaid: examQuestion.diagram_mermaid,
+      });
+      setGeneratedVariant(variantData);
+      console.log('Question variant generated successfully with', variantData.solutionObjectives.length, 'objectives');
+
+      // Start the interview with the generated variant and objectives
+      console.log('Calling aiPoweredInterview with generated variant and objectives...');
+      const res = await aiPoweredInterview({
+        subsection: examQuestion.summary,
+        question: variantData.questionText,
+        solutionObjectives: variantData.solutionObjectives,
+        previouslyCompletedObjectives: [],
+      });
+      console.log('Interview started, chat history:', res.chatHistory);
+      setChatHistory(res.chatHistory);
+      setCompletedObjectives(res.completedObjectives || []);
+    };
+
     const startInterview = async () => {
       console.log('Starting interview...');
       isInitializing.current = true;
       hasInitialized.current = questionKey;
       setIsLoading(true);
       try {
-        // Check if there's in-progress state saved
-        const savedProgressKey = `question-progress-${questionId}`;
-        const savedProgress = localStorage.getItem(savedProgressKey);
+        // Check if there's cached progress for this question
+        const cache = getQuestionCache();
+        const cachedData = cache[questionId];
 
-        if (savedProgress) {
-          console.log('Found saved progress, restoring...');
-          const { variant, chatHistory: savedChatHistory, completedObjectives: savedObjectives } = JSON.parse(savedProgress);
-          setGeneratedVariant(variant);
-          setChatHistory(savedChatHistory);
-          setCompletedObjectives(savedObjectives);
-          console.log('Restored in-progress question with', savedObjectives.length, 'completed objectives');
+        if (cachedData) {
+          console.log('Found cached progress, restoring...');
+          setGeneratedVariant(cachedData.variant);
+          setChatHistory(cachedData.chatHistory);
+          setCompletedObjectives(cachedData.completedObjectives);
+          console.log('Restored in-progress question with', cachedData.completedObjectives.length, 'completed objectives');
         } else {
-          // Generate a fresh variant using the loaded question data
-          console.log('Generating question variant with adapted objectives...');
-          const variantData = await generateSimilarQuestion({
-            originalQuestionText: examQuestion.question_text,
-            topicName: '', // Not used in variant generation
-            topicDescription: '', // Not used in variant generation
-            originalObjectives: examQuestion.solution_objectives,
-            originalDiagramMermaid: examQuestion.diagram_mermaid,
-          });
-          setGeneratedVariant(variantData);
-          console.log('Question variant generated successfully with', variantData.solutionObjectives.length, 'objectives');
+          // Check if cache is full before generating new question
+          if (!canAddToCache()) {
+            const oldest = getOldestCachedQuestion();
+            setOldestCachedQuestion(oldest);
+            setPendingQuestionGeneration(() => generateNewQuestion);
+            setShowCacheLimitWarning(true);
+            setIsLoading(false);
+            isInitializing.current = false;
+            return;
+          }
 
-          // Start the interview with the generated variant and objectives
-          console.log('Calling aiPoweredInterview with generated variant and objectives...');
-          const res = await aiPoweredInterview({
-            subsection: examQuestion.summary,
-            question: variantData.questionText,
-            solutionObjectives: variantData.solutionObjectives,
-            previouslyCompletedObjectives: [],
-          });
-          console.log('Interview started, chat history:', res.chatHistory);
-          setChatHistory(res.chatHistory);
-          setCompletedObjectives(res.completedObjectives || []);
+          await generateNewQuestion();
         }
       } catch (e: any) {
         if (e.message?.includes('no solution objectives')) {
@@ -420,14 +476,13 @@ function InterviewPageContent() {
   };
 
   const handleBackClick = () => {
-    // Save in-progress state before leaving
+    // Save in-progress state to cache before leaving
     if (generatedVariant && chatHistory.length > 1) {
-      localStorage.setItem(`question-progress-${questionId}`, JSON.stringify({
+      saveToCache(questionId, {
         variant: generatedVariant,
         chatHistory,
         completedObjectives,
-        timestamp: Date.now(),
-      }));
+      });
     }
     router.push(`/workspace/subject/${subjectId}/paper/${encodeURIComponent(paperTypeId)}/topic/${encodeURIComponent(topicId)}`);
   };
@@ -447,16 +502,55 @@ function InterviewPageContent() {
         description: `Completed ${completedObjectives.length}/${totalObjectives} objectives.`,
       });
     }
-    // Clear the in-progress state
-    localStorage.removeItem(`question-progress-${questionId}`);
+    // Remove from cache
+    removeFromCache(questionId);
     setShowFinishDialog(false);
     router.push(`/workspace/subject/${subjectId}/paper/${encodeURIComponent(paperTypeId)}/topic/${encodeURIComponent(topicId)}`);
   };
 
   const handleDiscardProgress = () => {
-    // Clear the in-progress state
-    localStorage.removeItem(`question-progress-${questionId}`);
+    // Remove from cache
+    removeFromCache(questionId);
     setShowFinishDialog(false);
+    router.push(`/workspace/subject/${subjectId}/paper/${encodeURIComponent(paperTypeId)}/topic/${encodeURIComponent(topicId)}`);
+  };
+
+  const handleConfirmCacheOverwrite = async () => {
+    if (oldestCachedQuestion && pendingQuestionGeneration) {
+      // Remove the oldest question from cache
+      removeFromCache(oldestCachedQuestion.id);
+      toast({
+        title: "Cache Updated",
+        description: "Oldest in-progress question was removed to make room.",
+      });
+
+      setShowCacheLimitWarning(false);
+      setOldestCachedQuestion(null);
+
+      // Now generate the new question
+      setIsLoading(true);
+      try {
+        await pendingQuestionGeneration();
+      } catch (e: any) {
+        if (e.message?.includes('no solution objectives')) {
+          setNoMarkscheme(true);
+          toast({ variant: 'destructive', title: 'No Markscheme', description: 'This question has no markscheme objectives.' });
+        } else {
+          toast({ variant: 'destructive', title: 'AI Error', description: 'Could not start the interview.' });
+        }
+        console.error(e);
+      } finally {
+        setIsLoading(false);
+        setPendingQuestionGeneration(null);
+      }
+    }
+  };
+
+  const handleCancelCacheOverwrite = () => {
+    setShowCacheLimitWarning(false);
+    setOldestCachedQuestion(null);
+    setPendingQuestionGeneration(null);
+    // Go back to topic
     router.push(`/workspace/subject/${subjectId}/paper/${encodeURIComponent(paperTypeId)}/topic/${encodeURIComponent(topicId)}`);
   };
 
@@ -489,6 +583,22 @@ function InterviewPageContent() {
           <AlertDialogFooter>
             <AlertDialogCancel onClick={handleDiscardProgress}>Discard</AlertDialogCancel>
             <AlertDialogAction onClick={handleSaveProgress}>Save Progress</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Cache Limit Warning Dialog */}
+      <AlertDialog open={showCacheLimitWarning} onOpenChange={setShowCacheLimitWarning}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>In-Progress Question Limit Reached</AlertDialogTitle>
+            <AlertDialogDescription>
+              You have 5 questions in progress already. Starting this new question will remove your progress on the oldest in-progress question. Do you want to continue?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={handleCancelCacheOverwrite}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmCacheOverwrite}>Continue</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
