@@ -72,21 +72,12 @@ export default function Header() {
 
             {/* Admin button for level 3 users */}
             {status === 'authenticated' && accessLevel === 3 && (
-              isAdminPage ? (
-                <Button variant="ghost" size="sm" asChild>
-                  <Link href="/">
-                    <ArrowLeft className="h-4 w-4 mr-2" />
-                    Back
-                  </Link>
-                </Button>
-              ) : (
-                <Button variant="ghost" size="sm" asChild>
-                  <Link href="/admin">
-                    <Terminal className="h-4 w-4 mr-2" />
-                    Admin
-                  </Link>
-                </Button>
-              )
+              <Button variant="ghost" size="sm" asChild>
+                <Link href="/admin">
+                  <Terminal className="h-4 w-4 mr-2" />
+                  Admin
+                </Link>
+              </Button>
             )}
           </div>
 
