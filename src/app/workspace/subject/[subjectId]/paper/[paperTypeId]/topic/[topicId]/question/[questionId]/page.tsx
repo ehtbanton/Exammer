@@ -224,6 +224,19 @@ function InterviewPageContent() {
     }
   }, [status]);
 
+  // Auto-save progress to cache whenever objectives are completed
+  useEffect(() => {
+    // Only save if we have a generated variant and some progress
+    if (generatedVariant && chatHistory.length > 1) {
+      saveToCache(questionId, {
+        variant: generatedVariant,
+        chatHistory,
+        completedObjectives,
+      });
+      console.log('Auto-saved progress to cache:', completedObjectives.length, 'objectives completed');
+    }
+  }, [completedObjectives, chatHistory, generatedVariant, questionId]);
+
   useEffect(() => {
     if (scrollAreaViewport.current) {
       scrollAreaViewport.current.scrollTo({ top: scrollAreaViewport.current.scrollHeight, behavior: 'smooth' });
@@ -476,14 +489,7 @@ function InterviewPageContent() {
   };
 
   const handleBackClick = () => {
-    // Save in-progress state to cache before leaving
-    if (generatedVariant && chatHistory.length > 1) {
-      saveToCache(questionId, {
-        variant: generatedVariant,
-        chatHistory,
-        completedObjectives,
-      });
-    }
+    // Progress is already auto-saved via useEffect
     router.push(`/workspace/subject/${subjectId}/paper/${encodeURIComponent(paperTypeId)}/topic/${encodeURIComponent(topicId)}`);
   };
 
@@ -642,8 +648,8 @@ function InterviewPageContent() {
                           className={cn(
                             "shrink-0",
                             (() => {
-                              const currentScore = examQuestion?.score || 0;
-                              const newScore = (completedObjectives.length / generatedVariant.solutionObjectives.length) * 10;
+                              const currentScore = examQuestion?.score || 0; // 0-100 from database
+                              const newScore = (completedObjectives.length / generatedVariant.solutionObjectives.length) * 100; // Convert to 0-100
                               if (newScore > currentScore) return "bg-green-600 hover:bg-green-700";
                               if (newScore < currentScore) return "bg-red-600 hover:bg-red-700";
                               return "bg-amber-600 hover:bg-amber-700";
