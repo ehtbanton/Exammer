@@ -279,6 +279,11 @@ After generating the question, ADAPT the GeoGebra diagram commands:
 - If you changed the scenario/context, adapt point positions and labels
 - The diagram must represent YOUR variant question, not the original
 - Use proper GeoGebra syntax - ALWAYS define points BEFORE using them
+- For points use direct assignment: A=(0,0) NOT Point(A=(0,0))
+- Point labels (A, B, C) appear AUTOMATICALLY - do NOT use Label() command
+- For segments use Segment(A,B) - NEVER use draw() which is Asymptote syntax
+- Use Text() only for custom measurements like Text("3 cm", Midpoint(A,B))
+- CRITICAL: Point(), draw(), and Label() are NOT valid GeoGebra commands
 - Update diagram bounds if the new coordinates extend beyond the original bounds
 
 Examples of proper GeoGebra diagram adaptation:

@@ -189,9 +189,17 @@ CRITICAL INSTRUCTIONS - READ CAREFULLY:
    b) ASYMPTOTE CODE: Some PDFs may contain diagram source code (marked with [asy]...[/asy]):
       - REMOVE the entire code block from questionText (including [asy] and [/asy] markers)
       - CONVERT the Asymptote code to equivalent GeoGebra commands
+      - CRITICAL Asymptote to GeoGebra conversions:
+        * draw(A--B) in Asymptote → Segment(A,B) in GeoGebra (NOT draw()!)
+        * draw(A--B--C) → Segment(A,B), Segment(B,C) as separate commands
+        * draw(A--B--C--cycle) → Polygon(A,B,C) for closed shapes
+        * label("text", point) → Text("text", point)
       - Example conversion:
-        * Asymptote: pair A, B, C; A=(0,0); B=(3,0); C=(3,4); draw(A--B--C--cycle);
-        * GeoGebra: ["A=(0,0)", "B=(3,0)", "C=(3,4)", "poly=Polygon(A,B,C)"]
+        * Asymptote: pair A, B, C; A=(0,0); B=(3,0); C=(3,4); draw(A--B); draw(B--C); draw(A--C);
+        * GeoGebra: ["A=(0,0)", "B=(3,0)", "C=(3,4)", "Segment(A,B)", "Segment(B,C)", "Segment(A,C)"]
+      - Example closed polygon:
+        * Asymptote: draw(A--B--C--cycle);
+        * GeoGebra: ["Polygon(A,B,C)"]
       - Include "The diagram shows..." text, but NO code in questionText
 
    c) NO DIAGRAM: If the question has no geometric diagram, omit diagramGeogebra entirely
@@ -207,13 +215,17 @@ CRITICAL INSTRUCTIONS - READ CAREFULLY:
      * Provide an array of GeoGebra construction commands as strings
      * Use proper GeoGebra syntax - ALWAYS define points BEFORE using them in other objects
      * Common commands:
-       - Points: A=(x,y) or A=(0,0)
-       - Segments: Segment(A,B) or just Segment[A,B]
+       - Points: A=(x,y) or A=(0,0) - DO NOT wrap in Point(), just use direct assignment
+       - Point labels (A, B, C) appear AUTOMATICALLY - do NOT use Label() command
+       - Segments: Segment(A,B) or Segment[A,B] - NEVER use draw() which is Asymptote syntax
        - Circles: Circle(centerPoint, radius) or Circle((0,0), 5)
        - Polygons: Polygon(A,B,C) for triangles, Polygon(A,B,C,D) for quadrilaterals
        - Angles: Angle(A,B,C) shows angle at vertex B
-       - Labels: Text("3 cm", Midpoint(A,B)) to label segments
+       - Custom text labels: Text("3 cm", Midpoint(A,B)) to label segments with measurements
        - Angle marks: Can use arc or Text to indicate angles
+       - CRITICAL: Point(), draw(), and Label() are NOT valid GeoGebra commands
+       - For points, use direct assignment: A=(0,0) NOT Point(A=(0,0))
+       - For segments, use Segment(A,B) NOT draw(A--B)
      * Example for a right triangle with sides 3,4,5: ["A=(0,0)", "B=(3,0)", "C=(3,4)", "poly=Polygon(A,B,C)", "Text(\\"3 cm\\", Midpoint(A,B))", "Text(\\"4 cm\\", Midpoint(B,C))"]
      * IMPORTANT: If the PDF contains Asymptote code, convert it to GeoGebra commands here
      * If question is text-only with no geometric diagram, OMIT this field entirely
