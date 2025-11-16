@@ -18,6 +18,7 @@ import {
 import { LogOut, User, Terminal, ArrowLeft, Users, Home } from 'lucide-react';
 import { ThemeToggle } from './theme-toggle';
 import FeedbackButton from './FeedbackButton';
+import DonationButton from './DonationButton';
 
 export default function Header() {
   const { data: session, status } = useSession();
@@ -135,6 +136,13 @@ export default function Header() {
                   variant="default"
                   size="sm"
                   className="bg-green-600 hover:bg-green-700 text-white shadow-md"
+                />
+
+                {/* Donation button */}
+                <DonationButton
+                  variant="default"
+                  size="sm"
+                  className="bg-gray-500 hover:bg-gray-600 text-white shadow-md"
                 />
 
                 <DropdownMenu>
