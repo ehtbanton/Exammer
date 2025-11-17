@@ -97,6 +97,7 @@ export function DonationModal({ isOpen, onClose }: DonationModalProps) {
   const [amount, setAmount] = useState<number>(25);
   const [isCustomSelected, setIsCustomSelected] = useState<boolean>(false);
   const [customAmount, setCustomAmount] = useState<string>("");
+  const [includeUserInfo, setIncludeUserInfo] = useState<boolean>(true);
   const [donorName, setDonorName] = useState<string>("");
   const [donorEmail, setDonorEmail] = useState<string>("");
   const [donorMessage, setDonorMessage] = useState<string>("");
@@ -109,13 +110,21 @@ export function DonationModal({ isOpen, onClose }: DonationModalProps) {
     return CURRENCIES.find((c) => c.code === currency)?.symbol || "$";
   };
 
-  // Pre-fill user info if authenticated
-  useEffect(() => {
-    if (session?.user) {
-      if (session.user.name) setDonorName(session.user.name);
-      if (session.user.email) setDonorEmail(session.user.email);
+  // Get donor name for display/submission
+  const getDonorName = () => {
+    if (session?.user && includeUserInfo) {
+      return session.user.name || "";
     }
-  }, [session]);
+    return donorName;
+  };
+
+  // Get donor email for display/submission
+  const getDonorEmail = () => {
+    if (session?.user && includeUserInfo) {
+      return session.user.email || "";
+    }
+    return donorEmail;
+  };
 
   // Load PayPal SDK when modal opens (reload if currency changes)
   useEffect(() => {
@@ -169,8 +178,13 @@ export function DonationModal({ isOpen, onClose }: DonationModalProps) {
 
     window.paypal
       .Buttons({
+        style: {
+          label: "donate",
+          color: "blue",
+        },
         createOrder: (data: any, actions: any) => {
           return actions.order.create({
+            intent: "CAPTURE",
             purchase_units: [
               {
                 amount: {
@@ -180,6 +194,11 @@ export function DonationModal({ isOpen, onClose }: DonationModalProps) {
                 description: "Donation to Exammer",
               },
             ],
+            application_context: {
+              shipping_preference: "NO_SHIPPING",
+              user_action: "PAY_NOW",
+              brand_name: "Exammer",
+            },
           });
         },
         onApprove: async (data: any, actions: any) => {
@@ -389,29 +408,53 @@ export function DonationModal({ isOpen, onClose }: DonationModalProps) {
 
             {/* Optional Info */}
             <div className="space-y-4 border-t pt-4">
-              <p className="text-sm text-muted-foreground">
-                Optional: Let us know who you are
-              </p>
-              <div>
-                <label className="block text-sm font-medium mb-2">Name</label>
-                <input
-                  type="text"
-                  value={donorName}
-                  onChange={(e) => setDonorName(e.target.value)}
-                  placeholder="Your name"
-                  className="w-full px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary bg-background"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-2">Email</label>
-                <input
-                  type="email"
-                  value={donorEmail}
-                  onChange={(e) => setDonorEmail(e.target.value)}
-                  placeholder="your.email@example.com"
-                  className="w-full px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary bg-background"
-                />
-              </div>
+              {session?.user ? (
+                // Logged in: Show checkbox to include user info
+                <div className="flex items-start gap-3">
+                  <input
+                    type="checkbox"
+                    id="includeUserInfo"
+                    checked={includeUserInfo}
+                    onChange={(e) => setIncludeUserInfo(e.target.checked)}
+                    className="mt-1 h-4 w-4 rounded border-gray-300 text-primary focus:ring-2 focus:ring-primary"
+                  />
+                  <label htmlFor="includeUserInfo" className="text-sm cursor-pointer">
+                    <span className="font-medium">Include my name and email with this donation</span>
+                    {includeUserInfo && session.user.name && (
+                      <span className="block text-muted-foreground mt-1">
+                        {session.user.name} ({session.user.email})
+                      </span>
+                    )}
+                  </label>
+                </div>
+              ) : (
+                // Not logged in: Show optional input fields
+                <>
+                  <p className="text-sm text-muted-foreground">
+                    Optional: Let us know who you are
+                  </p>
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Name</label>
+                    <input
+                      type="text"
+                      value={donorName}
+                      onChange={(e) => setDonorName(e.target.value)}
+                      placeholder="Your name"
+                      className="w-full px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary bg-background"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Email</label>
+                    <input
+                      type="email"
+                      value={donorEmail}
+                      onChange={(e) => setDonorEmail(e.target.value)}
+                      placeholder="your.email@example.com"
+                      className="w-full px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary bg-background"
+                    />
+                  </div>
+                </>
+              )}
               <div>
                 <label className="block text-sm font-medium mb-2">
                   Message (Optional)
@@ -448,9 +491,9 @@ export function DonationModal({ isOpen, onClose }: DonationModalProps) {
                 <span className="font-medium">Donation Amount:</span>
                 <span className="text-2xl font-bold">{getCurrencySymbol()}{amount.toFixed(2)}</span>
               </div>
-              {donorName && (
+              {getDonorName() && (
                 <div className="text-sm text-muted-foreground">
-                  From: {donorName}
+                  From: {getDonorName()}
                 </div>
               )}
             </div>
