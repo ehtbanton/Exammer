@@ -29,34 +29,22 @@ const TextStyleSchema = z.object({
   align: z.enum(['left', 'center', 'right']).optional(),
 });
 
-const LineEntitySchema = z.object({
-  type: z.literal('line'),
-  from: PointSchema,
-  to: PointSchema,
-  style: StyleSchema.optional(),
+const GeometricEntitySchema = z.object({
+  type: z.enum(['line', 'arc', 'text']),
+  // Line fields (only used when type='line')
+  from: PointSchema.optional(),
+  to: PointSchema.optional(),
+  // Arc fields (only used when type='arc')
+  center: PointSchema.optional(),
+  radius: z.number().optional(),
+  startAngle: z.number().optional(),
+  endAngle: z.number().optional(),
+  // Text fields (only used when type='text')
+  position: PointSchema.optional(),
+  content: z.string().optional(),
+  // Common style field
+  style: z.union([StyleSchema, TextStyleSchema]).optional(),
 });
-
-const ArcEntitySchema = z.object({
-  type: z.literal('arc'),
-  center: PointSchema,
-  radius: z.number(),
-  startAngle: z.number(),
-  endAngle: z.number(),
-  style: StyleSchema.optional(),
-});
-
-const TextEntitySchema = z.object({
-  type: z.literal('text'),
-  position: PointSchema,
-  content: z.string(),
-  style: TextStyleSchema.optional(),
-});
-
-const GeometricEntitySchema = z.discriminatedUnion('type', [
-  LineEntitySchema,
-  ArcEntitySchema,
-  TextEntitySchema,
-]);
 
 const EntityGroupSchema = z.object({
   label: z.string(),
@@ -106,9 +94,9 @@ export async function generateSimilarQuestion(
 
 GEOMETRIC DIAGRAM MODIFICATION:
 When modifying diagrams, you work with three primitives:
-- Lines: straight segments (from point, to point)
-- Arcs: curves (center, radius, start/end angles in degrees, 0° = right, counterclockwise)
-- Text: labels (position, content as plain text)
+- Line entities: type='line', from={x,y}, to={x,y}, optional style
+- Arc entities: type='arc', center={x,y}, radius, startAngle, endAngle (degrees, 0°=right, counterclockwise), optional style
+- Text entities: type='text', position={x,y}, content (plain text), optional style
 
 Entity groups have descriptive labels explaining their purpose. Use these labels to understand what to modify and how.
 
@@ -134,12 +122,8 @@ Original Question:
 {{#if originalDiagramData}}
 Original Diagram:
 Canvas: {{originalDiagramData.width}}x{{originalDiagramData.height}}
-{{#each originalDiagramData.groups}}
-Group "{{label}}":
-{{#each entities}}
-  - {{type}}: {{#if (eq type 'line')}}from ({{from.x}}, {{from.y}}) to ({{to.x}}, {{to.y}}){{/if}}{{#if (eq type 'arc')}}center ({{center.x}}, {{center.y}}), radius {{radius}}, {{startAngle}}° to {{endAngle}}°{{/if}}{{#if (eq type 'text')}}"{{content}}" at ({{position.x}}, {{position.y}}){{/if}}
-{{/each}}
-{{/each}}
+Groups: {{originalDiagramData.groups.length}} entity groups
+(Note: Modify coordinates, measurements, and labels to match your variant)
 {{/if}}
 
 {{#if originalObjectives}}

@@ -31,34 +31,22 @@ const TextStyleSchema = z.object({
   align: z.enum(['left', 'center', 'right']).optional(),
 });
 
-const LineEntitySchema = z.object({
-  type: z.literal('line'),
-  from: PointSchema,
-  to: PointSchema,
-  style: StyleSchema.optional(),
+const GeometricEntitySchema = z.object({
+  type: z.enum(['line', 'arc', 'text']),
+  // Line fields (only used when type='line')
+  from: PointSchema.optional(),
+  to: PointSchema.optional(),
+  // Arc fields (only used when type='arc')
+  center: PointSchema.optional(),
+  radius: z.number().optional(),
+  startAngle: z.number().optional(),
+  endAngle: z.number().optional(),
+  // Text fields (only used when type='text')
+  position: PointSchema.optional(),
+  content: z.string().optional(),
+  // Common style field
+  style: z.union([StyleSchema, TextStyleSchema]).optional(),
 });
-
-const ArcEntitySchema = z.object({
-  type: z.literal('arc'),
-  center: PointSchema,
-  radius: z.number(),
-  startAngle: z.number(),
-  endAngle: z.number(),
-  style: StyleSchema.optional(),
-});
-
-const TextEntitySchema = z.object({
-  type: z.literal('text'),
-  position: PointSchema,
-  content: z.string(),
-  style: TextStyleSchema.optional(),
-});
-
-const GeometricEntitySchema = z.discriminatedUnion('type', [
-  LineEntitySchema,
-  ArcEntitySchema,
-  TextEntitySchema,
-]);
 
 const EntityGroupSchema = z.object({
   label: z.string().describe('Detailed description of this group of entities, including mathematical/scientific context and purpose'),
@@ -109,9 +97,10 @@ export async function extractGeometricDiagram(
 
 GEOMETRIC SCHEMA:
 - Represent diagrams using three primitive types: lines, arcs, and text
-- Lines: straight segments between two points
-- Arcs: curved segments defined by center, radius, and start/end angles (0° = right, counterclockwise)
-- Text: plain text positioned at a point (NO LaTeX, NO special formatting)
+- Each entity has a 'type' field ('line', 'arc', or 'text')
+- Line entities: type='line', from={x,y}, to={x,y}, optional style
+- Arc entities: type='arc', center={x,y}, radius, startAngle, endAngle (degrees, 0°=right, counterclockwise), optional style
+- Text entities: type='text', position={x,y}, content (plain text only, NO LaTeX), optional style
 
 COORDINATE SYSTEM:
 - Use a coordinate system with origin at top-left
