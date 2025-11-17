@@ -25,6 +25,69 @@ declare global {
   }
 }
 
+// Validates GeoGebra commands for common errors
+function validateGeoGebraCommands(commands: string[]): { valid: boolean; error?: string } {
+  const definedPoints = new Set<string>();
+
+  // Pattern to match point definitions like "A=(1,2)"
+  const pointDefPattern = /^([A-Z][A-Za-z0-9]*)=\(/;
+
+  // Extract point names used in a command
+  const extractPointReferences = (cmd: string): string[] => {
+    // Skip if this is a point definition
+    if (pointDefPattern.test(cmd)) return [];
+
+    // Match point names (single uppercase letter or uppercase followed by alphanumeric)
+    const matches = cmd.match(/\b([A-Z][A-Za-z0-9]*)\b/g) || [];
+    return matches;
+  };
+
+  for (let i = 0; i < commands.length; i++) {
+    const cmd = commands[i].trim();
+
+    // Check if this is a point definition
+    const pointDefMatch = cmd.match(pointDefPattern);
+    if (pointDefMatch) {
+      const pointName = pointDefMatch[1];
+      definedPoints.add(pointName);
+      continue;
+    }
+
+    // Check for forbidden commands
+    if (cmd.startsWith('Point(') || cmd.includes('Point(')) {
+      return {
+        valid: false,
+        error: `Command ${i + 1} uses forbidden Point() function: "${cmd}". Use direct assignment like A=(x,y) instead.`
+      };
+    }
+    if (cmd.startsWith('Label(') || cmd.includes('Label(')) {
+      return {
+        valid: false,
+        error: `Command ${i + 1} uses forbidden Label() function: "${cmd}". Point labels appear automatically.`
+      };
+    }
+    if (cmd.startsWith('draw(') || cmd.includes('draw(')) {
+      return {
+        valid: false,
+        error: `Command ${i + 1} uses forbidden draw() function: "${cmd}". This is Asymptote syntax, not GeoGebra.`
+      };
+    }
+
+    // Check if all referenced points are defined
+    const referencedPoints = extractPointReferences(cmd);
+    for (const point of referencedPoints) {
+      if (!definedPoints.has(point)) {
+        return {
+          valid: false,
+          error: `Command ${i + 1} references undefined point "${point}": "${cmd}". Define ${point}=(x,y) before using it.`
+        };
+      }
+    }
+  }
+
+  return { valid: true };
+}
+
 export function GeoGebraDiagram({
   commands,
   bounds,
@@ -44,6 +107,15 @@ export function GeoGebraDiagram({
 
     if (!commands || commands.length === 0) {
       console.log('[GeoGebra] No commands provided, skipping render');
+      setIsLoading(false);
+      return;
+    }
+
+    // Validate commands before attempting to render
+    const validation = validateGeoGebraCommands(commands);
+    if (!validation.valid) {
+      console.error('[GeoGebra] Command validation failed:', validation.error);
+      setError(validation.error || 'Invalid GeoGebra commands');
       setIsLoading(false);
       return;
     }

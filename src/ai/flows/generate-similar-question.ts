@@ -278,15 +278,54 @@ After generating the question, ADAPT the GeoGebra diagram commands:
 - If you changed numbers in the question (e.g., 3 cm → 6 cm), update coordinates/measurements accordingly
 - If you changed the scenario/context, adapt point positions and labels
 - The diagram must represent YOUR variant question, not the original
-- Use proper GeoGebra syntax - ALWAYS define points BEFORE using them
-- For points use direct assignment: A=(0,0) NOT Point(A=(0,0))
-- Point labels (A, B, C) appear AUTOMATICALLY - do NOT use Label() command
-- For segments use Segment(A,B) - NEVER use draw() which is Asymptote syntax
-- Use Text() only for custom measurements like Text("3 cm", Midpoint(A,B))
-- CRITICAL: Point(), draw(), and Label() are NOT valid GeoGebra commands
 - Update diagram bounds if the new coordinates extend beyond the original bounds
 
-Examples of proper GeoGebra diagram adaptation:
+CRITICAL GEOGEBRA SYNTAX RULES (MUST FOLLOW):
+
+1. COMMAND ORDERING IS MANDATORY:
+   - You MUST define all points BEFORE using them in any other commands
+   - WRONG: ["Circle(O, 2)", "O=(0,0)"] ❌ O is used before being defined!
+   - CORRECT: ["O=(0,0)", "Circle(O, 2)"] ✅ O is defined first
+
+2. POINT DEFINITION SYNTAX:
+   - Use direct assignment: A=(0,0) ✅
+   - Do NOT use Point() function: Point(A=(0,0)) ❌
+   - Point labels appear AUTOMATICALLY - never use Label() command
+
+3. FORBIDDEN COMMANDS:
+   - Point() ❌ - use direct assignment instead
+   - Label() ❌ - labels appear automatically
+   - draw() ❌ - this is Asymptote syntax, not GeoGebra
+
+4. VALID GEOGEBRA COMMANDS:
+   - Points: A=(x,y)
+   - Lines: Line(A,B) or Line through two points
+   - Segments: Segment(A,B)
+   - Circles: Circle(center, radius) or Circle(center, point_on_circle)
+   - Polygons: Polygon(A,B,C) or Polygon(A,B,C,D)
+   - Tangents: Tangent(point, circle) - point must be defined first!
+   - Text: Text("label", position)
+   - Midpoint: Midpoint(A,B)
+
+Examples of CORRECT GeoGebra command sequences:
+
+Example 1 - Triangle with circle:
+  ["A=(0,0)", "B=(6,0)", "C=(3,4)", "Polygon(A,B,C)", "O=(3,2)", "Circle(O,2)"]
+  ✅ All points (A,B,C,O) are defined BEFORE being used
+
+Example 2 - Circle with tangent:
+  ["O=(0,0)", "Circle(O,3)", "P=(3,0)", "Tangent(P,O)"]
+  ✅ Point P is defined BEFORE calling Tangent(P,O)
+
+Example 3 - Triangle with labeled sides:
+  ["A=(0,0)", "B=(7,0)", "C=(7,5)", "Segment(A,B)", "Segment(B,C)", "Segment(C,A)", "Text(\\"7 cm\\", Midpoint(A,B))"]
+  ✅ All points defined first, then segments and text
+
+Example of WRONG command sequence (DO NOT DO THIS):
+  ["Circle(O,3)", "O=(0,0)", "Tangent(P,O)", "P=(3,0)"]
+  ❌ O and P are used BEFORE being defined - this will FAIL!
+
+Proper adaptation examples:
 - Original triangle 3-4-5: ["A=(0,0)", "B=(3,0)", "C=(3,4)", "Polygon(A,B,C)"]
   → Variant triangle 6-8-10: ["A=(0,0)", "B=(6,0)", "C=(6,8)", "Polygon(A,B,C)"]
 - Original circle radius 2: ["O=(0,0)", "Circle(O, 2)"]
@@ -330,12 +369,17 @@ After generating the question, objectives{{#if originalDiagramGeogebra}}, and Ge
 2. Verify that any numeric answers in objectives match the numbers/context in your question
 3. Verify that any formulas or calculations in objectives use the correct values from your question
 {{#if originalDiagramGeogebra}}
-4. Verify that your GeoGebra commands are valid and match the values in your variant question (not the original)
-5. Ensure all measurements, labels, and coordinates in the GeoGebra diagram are consistent with your variant
-6. If diagramBounds are provided, ensure they include all objects with padding (bounds are optional)
+4. CRITICAL: Verify that ALL points in GeoGebra commands are defined BEFORE they are used
+   - Check EVERY command that references a point (like Tangent(U,O), Line(T,S), Circle(O,3))
+   - Ensure the points (U, O, T, S, etc.) have been defined EARLIER in the command array
+   - If ANY point is used before definition, populate validationError describing the issue
+5. Verify that your GeoGebra commands are valid and match the values in your variant question (not the original)
+6. Ensure all measurements, labels, and coordinates in the GeoGebra diagram are consistent with your variant
+7. If diagramBounds are provided, ensure they include all objects with padding (bounds are optional)
+8. Ensure no forbidden commands are used (Point(), Label(), draw())
 {{/if}}
-7. If you detect ANY mismatch or inconsistency, populate the validationError field with a description
-8. If everything perfectly corresponds, leave validationError empty/omitted
+9. If you detect ANY mismatch or inconsistency, populate the validationError field with a description
+10. If everything perfectly corresponds, leave validationError empty/omitted
 
 Generate the similar question, adapted marking objectives{{#if originalDiagramGeogebra}}, adapted GeoGebra diagram{{/if}}, and perform validation.`,
     });
