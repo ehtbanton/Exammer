@@ -27,7 +27,8 @@ import { VoiceInterviewLive } from '@/components/voice-interview-live';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useSession } from 'next-auth/react';
 import { LatexRenderer } from '@/components/latex-renderer';
-import { GeoGebraDiagram } from '@/components/GeoGebraDiagram';
+import { GeometricDiagram } from '@/components/GeometricDiagram';
+import type { GeometricDiagram as GeometricDiagramType } from '@/lib/geometric-schema';
 
 export default function InterviewPage() {
   return (
@@ -56,7 +57,7 @@ function InterviewPageContent() {
   const [chatHistory, setChatHistory] = useState<ChatHistory>([]);
   const [userInput, setUserInput] = useState('');
   const [isLoading, setIsLoading] = useState(true);
-  const [generatedVariant, setGeneratedVariant] = useState<{questionText: string; solutionObjectives: string[]; diagramGeogebra?: string[]; diagramBounds?: {xmin: number; xmax: number; ymin: number; ymax: number}} | null>(null);
+  const [generatedVariant, setGeneratedVariant] = useState<{questionText: string; solutionObjectives: string[]; diagramData?: GeometricDiagramType} | null>(null);
   const [inputMode, setInputMode] = useState<'text' | 'whiteboard' | 'voice'>('text');
   const [accessLevel, setAccessLevel] = useState<number | null>(null);
   const [completedObjectives, setCompletedObjectives] = useState<number[]>([]);
@@ -213,38 +214,23 @@ function InterviewPageContent() {
     const generateNewQuestion = async () => {
       console.log('Generating question variant with adapted objectives...');
       console.log('[DEBUG] Original question data:', {
-        has_diagram_geogebra: !!examQuestion.diagram_geogebra,
-        has_diagram_bounds: !!examQuestion.diagram_bounds,
-        diagram_geogebra_value: examQuestion.diagram_geogebra,
-        diagram_bounds_value: examQuestion.diagram_bounds,
+        has_diagram_data: !!examQuestion.diagram_data,
+        diagram_data: examQuestion.diagram_data,
       });
 
-      const parsedDiagramGeogebra = examQuestion.diagram_geogebra ? JSON.parse(examQuestion.diagram_geogebra) : undefined;
-      const parsedDiagramBounds = examQuestion.diagram_bounds ? JSON.parse(examQuestion.diagram_bounds) : undefined;
-
-      // If we have GeoGebra commands but no bounds, provide default bounds
-      const defaultBounds = parsedDiagramGeogebra && !parsedDiagramBounds ? {
-        xmin: -2,
-        xmax: 10,
-        ymin: -2,
-        ymax: 10
-      } : parsedDiagramBounds;
+      const parsedDiagramData = examQuestion.diagram_data ? JSON.parse(examQuestion.diagram_data) : undefined;
 
       const variantData = await generateSimilarQuestion({
         originalQuestionText: examQuestion.question_text,
         topicName: '', // Not used in variant generation
         topicDescription: '', // Not used in variant generation
         originalObjectives: examQuestion.solution_objectives,
-        originalDiagramGeogebra: parsedDiagramGeogebra,
-        originalDiagramBounds: defaultBounds,
+        originalDiagramData: parsedDiagramData,
       });
 
       console.log('[DEBUG] Generated variant data:', {
-        has_diagram: !!variantData.diagramGeogebra,
-        diagram_length: variantData.diagramGeogebra?.length,
-        has_bounds: !!variantData.diagramBounds,
-        diagram_commands: variantData.diagramGeogebra,
-        bounds: variantData.diagramBounds,
+        has_diagram: !!variantData.diagramData,
+        diagram_data: variantData.diagramData,
       });
 
       setGeneratedVariant(variantData);
@@ -629,15 +615,12 @@ function InterviewPageContent() {
                           <LatexRenderer className="text-base leading-relaxed whitespace-pre-wrap break-words font-normal">
                             {formatQuestionText(generatedVariant.questionText)}
                           </LatexRenderer>
-                          {/* GeoGebra diagram display */}
-                          {generatedVariant.diagramGeogebra && generatedVariant.diagramGeogebra.length > 0 && (
+                          {/* Geometric diagram display */}
+                          {generatedVariant.diagramData && (
                             <div className="mt-6">
-                              <GeoGebraDiagram
-                                commands={generatedVariant.diagramGeogebra}
-                                bounds={generatedVariant.diagramBounds}
-                                width={600}
-                                height={400}
-                                interactive={false}
+                              <GeometricDiagram
+                                diagram={generatedVariant.diagramData}
+                                className="w-full max-w-2xl mx-auto"
                               />
                             </div>
                           )}

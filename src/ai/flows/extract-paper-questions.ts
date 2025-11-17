@@ -12,6 +12,8 @@ import {genkit} from 'genkit';
 import {googleAI} from '@genkit-ai/google-genai';
 import {z} from 'genkit';
 import {geminiApiKeyManager} from '@root/gemini-api-key-manager';
+import {extractGeometricDiagram} from './extract-geometric-diagram';
+import type {GeometricDiagram} from '@/lib/geometric-schema';
 
 const PaperTypeInfoSchema = z.object({
   index: z.number().describe('The 0-based index of this paper type in the provided array.'),
@@ -45,19 +47,12 @@ const ExtractPaperQuestionsInputSchema = z.object({
 export type ExtractPaperQuestionsInput = z.infer<typeof ExtractPaperQuestionsInputSchema>;
 
 const PaperQuestionSchema = z.object({
-  questionNumber: z.number().describe('The question number from the exam paper (e.g., 1, 2, 3). For multi-part questions, use only the main number.'),
-  questionText: z.string().describe('The complete text of the exam question, including all parts and sub-questions.'),
-  summary: z.string().describe('A brief one-sentence summary of what this question is about.'),
-  topicIndex: z.number().describe('The 0-based index of the topic this question belongs to (from the topics array). Choose based on content analysis, not header text.'),
-  categorizationConfidence: z.number().min(0).max(100).describe('Your confidence score (0-100) that this question belongs to the chosen topic. Use 100 for obvious matches, 70-90 for good matches, 50-70 for uncertain matches, below 50 for very uncertain matches.'),
-  categorizationReasoning: z.string().describe('A brief 1-2 sentence explanation of why you chose this topic for this question based on the question content and topic description.'),
-  diagramGeogebra: z.array(z.string()).optional().describe('If this question includes a GEOMETRIC diagram (shapes, triangles, circles, angles, coordinates), provide GeoGebra construction commands as a JSON array of strings. Each command should be a valid GeoGebra syntax. IMPORTANT: Define points before using them. Examples: ["A=(0,0)", "B=(3,0)", "C=(3,4)", "poly=Polygon(A,B,C)", "Text(\\"3 cm\\", Midpoint(A,B))"] for a right triangle. Common commands: Point notation A=(x,y), Segment(A,B) for line segments, Circle(center, radius), Polygon(A,B,C,...), Angle(A,B,C), Midpoint(A,B), Text("label", position). Omit entirely if question has no geometric diagram.'),
-  diagramBounds: z.object({
-    xmin: z.number(),
-    xmax: z.number(),
-    ymin: z.number(),
-    ymax: z.number(),
-  }).optional().describe('If a geometric diagram is provided, specify the coordinate bounds for proper viewing. Example: {xmin: -1, xmax: 5, ymin: -1, ymax: 5} for a diagram that fits in that range. Ensure all diagram objects fit within these bounds with some padding.'),
+  questionNumber: z.number().describe('Question number from the exam (1, 2, 3, etc.). For multi-part questions, use the main number only.'),
+  questionText: z.string().describe('Complete question text including all parts. Remove any diagram source code (Asymptote, TikZ, etc.).'),
+  summary: z.string().describe('One-sentence summary of the question.'),
+  topicIndex: z.number().describe('0-based index of the topic this question belongs to, determined by content analysis.'),
+  categorizationConfidence: z.number().min(0).max(100).describe('Confidence score (0-100) for topic categorization.'),
+  categorizationReasoning: z.string().describe('Brief explanation of why this topic was chosen based on question content.'),
 });
 
 const ExtractPaperQuestionsOutputSchema = z.object({
@@ -90,195 +85,34 @@ export async function extractPaperQuestions(
         name: 'extractPaperQuestionsPrompt',
         input: {schema: ExtractPaperQuestionsInputSchema},
         output: {schema: ExtractPaperQuestionsOutputSchema},
-        prompt: `TASK: Extract questions from exam paper using CONTENT-BASED ANALYSIS (not header matching).
+        prompt: `You are an exam question extractor. Extract questions from exam papers and categorize them by analyzing content against topic descriptions.
 
-PAPER TYPES (WITH INDICES AND TOPICS):
+CRITICAL RULES:
+1. Use content analysis, not string/header matching
+2. Remove all diagram source code (Asymptote, TikZ, etc.) from question text
+3. Return indices (0-based), not names
+4. Provide confidence scores (0-100) and reasoning for all categorizations
+5. Combine multi-part questions (1a, 1b, 1c) under the main number
+6. Extract year (4 digits) and month (1-12) from the paper header
+
+PAPER TYPES:
 {{#each paperTypes}}
-[Paper Type {{index}}] {{name}}
-  Topics:
-  {{#each topics}}
-  - [Topic {{index}}] {{name}}: {{description}}
-  {{/each}}
-
-{{/each}}
-
-ALL TOPICS (FOR REFERENCE):
+[{{index}}] {{name}}
 {{#each topics}}
-[{{index}}] {{name}}: {{description}}
+  - [{{index}}] {{name}}: {{description}}
+{{/each}}
 {{/each}}
 
-DOCUMENT:
+EXAM PAPER:
 {{media url=examPaperDataUri}}
 
-CRITICAL INSTRUCTIONS - READ CAREFULLY:
-
-1. PAPER TYPE DETERMINATION (CONTENT-BASED, NOT HEADER-BASED)
-
-   DO NOT rely on paper header text like "Paper 1", "Paper 2", etc.
-   Instead, follow this procedure:
-
-   a) First, extract ALL questions from the document
-   b) For EACH question, identify which topics it relates to (based on content)
-   c) Count which paper type has the MOST topic matches
-   d) Return the INDEX (0-based) of that paper type
-   e) Provide a confidence score (0-100):
-      - 100: All questions clearly match one paper type
-      - 70-90: Most questions match, some ambiguous
-      - 50-70: Moderate uncertainty, questions could fit multiple paper types
-      - <50: Very uncertain, questions don't clearly match any paper type
-   f) Explain your reasoning in 1-2 sentences
-
-   Example: If most questions relate to topics under Paper Type 0, return paperTypeIndex: 0
-
-2. TOPIC CATEGORIZATION (CONTENT-BASED MATCHING)
-
-   For EACH question:
-
-   a) Read the complete question text carefully
-   b) Compare the question content against ALL topic descriptions
-   c) Identify which topic's description BEST matches the question content
-   d) Return the INDEX (0-based) of that topic from the topics array
-   e) Provide a confidence score (0-100):
-      - 100: Question content perfectly matches topic description
-      - 70-90: Good match, clear alignment with topic
-      - 50-70: Moderate match, some ambiguity
-      - <50: Uncertain, question could fit multiple topics
-   f) Explain your reasoning in 1-2 sentences (why this topic based on content)
-
-   IMPORTANT:
-   - DO NOT use fuzzy string matching or name similarity
-   - DO NOT guess based on question wording alone
-   - ALWAYS refer back to the topic description
-   - If a question spans multiple topics, choose the PRIMARY topic
-
-3. QUESTION NUMBER IDENTIFICATION
-
-   To correctly identify question numbers in the document, follow this protocol:
-
-   a) Locate question markers in the document:
-      - Standard formats: "Question 1", "Question 2", "Q1", "Q2", "Q.1", "Q.2"
-      - Numeric formats: "1.", "2)", "3." at the start of content blocks
-      - Visual emphasis: Numbers in bold or larger font preceding question content
-
-   b) Distinguish question numbers from other numeric elements:
-      - Page numbers (typically in headers, footers, or page corners) are NOT question numbers
-      - Section headers ("Section A", "Part I", "Part II") are NOT question numbers
-      - Mark allocations ("[3 marks]", "(5 marks)", "[Total: 20]") are NOT question numbers
-      - Years and dates ("2023", "June 2022") are NOT question numbers
-
-   c) Handle multi-part questions:
-      - Treat "1a", "1(a)", "1 (a)", "1(i)", "1 i" as sub-parts of Question 1
-      - Combine all sub-parts into a single question using the main number only
-      - Extract the complete text including all sub-parts
-
-   d) Validate sequential numbering:
-      - Questions should be numbered consecutively: 1, 2, 3, 4, 5, etc.
-      - Typical exam papers contain 5-15 questions
-      - If numbering contains gaps or appears incorrect, re-examine the document
-
-4. DIAGRAM HANDLING - CRITICAL INSTRUCTIONS:
-
-   When examining questions in the PDF, look for GEOMETRIC DIAGRAMS (shapes, triangles, circles, angles, graphs, etc.):
-
-   a) VISUAL DIAGRAMS: If you see a geometric diagram rendered in the PDF:
-      - Analyze the diagram and create GeoGebra commands to recreate it
-      - Include descriptive text like "The diagram shows..." in questionText
-      - Put GeoGebra commands in diagramGeogebra field
-      - Set appropriate diagramBounds
-
-   b) ASYMPTOTE CODE: Some PDFs may contain diagram source code (marked with [asy]...[/asy]):
-      - REMOVE the entire code block from questionText (including [asy] and [/asy] markers)
-      - CONVERT the Asymptote code to equivalent GeoGebra commands
-      - CRITICAL Asymptote to GeoGebra conversions:
-        * draw(A--B) in Asymptote → Segment(A,B) in GeoGebra (NOT draw()!)
-        * draw(A--B--C) → Segment(A,B), Segment(B,C) as separate commands
-        * draw(A--B--C--cycle) → Polygon(A,B,C) for closed shapes
-        * label("text", point) → Text("text", point)
-      - Example conversion:
-        * Asymptote: pair A, B, C; A=(0,0); B=(3,0); C=(3,4); draw(A--B); draw(B--C); draw(A--C);
-        * GeoGebra: ["A=(0,0)", "B=(3,0)", "C=(3,4)", "Segment(A,B)", "Segment(B,C)", "Segment(A,C)"]
-      - Example closed polygon:
-        * Asymptote: draw(A--B--C--cycle);
-        * GeoGebra: ["Polygon(A,B,C)"]
-      - Include "The diagram shows..." text, but NO code in questionText
-
-   c) NO DIAGRAM: If the question has no geometric diagram, omit diagramGeogebra entirely
-
-5. FOR EACH QUESTION OUTPUT:
-   - questionNumber: Just the number (e.g., 1, 2, 3)
-   - questionText: Complete text including all sub-parts, BUT EXCLUDING any diagram code (Asymptote, TikZ, etc.)
-   - summary: Single sentence description
-   - topicIndex: The 0-based index from the topics array (based on content analysis)
-   - categorizationConfidence: 0-100 score for topic match confidence
-   - categorizationReasoning: 1-2 sentences explaining why you chose this topic
-   - diagramGeogebra (OPTIONAL): If the question includes a GEOMETRIC diagram (shapes, triangles, circles, angles, coordinate planes):
-     * Provide an array of GeoGebra construction commands as strings
-     * Use proper GeoGebra syntax - ALWAYS define points BEFORE using them in other objects
-     * Common commands:
-       - Points: A=(x,y) or A=(0,0) - DO NOT wrap in Point(), just use direct assignment
-       - Point labels (A, B, C) appear AUTOMATICALLY - do NOT use Label() command
-       - Segments: Segment(A,B) or Segment[A,B] - NEVER use draw() which is Asymptote syntax
-       - Circles: Circle(centerPoint, radius) or Circle((0,0), 5)
-       - Polygons: Polygon(A,B,C) for triangles, Polygon(A,B,C,D) for quadrilaterals
-       - Angles: Angle(A,B,C) shows angle at vertex B
-       - Custom text labels: Text("3 cm", Midpoint(A,B)) to label segments with measurements
-       - Angle marks: Can use arc or Text to indicate angles
-       - CRITICAL: Point(), draw(), and Label() are NOT valid GeoGebra commands
-       - For points, use direct assignment: A=(0,0) NOT Point(A=(0,0))
-       - For segments, use Segment(A,B) NOT draw(A--B)
-     * Example for a right triangle with sides 3,4,5: ["A=(0,0)", "B=(3,0)", "C=(3,4)", "poly=Polygon(A,B,C)", "Text(\\"3 cm\\", Midpoint(A,B))", "Text(\\"4 cm\\", Midpoint(B,C))"]
-     * IMPORTANT: If the PDF contains Asymptote code, convert it to GeoGebra commands here
-     * If question is text-only with no geometric diagram, OMIT this field entirely
-   - diagramBounds (OPTIONAL): If diagramGeogebra is provided, specify viewing bounds:
-     * Provide {xmin, xmax, ymin, ymax} to ensure all objects are visible
-     * Add padding around objects (e.g., if triangle spans 0-5 on x-axis, use xmin:-1, xmax:6)
-     * Example: {xmin: -1, xmax: 6, ymin: -1, ymax: 5}
-
-6. YEAR AND MONTH EXTRACTION
-
-   - Locate the exam date in the document (usually at the top)
-   - Extract year as 4-digit number (e.g., 2022)
-   - Extract month as number 1-12 (e.g., 6 for June)
-
-OUTPUT STRUCTURE:
-{
-  "paperTypeIndex": <0-based index>,
-  "paperTypeConfidence": <0-100>,
-  "paperTypeReasoning": "<1-2 sentence explanation>",
-  "year": <4-digit year>,
-  "month": <1-12>,
-  "questions": [
-    {
-      "questionNumber": <integer>,
-      "questionText": "<complete text WITHOUT any Asymptote/TikZ/diagram code>",
-      "summary": "<single sentence>",
-      "topicIndex": <0-based index from topics array>,
-      "categorizationConfidence": <0-100>,
-      "categorizationReasoning": "<1-2 sentence explanation>",
-      "diagramGeogebra": ["<GeoGebra command 1>", "<GeoGebra command 2>", ...],  // OPTIONAL - only if geometric diagram present
-      "diagramBounds": {"xmin": <number>, "xmax": <number>, "ymin": <number>, "ymax": <number>}  // OPTIONAL - only if diagramGeogebra present
-    }
-  ]
-}
-
-VALIDATION REQUIREMENTS:
-
-Before generating output, verify the following:
-- Paper type index is within valid range (0 to {{paperTypes.length}} - 1)
-- All topic indices are within valid range (0 to {{topics.length}} - 1)
-- Question numbers are sequential without gaps (1, 2, 3, 4...)
-- Total question count is within expected range (typically 5-15 questions)
-- Each question has substantial content (not just a number)
-- Multi-part questions (1a, 1b, 1c) are combined under a single main number
-- All confidence scores are between 0 and 100
-- Categorization reasoning explains the content match, not just restates the topic name
-- All Asymptote code blocks ([asy]...[/asy]) have been REMOVED from questionText
-- Geometric diagrams have been converted to GeoGebra commands in diagramGeogebra field
-- If diagramGeogebra is provided, diagramBounds is also provided
-
-REMEMBER:
-1. Use CONTENT ANALYSIS, not string matching or header text matching!
-2. REMOVE all diagram code from questionText and convert to GeoGebra commands!`,
+INSTRUCTIONS:
+1. Determine paper type by analyzing which topics best match ALL questions (return index)
+2. Extract each question (combine multi-part questions like 1a, 1b under main number)
+3. Remove any diagram source code from question text
+4. Categorize each question by topic using content analysis (return topic index)
+5. Extract year and month from paper header
+6. Provide confidence scores and reasoning for all categorizations`,
       });
 
       const flow = aiInstance.defineFlow(

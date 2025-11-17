@@ -69,7 +69,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 
     // Get question previews with user progress
     // Only return: id, summary, score, attempts, has_markscheme
-    // Do NOT return: question_text, solution_objectives, diagram_geogebra, diagram_bounds
+    // Do NOT return: question_text, solution_objectives, diagram_data
     const questions = await db.all<any>(
       `SELECT
         q.id,

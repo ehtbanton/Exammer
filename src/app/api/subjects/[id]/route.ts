@@ -63,8 +63,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         q.question_text,
         q.summary,
         q.solution_objectives,
-        q.diagram_geogebra,
-        q.diagram_bounds,
+        q.diagram_data,
         q.paper_date,
         q.question_number,
         q.created_at as question_created_at,
@@ -143,8 +142,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
           attempts: row.attempts,
           paperDate: row.paper_date,
           questionNumber: row.question_number,
-          diagramGeogebra: row.diagram_geogebra,
-          diagramBounds: row.diagram_bounds,
+          diagramData: row.diagram_data,
         });
       }
     });
