@@ -182,33 +182,61 @@ export function DonationModal({ isOpen, onClose }: DonationModalProps) {
           label: "donate",
           color: "blue",
         },
-        createOrder: (data: any, actions: any) => {
-          return actions.order.create({
-            intent: "CAPTURE",
-            purchase_units: [
-              {
-                amount: {
-                  value: amount.toFixed(2),
-                  currency_code: currency,
-                },
-                description: "Donation to Exammer",
+        createOrder: async (data: any, actions: any) => {
+          try {
+            // Create order on server
+            const response = await fetch("/api/paypal-create-order", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
               },
-            ],
-            application_context: {
-              shipping_preference: "NO_SHIPPING",
-              user_action: "PAY_NOW",
-              brand_name: "Exammer",
-            },
-          });
+              body: JSON.stringify({
+                amount: amount,
+                currency: currency,
+              }),
+            });
+
+            if (!response.ok) {
+              throw new Error("Failed to create order");
+            }
+
+            const orderData = await response.json();
+            return orderData.orderID;
+          } catch (err) {
+            console.error("Order creation error:", err);
+            setError("Failed to create order. Please try again.");
+            throw err;
+          }
         },
         onApprove: async (data: any, actions: any) => {
           setIsProcessing(true);
           try {
-            // Capture the order
-            const details = await actions.order.capture();
+            // Capture the order on server
+            const response = await fetch("/api/paypal-capture-order", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                orderID: data.orderID,
+              }),
+            });
 
-            // Show success
-            setStep(3);
+            if (!response.ok) {
+              const errorData = await response.json();
+              console.error("Capture error:", errorData);
+              throw new Error(errorData.error || "Failed to capture payment");
+            }
+
+            const captureData = await response.json();
+
+            if (captureData.success) {
+              // Show success
+              setStep(3);
+            } else {
+              throw new Error("Payment capture was not successful");
+            }
+
             setIsProcessing(false);
           } catch (err) {
             setError("Payment processing failed. Please try again.");
