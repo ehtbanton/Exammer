@@ -4,7 +4,6 @@ import { AppProvider } from '@/app/context/AppContext';
 import { SessionProvider } from '@/components/SessionProvider';
 import { Toaster } from '@/components/ui/toaster';
 import Header from '@/components/Header';
-import Footer from '@/components/Footer';
 import CookieConsent from '@/components/CookieConsent';
 import { BackgroundTaskIndicator } from '@/components/BackgroundTaskIndicator';
 import { ThemeProvider } from '@/components/theme-provider';
@@ -63,7 +62,6 @@ export default function RootLayout({
                 <main className="flex-1 overflow-y-auto p-4 sm:p-6 md:p-8">
                   {children}
                 </main>
-                <Footer />
               </div>
               <BackgroundTaskIndicator />
               <CookieConsent />
