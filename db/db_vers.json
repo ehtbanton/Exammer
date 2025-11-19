@@ -1,5 +1,5 @@
 {
-  "currentVersion": 8,
+  "currentVersion": 10,
   "versions": {
     "0": {
       "description": "Initial schema - subjects owned by users",
@@ -353,6 +353,33 @@
             "action": "create_index",
             "table": "feedback_status_history",
             "sql": "CREATE INDEX IF NOT EXISTS idx_feedback_status_history_feedback_id ON feedback_status_history(feedback_id)"
+          }
+        ]
+      }
+    },
+    "9": {
+      "description": "Transition version - no migration needed (feedback system already applied)",
+      "schema": {},
+      "migration": {
+        "from": 8,
+        "steps": []
+      }
+    },
+    "10": {
+      "description": "Add email verification system - replaces manual approval with automated email verification",
+      "schema": {
+        "users": {
+          "columns": ["id", "name", "email", "email_verified", "image", "access_level", "email_verification_sent_at", "created_at", "updated_at"],
+          "note": "email_verification_sent_at stores timestamp of last verification email sent (for rate limiting)"
+        }
+      },
+      "migration": {
+        "from": 9,
+        "steps": [
+          {
+            "action": "add_column",
+            "table": "users",
+            "sql": "ALTER TABLE users ADD COLUMN email_verification_sent_at INTEGER DEFAULT NULL"
           }
         ]
       }

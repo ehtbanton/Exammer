@@ -20,6 +20,7 @@ function SignUpContent() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
 
   // Redirect if already signed in
@@ -70,21 +71,9 @@ function SignUpContent() {
         return;
       }
 
-      // Automatically sign in the user
-      const signInResult = await signIn('credentials', {
-        email,
-        password,
-        redirect: false,
-      });
-
-      if (signInResult?.error) {
-        setError('Account created but failed to sign in. Please try signing in manually.');
-        setLoading(false);
-        return;
-      }
-
-      // Redirect to workspace
-      router.push('/workspace');
+      // Show success message - user needs to verify email
+      setSuccess(true);
+      setLoading(false);
     } catch (err) {
       setError('An unexpected error occurred');
       setLoading(false);
@@ -100,10 +89,46 @@ function SignUpContent() {
     );
   }
 
+  // Show success message after registration
+  if (success) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4 py-12 sm:px-6 lg:px-8">
+        <Card className="w-full max-w-md">
+          <CardHeader>
+            <CardTitle className="text-2xl font-bold">Check Your Email</CardTitle>
+            <CardDescription>We've sent you a verification link</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Alert>
+              <AlertDescription>
+                A verification email has been sent to <strong>{email}</strong>.
+                Please check your inbox and click the link to verify your account.
+              </AlertDescription>
+            </Alert>
+            <p className="text-sm text-muted-foreground">
+              Didn't receive the email? Check your spam folder or{' '}
+              <Link href="/auth/resend-verification" className="font-medium text-primary hover:underline">
+                request a new verification email
+              </Link>.
+            </p>
+          </CardContent>
+          <CardFooter>
+            <Link href="/auth/signin" className="w-full">
+              <Button className="w-full" variant="outline">
+                Back to Sign In
+              </Button>
+            </Link>
+          </CardFooter>
+        </Card>
+      </div>
+    );
+  }
+
   // Don't render the form if already authenticated (will redirect)
   if (status === 'authenticated') {
     return null;
   }
+
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4 py-12 sm:px-6 lg:px-8">
