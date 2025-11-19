@@ -24,7 +24,7 @@ export default function FeedbackButton({
         variant={variant}
         size={size}
         onClick={() => setIsModalOpen(true)}
-        className={className}
+        className={`font-semibold ${className}`}
       >
         <MessageSquare className="h-4 w-4 mr-2" />
         Feedback

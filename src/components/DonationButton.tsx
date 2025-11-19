@@ -12,7 +12,7 @@ interface DonationButtonProps {
 }
 
 export default function DonationButton({
-  variant = "outline",
+  variant = "ghost",
   size = "sm",
   className = "",
 }: DonationButtonProps) {
@@ -24,9 +24,9 @@ export default function DonationButton({
         variant={variant}
         size={size}
         onClick={() => setIsModalOpen(true)}
-        className={className}
+        className={`font-semibold ${className}`}
       >
-        <Heart className="h-4 w-4 mr-2" />
+        <Heart className="h-4 w-4 mr-2 fill-current" />
         Donate
       </Button>
       <DonationModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
