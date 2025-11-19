@@ -1,3 +1,5 @@
+'use client';
+
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft } from 'lucide-react';
@@ -112,8 +114,24 @@ export default function PrivacyPolicy() {
 
         <section>
           <h2 className="text-2xl font-semibold mb-3">Cookies</h2>
+          <p className="text-muted-foreground mb-3">
+            We use cookies to make Exammer work and improve your experience. Cookies are categorized as:
+          </p>
+          <ul className="list-disc pl-6 text-muted-foreground space-y-1 mb-3">
+            <li><strong>Essential:</strong> Required for authentication and basic functionality (cannot be disabled)</li>
+            <li><strong>Functional:</strong> Remember your preferences like theme settings</li>
+            <li><strong>Analytics:</strong> Help us understand how you use the site (optional)</li>
+            <li><strong>Marketing:</strong> Show relevant advertisements (optional, not currently used)</li>
+          </ul>
           <p className="text-muted-foreground">
-            We use essential cookies for authentication and session management. You can manage cookie preferences through our cookie consent banner. Disabling essential cookies may prevent you from using certain features.
+            You can manage your cookie preferences at any time through our{' '}
+            <button
+              onClick={() => window.dispatchEvent(new CustomEvent('show-cookie-banner'))}
+              className="text-primary hover:underline"
+            >
+              Cookie Preferences
+            </button>
+            {' '}settings. Disabling essential cookies will prevent you from using Exammer.
           </p>
         </section>
 
