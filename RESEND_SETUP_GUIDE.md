@@ -100,108 +100,345 @@ This guide will walk you through setting up Resend email service for the Exammer
 
 ### Find Your DNS Settings
 
-**Where is exammer.co.uk registered?** Common registrars:
+**YOUR DOMAIN:** exammer.co.uk is registered with **GoDaddy**
+
+#### Accessing GoDaddy DNS Management (Detailed Steps):
+
+**Step 1: Log In**
+1. Go to https://account.godaddy.com/products
+2. Click **"Sign In"** in the top right corner
+3. Enter your GoDaddy username and password
+4. Complete 2-factor authentication if enabled
+
+**Step 2: Navigate to Domain List**
+1. After login, you should see the **My Products** page
+2. If not, click your **account name** in the upper right
+3. Select **"My Products"** from the dropdown menu
+4. Look for the **Domains** section
+
+**Step 3: Access DNS Settings for exammer.co.uk**
+
+**Option A - Using the Quick Menu (Recommended):**
+1. In the **Domains** section, find **exammer.co.uk** in the list
+2. Look for the **three dots (...)** or ellipsis icon next to the domain name
+3. Click the **three dots (...)**
+4. Select **"Edit DNS"** from the dropdown menu
+5. You'll be taken directly to the DNS management page
+
+**Option B - Using Domain Details Page:**
+1. In the **Domains** section, click **"Manage All"** or the domain name **exammer.co.uk**
+2. This opens the domain details page
+3. Look for the **"DNS"** button or tab
+4. Click **"Manage DNS"** or **"DNS Settings"**
+5. You'll see the DNS records table
+
+**What You'll See:**
+- A table showing existing DNS records (Type, Name, Value, TTL, Actions)
+- An **"Add New Record"** button (usually at the top or bottom)
+- Filter options to show specific record types
+- Edit and Delete icons next to each existing record
+
+**Keep this page open** - you'll be adding records here in the next steps.
+
+---
+
+### Alternative Registrars (If Not Using GoDaddy):
 
 #### If using **Namecheap:**
 1. Log in to Namecheap
 2. Dashboard → Domain List
-3. Click **"Manage"** next to exammer.co.uk
+3. Click **"Manage"** next to your domain
 4. Go to **"Advanced DNS"** tab
-
-#### If using **GoDaddy:**
-1. Log in to GoDaddy
-2. My Products → Domains
-3. Click DNS next to exammer.co.uk
-4. Scroll to DNS records section
 
 #### If using **Cloudflare:**
 1. Log in to Cloudflare
-2. Select exammer.co.uk
+2. Select your domain
 3. Click **"DNS"** tab
 4. **Note:** Cloudflare supports automatic Resend setup via "Domain Connect"
 
 #### If using **123-reg:**
 1. Log in to 123-reg Control Panel
 2. Domain Names → Manage
-3. Select exammer.co.uk
+3. Select your domain
 4. Advanced Domain Settings → Manage DNS
 
-### Add the DNS Records
+### Add the DNS Records (GoDaddy-Specific Instructions)
 
-Resend will provide **3-4 DNS records** to add. Here's what to expect:
+Resend will provide **3-4 DNS records** to add. Follow these steps for each record:
 
-#### 1. **MX Record** (Mail Exchange)
+#### 1. **MX Record** (Mail Exchange) - GoDaddy Steps
 
 **Purpose:** Routes bounce messages back to Resend
 
+**Click-by-Click Instructions:**
+
+1. **Open Add Record Modal**
+   - On the DNS Management page, locate **"Add New Record"** button (top right or bottom of records table)
+   - Click **"Add New Record"** or **"Add"**
+   - A modal/popup will appear
+
+2. **Select Record Type**
+   - In the modal, you'll see a **"Type"** dropdown menu
+   - Click the dropdown
+   - Scroll down and select **"MX"** from the list
+   - The form will update to show MX-specific fields
+
+3. **Fill in MX Record Details**
+   - **Type:** MX (already selected)
+   - **Name:** Enter `mail`
+     - GoDaddy will automatically append `.exammer.co.uk` to this
+     - So it becomes `mail.exammer.co.uk`
+     - **Do NOT type the full domain** - just `mail`
+   - **Value:** Copy EXACTLY from Resend dashboard
+     - Typical value: `feedback-smtp.us-east-1.amazonses.com`
+     - **⚠️ Important:** Copy/paste to avoid typos
+   - **Priority:** Enter `10`
+     - This is the mail server priority (lower = higher priority)
+   - **TTL:** Select **"1 hour"** or **"3600"** (recommended)
+     - Or leave as **"Automatic"** if that's the default
+
+4. **Save the Record**
+   - Click **"Save"** button at the bottom of the modal
+   - The modal will close
+   - You should see the new MX record appear in the DNS records table
+   - ✅ Success indicator: New row with Type=MX, Name=mail, Value=feedback-smtp...
+
+**What the Final Record Looks Like:**
 ```
 Type: MX
-Name: mail (or @ if your registrar auto-appends domain)
-Value: feedback-smtp.us-east-1.amazonses.com
+Name: mail
+Value: feedback-smtp.us-east-1.amazonses.com (check Resend for exact value)
 Priority: 10
-TTL: 3600 (or Auto)
+TTL: 1 hour
 ```
 
-**⚠️ Important Notes:**
-- Some registrars auto-append `.exammer.co.uk` to the name
-- If in doubt, use just `mail` or `@` as the name
-- The value is provided by Resend - copy exactly as shown
+**⚠️ Common GoDaddy-Specific Issues:**
+- **Name field auto-append:** GoDaddy adds `.exammer.co.uk` automatically, so only enter `mail`
+- **Wrong Name entry:** If you enter `mail.exammer.co.uk`, it becomes `mail.exammer.co.uk.exammer.co.uk` (WRONG)
+- **Priority field:** Some interfaces call this "Priority", others "Preference" - same thing
+- **Value must NOT have trailing dot:** Remove any `.` at the end of the mail server address
 
-#### 2. **TXT Record for SPF** (Sender Policy Framework)
+#### 2. **TXT Record for SPF** (Sender Policy Framework) - GoDaddy Steps
 
 **Purpose:** Authorizes Resend to send emails on your behalf
 
+**Click-by-Click Instructions:**
+
+1. **Open Add Record Modal**
+   - Click **"Add New Record"** button again
+   - A new modal will appear
+
+2. **Select Record Type**
+   - Click the **"Type"** dropdown
+   - Select **"TXT"** from the list
+   - The form will show TXT-specific fields
+
+3. **Fill in SPF TXT Record Details**
+   - **Type:** TXT (already selected)
+   - **Name:** Enter `mail`
+     - Same as MX record - for the subdomain `mail.exammer.co.uk`
+     - GoDaddy auto-appends `.exammer.co.uk`
+   - **Value:** Copy EXACTLY from Resend dashboard
+     - Typical value: `v=spf1 include:amazonses.com ~all`
+     - **⚠️ Critical:** Must start with `v=spf1`
+     - **⚠️ GoDaddy Note:** Do NOT add quotes around the value
+     - Paste the value WITHOUT quotes: `v=spf1 include:amazonses.com ~all`
+   - **TTL:** Select **"1 hour"** or **"3600"** (recommended)
+
+4. **Save the Record**
+   - Click **"Save"** button
+   - The modal closes
+   - New TXT record appears in the table
+   - ✅ Success: Type=TXT, Name=mail, Value=v=spf1...
+
+**What the Final Record Looks Like:**
 ```
 Type: TXT
-Name: mail (or @ depending on registrar)
+Name: mail
 Value: v=spf1 include:amazonses.com ~all
+TTL: 1 hour
 ```
 
-**Example Value from Resend:**
-```
-v=spf1 include:amazonses.com ~all
-```
+**⚠️ Common GoDaddy-Specific Issues:**
+- **No quotes needed:** GoDaddy interface doesn't require quotes around TXT values
+- **If quotes added:** GoDaddy might store the quotes as part of the value (WRONG)
+- **Correct:** `v=spf1 include:amazonses.com ~all`
+- **Wrong:** `"v=spf1 include:amazonses.com ~all"`
+- **Exact copy:** Make sure to copy the EXACT value from Resend - syntax matters!
 
-**⚠️ Copy the EXACT value** shown in your Resend dashboard - it may differ slightly.
-
-#### 3. **TXT Record for DKIM** (DomainKeys Identified Mail)
+#### 3. **TXT Record for DKIM** (DomainKeys Identified Mail) - GoDaddy Steps
 
 **Purpose:** Adds cryptographic signature to verify email authenticity
 
+**Click-by-Click Instructions:**
+
+1. **Open Add Record Modal**
+   - Click **"Add New Record"** button again
+   - A new modal appears
+
+2. **Select Record Type**
+   - Click the **"Type"** dropdown
+   - Select **"TXT"** from the list
+
+3. **Fill in DKIM TXT Record Details**
+   - **Type:** TXT (already selected)
+   - **Name:** Copy EXACTLY from Resend dashboard
+     - Typical format: `resend._domainkey.mail`
+     - Or might be: `[selector]._domainkey.mail`
+     - **⚠️ CRITICAL:** Check your Resend dashboard for exact name
+     - GoDaddy will auto-append `.exammer.co.uk`
+     - Example: If Resend shows `resend._domainkey.mail`, enter exactly that
+   - **Value:** Copy the ENTIRE LONG string from Resend
+     - **⚠️ This is a VERY LONG value** (200-500+ characters)
+     - Starts with: `p=MIGfMA0GCSqGSIb3DQEBAQUAA...`
+     - **⚠️ GoDaddy allows long values** - paste the entire string
+     - **⚠️ Do NOT add quotes**
+     - **⚠️ Do NOT split into multiple lines**
+     - Triple-click in Resend to select all, then Ctrl+C to copy
+   - **TTL:** Select **"1 hour"** or **"3600"**
+
+4. **Verify the Value Before Saving**
+   - **IMPORTANT:** Before clicking Save, double-check:
+   - The value starts with `p=` and is very long
+   - No line breaks or spaces in the middle
+   - No quotes at beginning or end
+   - The entire string was copied (scroll in the value field to check)
+
+5. **Save the Record**
+   - Click **"Save"** button
+   - The modal closes
+   - New TXT record appears with Name=resend._domainkey.mail
+   - ✅ Success: Type=TXT, Name=resend._domainkey.mail, Value=p=MIG...
+
+**What the Final Record Looks Like:**
 ```
 Type: TXT
-Name: resend._domainkey.mail (check Resend dashboard for exact name)
-Value: p=MIGfMA0GCSqGSIb3DQEBAQUAA... (very long string)
+Name: resend._domainkey.mail (or whatever Resend provides)
+Value: p=MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQC... (200+ characters)
+TTL: 1 hour
 ```
 
-**⚠️ Important:**
-- The value is a VERY LONG string (200+ characters)
-- Copy the entire value carefully
-- Don't add quotes unless your registrar requires them
-- The name might be different - check Resend dashboard
+**⚠️ Common GoDaddy-Specific Issues:**
+- **Name field confusion:** The Name field must include `_domainkey` - copy exact from Resend
+- **Value truncation:** Make sure you copied the ENTIRE long string (use Ctrl+A in the field, or triple-click)
+- **Hidden characters:** Don't copy extra spaces or line breaks
+- **GoDaddy limits:** GoDaddy TXT records support up to 255 characters per string, but Resend values should fit
+- **Multiple DKIM records:** You might have multiple DKIM records for different selectors - that's normal
 
-#### 4. **Optional: TXT Record for DMARC** (Recommended)
+#### 4. **Optional: TXT Record for DMARC** (Recommended) - GoDaddy Steps
 
 **Purpose:** Tells email receivers what to do with failed authentication
 
+**Click-by-Click Instructions:**
+
+1. **Open Add Record Modal**
+   - Click **"Add New Record"** button one more time
+   - Modal appears
+
+2. **Select Record Type**
+   - Click the **"Type"** dropdown
+   - Select **"TXT"**
+
+3. **Fill in DMARC TXT Record Details**
+   - **Type:** TXT (already selected)
+   - **Name:** Enter `_dmarc.mail`
+     - Note the underscore at the beginning: `_dmarc.mail`
+     - GoDaddy will auto-append `.exammer.co.uk`
+     - Final domain: `_dmarc.mail.exammer.co.uk`
+   - **Value:** Enter one of these policies (copy exactly):
+     - **For testing (recommended first):** `v=DMARC1; p=none; rua=mailto:dmarc@exammer.co.uk`
+     - **After testing (production):** `v=DMARC1; p=quarantine; rua=mailto:dmarc@exammer.co.uk`
+     - **Strict (after confirmed working):** `v=DMARC1; p=reject; rua=mailto:dmarc@exammer.co.uk`
+   - **TTL:** Select **"1 hour"** or **"3600"**
+
+4. **Save the Record**
+   - Click **"Save"** button
+   - Modal closes
+   - New TXT record appears with Name=_dmarc.mail
+   - ✅ Success: Type=TXT, Name=_dmarc.mail, Value=v=DMARC1...
+
+**What the Final Record Looks Like:**
 ```
 Type: TXT
 Name: _dmarc.mail
 Value: v=DMARC1; p=none; rua=mailto:dmarc@exammer.co.uk
+TTL: 1 hour
 ```
 
-**DMARC Policy Options:**
-- `p=none` - Monitor only (recommended for first 48 hours)
-- `p=quarantine` - Send suspicious emails to spam
-- `p=reject` - Block suspicious emails entirely
+**DMARC Policy Options Explained:**
+- **`p=none`** - Monitor only, no action taken (recommended for first 48-72 hours)
+  - Use this to test and ensure SPF/DKIM are working
+  - Email providers will report issues but won't block emails
+- **`p=quarantine`** - Send suspicious emails to spam (recommended for production)
+  - Emails that fail authentication go to spam folder
+  - Good balance of security and deliverability
+- **`p=reject`** - Block suspicious emails entirely (strictest)
+  - Emails that fail authentication are rejected completely
+  - Only use after confirming everything works perfectly
 
-**Recommendation:** Start with `p=none` for testing, upgrade to `p=quarantine` after confirming everything works.
+**`rua=` Explanation:**
+- `rua=mailto:dmarc@exammer.co.uk` - Where DMARC reports are sent
+- You'll receive XML reports about email authentication
+- You can use any email address (doesn't need to exist yet)
+- Or use a DMARC reporting service
 
-### Save Your DNS Changes
+**Recommendation:**
+1. Start with `p=none` for initial testing (48-72 hours)
+2. Monitor Resend dashboard for delivery issues
+3. Upgrade to `p=quarantine` after confirming emails deliver successfully
+4. Consider `p=reject` only after months of stable operation
 
-1. Double-check all records for typos
-2. Click **"Save"** or **"Add Record"** for each
-3. Note the time - DNS propagation begins now
+### Save and Review Your DNS Changes (GoDaddy)
+
+**After Adding All Records:**
+
+1. **Review Your DNS Records Table**
+   - You should now see 3-4 new records in the DNS management page:
+     - ✅ **1 MX record:** Type=MX, Name=mail, Priority=10
+     - ✅ **2-3 TXT records:**
+       - SPF: Name=mail, Value=v=spf1...
+       - DKIM: Name=resend._domainkey.mail, Value=p=MIG...
+       - DMARC (optional): Name=_dmarc.mail, Value=v=DMARC1...
+
+2. **Double-Check Each Record**
+   - Click the **Edit** icon (pencil) next to each record to review
+   - Verify no typos in Name fields
+   - Verify values match exactly what Resend provided
+   - Check that TTL is set appropriately (1 hour recommended)
+   - Click **Cancel** to close without changes, or **Save** if you need to fix something
+
+3. **GoDaddy Auto-Save**
+   - **Good news:** GoDaddy saves records immediately when you click "Save" on each modal
+   - You don't need a final "Save All" button
+   - Each record is saved individually as you add it
+
+4. **Note the Time**
+   - Write down the current time
+   - DNS propagation begins immediately
+   - Most changes propagate within 15-60 minutes
+   - Full global propagation can take up to 48 hours
+
+5. **Keep the GoDaddy DNS Page Open**
+   - You might need to come back to check or edit records
+   - Or bookmark the page for easy access later
+
+**Visual Confirmation:**
+Your DNS records table should look similar to this:
+
+```
+Type    Name                      Value                                          Priority  TTL
+----    ----                      -----                                          --------  ---
+MX      mail                      feedback-smtp.us-east-1.amazonses.com         10        1 hour
+TXT     mail                      v=spf1 include:amazonses.com ~all             -         1 hour
+TXT     resend._domainkey.mail    p=MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKB...   -         1 hour
+TXT     _dmarc.mail               v=DMARC1; p=none; rua=mailto:dmarc@...        -         1 hour
+```
+
+**GoDaddy-Specific Notes:**
+- Records are active immediately after saving
+- No need to restart DNS servers or click "Publish Changes"
+- TTL of 1 hour means caching servers will refresh hourly
+- You can edit or delete records anytime by clicking the icons in the Actions column
 
 ---
 
