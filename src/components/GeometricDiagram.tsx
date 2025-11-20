@@ -4,10 +4,13 @@
  * @fileOverview SVG renderer for geometric command diagrams.
  *
  * Parses and renders geometric commands (e.g., "A=(0,0)", "Triangle(A,B,C)", "Circle(O,5)").
+ * Supports LaTeX labels and semantic markers (right angles, tick marks, etc.).
  * No interactivity - just clean, static rendering.
  */
 
 import React from 'react';
+import { InlineMath } from 'react-katex';
+import 'katex/dist/katex.min.css';
 import type { GeometricDiagram } from '@/lib/geometric-schema';
 
 interface GeometricDiagramProps {
@@ -69,6 +72,7 @@ export function GeometricDiagram({ diagram, className }: GeometricDiagramProps) 
 
   const viewBox = `0 0 ${width} ${height}`;
   console.log(`[GeometricDiagram] Rendering diagram with ${commands.length} commands`);
+  console.log(`[GeometricDiagram] Commands:`, commands);
 
   // Map to store defined points
   const points: Record<string, Point> = {};
@@ -252,24 +256,211 @@ export function GeometricDiagram({ diagram, className }: GeometricDiagramProps) 
     }
 
     // Label: Label(A,"text") or Label(Midpoint(A,B),"text")
-    const labelMatch = trimmed.match(/^Label\(([^,]+),"([^"]+)"\)$/);
+    // Use a more flexible pattern that handles nested function calls
+    const labelMatch = trimmed.match(/^Label\((.+?),"([^"]+)"\)$/);
     if (labelMatch) {
       const position = getPoint(labelMatch[1].trim());
       const text = labelMatch[2];
-      elements.push(
-        <text
-          key={`label-${elementIndex++}`}
-          x={position.x}
-          y={position.y}
-          fill="black"
-          fontSize={14}
-          textAnchor="middle"
-          dominantBaseline="middle"
-        >
-          {text}
-        </text>
-      );
+
+      // Check if text contains LaTeX (wrapped in $...$)
+      const hasLatex = text.includes('$');
+
+      if (hasLatex) {
+        // For LaTeX labels, use foreignObject with better sizing
+        const parts = text.split(/(\$[^$]+\$)/g);
+        elements.push(
+          <foreignObject
+            key={`label-${elementIndex++}`}
+            x={position.x - 50}
+            y={position.y - 15}
+            width={100}
+            height={30}
+            style={{ overflow: 'visible', pointerEvents: 'none' }}
+          >
+            <div style={{
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'center',
+              fontSize: '14px',
+              textAlign: 'center',
+              width: '100%',
+              height: '100%'
+            }}>
+              {parts.map((part, i) => {
+                if (part.startsWith('$') && part.endsWith('$')) {
+                  const latex = part.slice(1, -1);
+                  return <InlineMath key={i} math={latex} />;
+                } else if (part) {
+                  return <span key={i}>{part}</span>;
+                }
+                return null;
+              })}
+            </div>
+          </foreignObject>
+        );
+      } else {
+        // Plain text label - always render these
+        elements.push(
+          <text
+            key={`label-${elementIndex++}`}
+            x={position.x}
+            y={position.y}
+            fill="black"
+            fontSize={14}
+            textAnchor="middle"
+            dominantBaseline="middle"
+            fontFamily="Arial, sans-serif"
+          >
+            {text}
+          </text>
+        );
+      }
       continue;
+    }
+
+    // Log unmatched commands for debugging
+    console.warn(`[GeometricDiagram] Unmatched command: ${trimmed}`);
+  }
+
+  // Render semantic markers after all commands are parsed
+  const semanticMarkers: JSX.Element[] = [];
+
+  if (diagram.semanticInfo) {
+    // Right angle markers (small squares at vertices)
+    if (diagram.semanticInfo.rightAngleMarkers) {
+      for (const pointName of diagram.semanticInfo.rightAngleMarkers) {
+        if (points[pointName]) {
+          const p = points[pointName];
+          const size = 12; // Size of right angle square
+          semanticMarkers.push(
+            <rect
+              key={`right-angle-${pointName}`}
+              x={p.x - size/2}
+              y={p.y - size/2}
+              width={size}
+              height={size}
+              fill="none"
+              stroke="black"
+              strokeWidth={1.5}
+            />
+          );
+        }
+      }
+    }
+
+    // Equal segment markers (tick marks)
+    if (diagram.semanticInfo.equalSegmentGroups) {
+      for (const group of diagram.semanticInfo.equalSegmentGroups) {
+        for (const segmentRef of group.segments) {
+          // Parse segment reference like "Segment(A,B)"
+          const segMatch = segmentRef.match(/^Segment\(([^,]+),([^)]+)\)$/);
+          if (segMatch) {
+            const p1 = getPoint(segMatch[1].trim());
+            const p2 = getPoint(segMatch[2].trim());
+            const mid = { x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 };
+
+            // Calculate perpendicular direction
+            const dx = p2.x - p1.x;
+            const dy = p2.y - p1.y;
+            const len = Math.sqrt(dx * dx + dy * dy);
+            const perpX = -dy / len;
+            const perpY = dx / len;
+
+            // Draw tick marks
+            const tickLength = 8;
+            const tickSpacing = 4;
+            for (let i = 0; i < group.marks; i++) {
+              const offset = (i - (group.marks - 1) / 2) * tickSpacing;
+              const baseX = mid.x + offset * dx / len;
+              const baseY = mid.y + offset * dy / len;
+
+              semanticMarkers.push(
+                <line
+                  key={`tick-${segmentRef}-${i}`}
+                  x1={baseX - perpX * tickLength}
+                  y1={baseY - perpY * tickLength}
+                  x2={baseX + perpX * tickLength}
+                  y2={baseY + perpY * tickLength}
+                  stroke="black"
+                  strokeWidth={1.5}
+                />
+              );
+            }
+          }
+        }
+      }
+    }
+
+    // Equal angle markers (arcs at vertices)
+    if (diagram.semanticInfo.equalAngleGroups) {
+      for (const group of diagram.semanticInfo.equalAngleGroups) {
+        for (const vertex of group.angles) {
+          if (points[vertex]) {
+            const p = points[vertex];
+            const arcRadius = 15;
+
+            // Draw arc marks
+            for (let i = 0; i < group.marks; i++) {
+              const r = arcRadius + i * 4;
+              semanticMarkers.push(
+                <circle
+                  key={`angle-arc-${vertex}-${i}`}
+                  cx={p.x}
+                  cy={p.y}
+                  r={r}
+                  fill="none"
+                  stroke="black"
+                  strokeWidth={1}
+                  opacity={0.6}
+                />
+              );
+            }
+          }
+        }
+      }
+    }
+
+    // Parallel line markers (arrows)
+    if (diagram.semanticInfo.parallelGroups) {
+      for (const group of diagram.semanticInfo.parallelGroups) {
+        for (const lineRef of group.lines) {
+          // Parse line reference like "Line(A,B)"
+          const lineMatch = lineRef.match(/^(Line|Segment)\(([^,]+),([^)]+)\)$/);
+          if (lineMatch) {
+            const p1 = getPoint(lineMatch[2].trim());
+            const p2 = getPoint(lineMatch[3].trim());
+            const mid = { x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 };
+
+            // Calculate direction
+            const dx = p2.x - p1.x;
+            const dy = p2.y - p1.y;
+            const len = Math.sqrt(dx * dx + dy * dy);
+            const dirX = dx / len;
+            const dirY = dy / len;
+
+            // Draw arrow marks
+            const arrowSize = 6;
+            const arrowSpacing = 8;
+            for (let i = 0; i < group.marks; i++) {
+              const offset = (i - (group.marks - 1) / 2) * arrowSpacing;
+              const baseX = mid.x + offset * dirX;
+              const baseY = mid.y + offset * dirY;
+
+              semanticMarkers.push(
+                <path
+                  key={`arrow-${lineRef}-${i}`}
+                  d={`M ${baseX - dirX * arrowSize} ${baseY - dirY * arrowSize}
+                      L ${baseX} ${baseY}
+                      L ${baseX - dirY * arrowSize} ${baseY + dirX * arrowSize}`}
+                  fill="none"
+                  stroke="black"
+                  strokeWidth={1.5}
+                />
+              );
+            }
+          }
+        }
+      }
     }
   }
 
@@ -280,6 +471,7 @@ export function GeometricDiagram({ diagram, className }: GeometricDiagramProps) 
       style={{ maxWidth: '100%', height: 'auto' }}
     >
       {elements}
+      {semanticMarkers}
     </svg>
   );
 }

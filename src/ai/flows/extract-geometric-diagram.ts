@@ -13,12 +13,22 @@ import { genkit } from 'genkit';
 import { googleAI } from '@genkit-ai/google-genai';
 import { z } from 'genkit';
 import { geminiApiKeyManager } from '@root/gemini-api-key-manager';
-import type { GeometricDiagram } from '@/lib/geometric-schema';
+import type { GeometricDiagram, GeometricConstraint, DiagramSemanticInfo } from '@/lib/geometric-schema';
+
+// Simplified schema for Gemini API compatibility
+// Using arrays of strings to avoid complex nested structures
+const DiagramMetadataSchema = z.object({
+  description: z.string().optional().describe('High-level description of the diagram'),
+  relationships: z.array(z.string()).optional().describe('Geometric relationships that are important'),
+  variableElements: z.array(z.string()).optional().describe('Elements that can be changed in variants'),
+  constraints: z.array(z.string()).optional().describe('Constraints that must be preserved'),
+});
 
 const GeometricDiagramSchema = z.object({
   width: z.number().describe('Canvas width in coordinate units'),
   height: z.number().describe('Canvas height in coordinate units'),
   commands: z.array(z.string()).describe('Array of geometric command strings'),
+  metadata: DiagramMetadataSchema.optional().describe('Semantic metadata about geometric relationships'),
 });
 
 const ExtractGeometricDiagramInputSchema = z.object({
@@ -81,8 +91,8 @@ Circles and Arcs:
 Labels and Text:
   Label(A,"Point A")
   Label(Midpoint(A,B),"5cm")
-  Label(O,"Origin")
-  // Use plain text only, NO LaTeX
+  Label(O,"$\\theta$")  // LaTeX supported! Wrap in $...$
+  // LaTeX examples: $\\theta$, $\\pi$, $\\frac{1}{2}$, $\\sqrt{2}$, $x_1$, $\\angle ABC$
 
 Helper Functions:
   Midpoint(A,B)         // Returns point halfway between A and B
@@ -97,25 +107,76 @@ EXTRACTION GUIDELINES:
 1. Start by defining all key points
 2. Then draw shapes, lines, circles, arcs
 3. Finally add labels and text annotations
-4. ONLY extract mathematically/scientifically relevant diagrams
-5. IGNORE decorative images, logos, or irrelevant graphics
-6. If no relevant diagram exists, return hasDiagram: false
-7. Be precise with coordinates, angles, and measurements
+4. Use LaTeX notation for mathematical symbols in labels
+5. ONLY extract mathematically/scientifically relevant diagrams
+6. IGNORE decorative images, logos, or irrelevant graphics
+7. If no relevant diagram exists, return hasDiagram: false
+8. Be precise with coordinates, angles, and measurements
+
+METADATA - DESCRIBE THE DIAGRAM SEMANTICALLY:
+After extracting commands, provide metadata describing the geometric meaning:
+
+metadata.description: One sentence describing what the diagram shows
+  Example: "A right triangle ABC with angle B = 90°"
+  Example: "Triangle PQR inscribed in a circle with PQ as diameter"
+
+metadata.relationships: List important geometric relationships you observe
+  Example: "PQ is the diameter of the circle"
+  Example: "Angle PRQ = 90° because it's inscribed in a semicircle"
+  Example: "AB is perpendicular to BC (right angle at B)"
+  Example: "Segments AB and BC have equal length (both 5cm)"
+
+metadata.variableElements: List what can be changed in variants
+  Example: "PQ diameter length can change (currently 22cm)"
+  Example: "Angle QPR can change (currently 35°)"
+  Example: "Side lengths can scale proportionally"
+
+metadata.constraints: List what MUST be preserved in variants
+  Example: "Angle PRQ must remain 90°"
+  Example: "PQ must remain the diameter"
+  Example: "AB must stay perpendicular to BC"
+  Example: "Triangle must remain inscribed in circle"
 
 EXAMPLE:
 For a right triangle with labeled vertices and sides:
-[
-  "A=(50,200)",
-  "B=(250,200)",
-  "C=(250,50)",
-  "Triangle(A,B,C)",
-  "Label(A,\"A\")",
-  "Label(B,\"B\")",
-  "Label(C,\"C\")",
-  "Label(Midpoint(A,B),\"6cm\")",
-  "Label(Midpoint(B,C),\"4cm\")",
-  "Label(Midpoint(C,A),\"7.2cm\")"
-]
+{
+  "width": 400,
+  "height": 300,
+  "commands": [
+    "A=(50,200)",
+    "B=(250,200)",
+    "C=(250,50)",
+    "Triangle(A,B,C)",
+    "Label(A,\"A\")",
+    "Label(B,\"B\")",
+    "Label(C,\"C\")",
+    "Label(Midpoint(A,B),\"6cm\")",
+    "Label(Midpoint(B,C),\"4cm\")",
+    "Label(Midpoint(C,A),\"$\\\\sqrt{52}$ cm\")"
+  ],
+  "metadata": {
+    "description": "Right triangle ABC with right angle at B",
+    "relationships": [
+      "AB is horizontal (base)",
+      "BC is vertical (height)",
+      "AB and BC are perpendicular (right angle at B)",
+      "AB length is 6cm",
+      "BC length is 4cm",
+      "AC (hypotenuse) length is √52 cm by Pythagoras"
+    ],
+    "variableElements": [
+      "AB length can change (currently 6cm)",
+      "BC length can change (currently 4cm)",
+      "Overall scale can change"
+    ],
+    "constraints": [
+      "AB must remain horizontal",
+      "BC must remain vertical",
+      "AB and BC must stay perpendicular (right angle at B)",
+      "AC length must equal √(AB² + BC²)"
+    ]
+  }
+}
 
 Question text:
 {{questionText}}
@@ -123,7 +184,7 @@ Question text:
 Exam paper (containing the question and any diagrams):
 {{media url=examPaperDataUri}}
 
-Analyze this question. If it contains a mathematically/scientifically relevant diagram, extract it as geometric commands. If no relevant diagram exists, return hasDiagram: false.`,
+Analyze this question. Extract diagram with commands AND metadata describing geometric relationships. If no relevant diagram exists, return hasDiagram: false.`,
       });
 
       const flow = aiInstance.defineFlow(

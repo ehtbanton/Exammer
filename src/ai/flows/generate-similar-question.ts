@@ -9,12 +9,22 @@
 
 import {z} from 'genkit';
 import {executeWithManagedKey} from '@/ai/genkit';
-import type {GeometricDiagram} from '@/lib/geometric-schema';
+import type {GeometricDiagram, GeometricConstraint, DiagramSemanticInfo} from '@/lib/geometric-schema';
+
+// Simplified schema for Gemini API compatibility
+// Using arrays of strings to avoid complex nested structures
+const DiagramMetadataSchema = z.object({
+  description: z.string().optional(),
+  relationships: z.array(z.string()).optional(),
+  variableElements: z.array(z.string()).optional(),
+  constraints: z.array(z.string()).optional(),
+});
 
 const GeometricDiagramSchema = z.object({
   width: z.number(),
   height: z.number(),
   commands: z.array(z.string()),
+  metadata: DiagramMetadataSchema.optional(),
 });
 
 const GenerateSimilarQuestionInputSchema = z.object({
@@ -61,14 +71,19 @@ Command types:
 - Shapes: Triangle(A,B,C), Rectangle(A,B,C,D), Polygon(...)
 - Circles: Circle(O,50) [center, radius]
 - Arcs: Arc(O,50,0,90) [center, radius, start°, end°]
-- Labels: Label(A,"text"), Label(Midpoint(A,B),"5cm")
+- Labels: Label(A,"text"), Label(Midpoint(A,B),"5cm"), Label(O,"$\\theta$") [LaTeX supported!]
 
 When modifying diagrams:
-1. Update point coordinates to create different dimensions
-2. Change measurements in labels to match new values
-3. Maintain the same structure and relationships
-4. Keep canvas dimensions appropriate
-5. Ensure diagram measurements match question text
+1. READ THE METADATA CAREFULLY - it tells you what can and cannot change
+2. PRESERVE all constraints listed in metadata (these are geometric truths)
+3. Only modify variableElements listed in metadata (safe to change)
+4. Maintain all geometric relationships described in metadata
+5. Update point coordinates to match new values while preserving constraints
+6. Change measurements in labels to match new values
+7. Keep canvas dimensions appropriate
+8. Ensure diagram measurements match question text
+9. Use LaTeX for mathematical symbols: $\\theta$, $\\pi$, $\\frac{1}{2}$, $\\sqrt{2}$, etc.
+10. Include updated metadata for the variant diagram
 
 OBJECTIVE ADAPTATION:
 - If markscheme provided: adapt each objective to match variant values
@@ -90,6 +105,33 @@ Example commands from original:
 {{#each originalDiagramData.commands}}
   {{this}}
 {{/each}}
+
+{{#if originalDiagramData.metadata}}
+DIAGRAM METADATA (CRITICAL - USE THIS TO GUIDE MODIFICATIONS):
+
+Description: {{originalDiagramData.metadata.description}}
+
+{{#if originalDiagramData.metadata.relationships}}
+Geometric Relationships:
+{{#each originalDiagramData.metadata.relationships}}
+  - {{this}}
+{{/each}}
+{{/if}}
+
+{{#if originalDiagramData.metadata.variableElements}}
+What CAN Change (safe to modify):
+{{#each originalDiagramData.metadata.variableElements}}
+  - {{this}}
+{{/each}}
+{{/if}}
+
+{{#if originalDiagramData.metadata.constraints}}
+What MUST BE PRESERVED (do not break these):
+{{#each originalDiagramData.metadata.constraints}}
+  - {{this}}
+{{/each}}
+{{/if}}
+{{/if}}
 {{/if}}
 
 {{#if originalObjectives}}
@@ -102,8 +144,10 @@ Original Objectives:
 Generate a similar question that:
 1. Tests the same concepts with different values/context
 2. Maintains the same structure and difficulty
-3. {{#if originalDiagramData}}Modifies diagram commands to match new values{{/if}}
-4. {{#if originalObjectives}}Adapts objectives to match the variant{{else}}Creates appropriate marking objectives{{/if}}`,
+3. {{#if originalDiagramData}}{{#if originalDiagramData.metadata}}Modifies diagram while PRESERVING all constraints from metadata{{else}}Modifies diagram commands to match new values{{/if}}{{/if}}
+4. {{#if originalObjectives}}Adapts objectives to match the variant{{else}}Creates appropriate marking objectives{{/if}}
+5. Uses LaTeX notation in diagram labels for mathematical symbols
+6. {{#if originalDiagramData.metadata}}Includes updated metadata describing the variant diagram's relationships and constraints{{/if}}`,
     });
 
     const response = await prompt(flowInput, {
