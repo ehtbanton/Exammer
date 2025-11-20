@@ -139,11 +139,19 @@ CRITICAL INSTRUCTIONS - READ CAREFULLY:
       - <50: Uncertain, question could fit multiple topics
    f) Explain your reasoning in 1-2 sentences (why this topic based on content)
 
+   CRITICAL CONSTRAINT - PAPER TYPE CONSISTENCY:
+   - Once you determine the paper type (step 1), ALL questions MUST be categorized into topics that BELONG to that paper type
+   - Each paper type has its own set of topics listed under it in the "PAPER TYPES" section above
+   - DO NOT assign questions to topics from a different paper type
+   - For example, if you determine this is "Paper Type 1", you can ONLY use topic indices listed under Paper Type 1
+   - If a question doesn't fit any topics in the identified paper type well, choose the CLOSEST match within that paper type and use a lower confidence score
+
    IMPORTANT:
    - DO NOT use fuzzy string matching or name similarity
    - DO NOT guess based on question wording alone
    - ALWAYS refer back to the topic description
    - If a question spans multiple topics, choose the PRIMARY topic
+   - ALWAYS ensure the chosen topic belongs to the identified paper type
 
 3. QUESTION NUMBER IDENTIFICATION
 
@@ -216,6 +224,7 @@ VALIDATION REQUIREMENTS:
 Before generating output, verify the following:
 - Paper type index is within valid range (0 to {{paperTypes.length}} - 1)
 - All topic indices are within valid range (0 to {{topics.length}} - 1)
+- CRITICAL: All topic indices belong to the identified paper type (check the topic lists under each paper type above)
 - Question numbers are sequential without gaps (1, 2, 3, 4...)
 - Total question count is within expected range (typically 5-15 questions)
 - Each question has substantial content (not just a number)
@@ -223,7 +232,8 @@ Before generating output, verify the following:
 - All confidence scores are between 0 and 100
 - Categorization reasoning explains the content match, not just restates the topic name
 
-REMEMBER: Use CONTENT ANALYSIS, not string matching or header text matching!`,
+REMEMBER: Use CONTENT ANALYSIS, not string matching or header text matching!
+REMEMBER: Topics must belong to the identified paper type!`,
       });
 
       const flow = aiInstance.defineFlow(

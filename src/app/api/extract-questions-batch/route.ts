@@ -71,15 +71,23 @@ export async function POST(req: NextRequest) {
       })
     }));
 
-    // Create a flat array of all topics with global indices
+    // Create a flat array of all topics with global indices AND paper type ownership
     const allTopicsFlat = paperTypes.flatMap((pt, ptIndex) => {
       const topicsBeforeThisPaperType = paperTypes.slice(0, ptIndex).reduce((acc, prevPt) => acc + prevPt.topics.length, 0);
       return pt.topics.map((t, tIndex) => ({
         index: topicsBeforeThisPaperType + tIndex,
         id: t.id,
         name: t.name,
-        description: t.description
+        description: t.description,
+        paperTypeIndex: ptIndex // Track which paper type this topic belongs to
       }));
+    });
+
+    // Build a map of valid topic indices for each paper type
+    const topicIndicesByPaperType = new Map<number, number[]>();
+    paperTypesWithIndices.forEach((pt, ptIndex) => {
+      const topicIndices = pt.topics.map(t => t.index);
+      topicIndicesByPaperType.set(ptIndex, topicIndices);
     });
 
     // Step 1: Process papers and markschemes in parallel
@@ -258,6 +266,7 @@ export async function POST(req: NextRequest) {
     const questionsToSave: QuestionToSave[] = [];
     const unmatchedQuestions: any[] = [];
     const unmatchedSolutions: any[] = [];
+    let paperTypeMismatchCount = 0; // Track how many questions had topic/paper type mismatches
 
     // Process all questions using index-based approach (NO fuzzy matching)
     for (const paperResult of successfulPapers) {
@@ -290,7 +299,7 @@ export async function POST(req: NextRequest) {
         }
 
         // Get topic index directly from AI output (NO fuzzy matching)
-        const topicIndex = question.topicIndex;
+        let topicIndex = question.topicIndex;
 
         // Validate topic index
         if (topicIndex < 0 || topicIndex >= allTopicsFlat.length) {
@@ -299,7 +308,44 @@ export async function POST(req: NextRequest) {
         }
 
         // Get topic from flat array using index
-        const topic = allTopicsFlat[topicIndex];
+        let topic = allTopicsFlat[topicIndex];
+
+        // CRITICAL VALIDATION: Ensure the topic belongs to the identified paper type
+        // This prevents questions from being categorized into topics of wrong paper types
+        const validTopicIndices = topicIndicesByPaperType.get(paperTypeIndex) || [];
+        if (!validTopicIndices.includes(topicIndex)) {
+          // Topic belongs to a different paper type than the identified paper type
+          const actualPaperTypeName = paperTypes[topic.paperTypeIndex]?.name || `Type ${topic.paperTypeIndex}`;
+          const expectedPaperTypeName = paperTypes[paperTypeIndex]?.name || `Type ${paperTypeIndex}`;
+
+          console.warn(`[Processing] ⚠ PAPER TYPE MISMATCH: Paper "${paperName}" Q${questionNumber}`);
+          console.warn(`[Processing]   - Paper identified as: "${expectedPaperTypeName}" (index ${paperTypeIndex})`);
+          console.warn(`[Processing]   - Topic "${topic.name}" belongs to: "${actualPaperTypeName}" (index ${topic.paperTypeIndex})`);
+          console.warn(`[Processing]   - Original topic index: ${topicIndex}, Valid indices for paper type: [${validTopicIndices.join(', ')}]`);
+
+          paperTypeMismatchCount++;
+
+          // Attempt to find a better topic within the correct paper type
+          // Use the first topic of the correct paper type as fallback
+          if (validTopicIndices.length > 0) {
+            const fallbackTopicIndex = validTopicIndices[0];
+            const fallbackTopic = allTopicsFlat[fallbackTopicIndex];
+
+            console.warn(`[Processing]   - CORRECTING: Reassigning to first topic of correct paper type: "${fallbackTopic.name}" (index ${fallbackTopicIndex})`);
+
+            // Update to use the correct paper type's topic
+            topicIndex = fallbackTopicIndex;
+            topic = fallbackTopic;
+
+            // Override confidence to indicate this was a corrected categorization
+            question.categorizationConfidence = Math.min(question.categorizationConfidence, 40);
+            question.categorizationReasoning = `AUTO-CORRECTED: Original topic "${allTopicsFlat[question.topicIndex].name}" belongs to wrong paper type. ${question.categorizationReasoning}`;
+          } else {
+            console.warn(`[Processing]   - SKIPPING: No valid topics found for paper type ${paperTypeIndex}`);
+            continue;
+          }
+        }
+
         const topicId = topic.id;
         const topicName = topic.name;
 
@@ -388,7 +434,7 @@ export async function POST(req: NextRequest) {
     const questionsWithSolutions = questionsToSave.filter(q => q.solutionObjectives).length;
     const questionsWithoutSolutions = questionsToSave.filter(q => !q.solutionObjectives).length;
     const lowConfidenceCount = questionsToSave.filter(q => q.categorizationConfidence < 70).length;
-    console.log(`[Batch Extraction] Processing complete: ${questionsToSave.length} questions total (${questionsWithSolutions} with solutions, ${questionsWithoutSolutions} without), ${lowConfidenceCount} low confidence (<70%), ${unmatchedSolutions.length} unmatched solutions`);
+    console.log(`[Batch Extraction] Processing complete: ${questionsToSave.length} questions total (${questionsWithSolutions} with solutions, ${questionsWithoutSolutions} without), ${lowConfidenceCount} low confidence (<70%), ${paperTypeMismatchCount} paper type mismatches corrected, ${unmatchedSolutions.length} unmatched solutions`);
 
     // Step 3: Save all questions to database
     console.log(`[Batch Extraction] Step 3: Saving ${questionsToSave.length} questions to database...`);
@@ -434,6 +480,7 @@ export async function POST(req: NextRequest) {
     console.log(`[Batch Extraction] Questions with solutions: ${questionsWithSolutions}`);
     console.log(`[Batch Extraction] Questions without solutions: ${questionsWithoutSolutions}`);
     console.log(`[Batch Extraction] Low confidence questions (<70%): ${lowConfidenceCount}`);
+    console.log(`[Batch Extraction] Paper type mismatches corrected: ${paperTypeMismatchCount}`);
     console.log(`[Batch Extraction] Unmatched solutions: ${unmatchedSolutions.length}`);
 
     if (failedPapers.length > 0) {
@@ -472,6 +519,7 @@ export async function POST(req: NextRequest) {
       questionsWithSolutions,
       questionsWithoutSolutions,
       lowConfidenceQuestions: lowConfidenceCount,
+      paperTypeMismatchesCorrected: paperTypeMismatchCount,
       unmatchedSolutions: unmatchedSolutions.length,
       failedPapers,
       failedMarkschemes
