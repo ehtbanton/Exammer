@@ -1,63 +1,23 @@
 /**
- * @fileOverview Custom geometric schema for representing diagrams as simple primitives.
+ * @fileOverview Geometric Commands schema for representing diagrams.
  *
- * This schema allows any diagram to be represented using:
- * - Lines (straight segments between two points)
- * - Arcs (curved segments defined by center, radius, start/end angles)
- * - Text (positioned labels and annotations)
+ * This schema represents diagrams as a sequence of declarative commands,
+ * similar to GeoGebra but simplified. Commands are string-based for conciseness
+ * and AI-friendliness.
  *
- * Entities are organized into labeled groups for semantic understanding and modification.
+ * Command Types:
+ * - Points: A=(0,0), B=(3,4)
+ * - Lines: Line(A,B), Segment(A,B)
+ * - Shapes: Triangle(A,B,C), Rectangle(A,B,C,D), Polygon(A,B,C,...)
+ * - Circles: Circle(O,5) [center point, radius]
+ * - Arcs: Arc(O,5,0,90) [center, radius, start degrees, end degrees]
+ * - Labels: Label(A,"text"), Label(Midpoint(A,B),"5cm")
+ *
+ * Points can be referenced across commands, reducing duplication and improving clarity.
  */
-
-export interface Point {
-  x: number;
-  y: number;
-}
-
-export interface LineEntity {
-  type: 'line';
-  from: Point;
-  to: Point;
-  style?: {
-    color?: string;
-    width?: number;
-    dashed?: boolean;
-  };
-}
-
-export interface ArcEntity {
-  type: 'arc';
-  center: Point;
-  radius: number;
-  startAngle: number; // degrees, 0 = right, counterclockwise
-  endAngle: number;   // degrees
-  style?: {
-    color?: string;
-    width?: number;
-    dashed?: boolean;
-  };
-}
-
-export interface TextEntity {
-  type: 'text';
-  position: Point;
-  content: string; // Plain text only
-  style?: {
-    color?: string;
-    size?: number;
-    align?: 'left' | 'center' | 'right';
-  };
-}
-
-export type GeometricEntity = LineEntity | ArcEntity | TextEntity;
-
-export interface EntityGroup {
-  label: string; // Detailed description, e.g., "right triangle ABC with labeled vertices"
-  entities: GeometricEntity[];
-}
 
 export interface GeometricDiagram {
   width: number;  // Canvas width
   height: number; // Canvas height
-  groups: EntityGroup[];
+  commands: string[]; // Array of command strings
 }

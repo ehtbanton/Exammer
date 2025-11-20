@@ -4,57 +4,17 @@
  * @fileOverview Generates a similar question variant with modified geometric diagrams.
  *
  * - generateSimilarQuestion - Creates a new question similar in structure and content
- * - Modifies geometric diagrams using our custom schema
+ * - Modifies geometric diagrams using command-based schema
  */
 
 import {z} from 'genkit';
 import {executeWithManagedKey} from '@/ai/genkit';
 import type {GeometricDiagram} from '@/lib/geometric-schema';
 
-// Import geometric schema as Zod schema
-const PointSchema = z.object({
-  x: z.number(),
-  y: z.number(),
-});
-
-const StyleSchema = z.object({
-  color: z.string().optional(),
-  width: z.number().optional(),
-  dashed: z.boolean().optional(),
-});
-
-const TextStyleSchema = z.object({
-  color: z.string().optional(),
-  size: z.number().optional(),
-  align: z.enum(['left', 'center', 'right']).optional(),
-});
-
-const GeometricEntitySchema = z.object({
-  type: z.enum(['line', 'arc', 'text']),
-  // Line fields (only used when type='line')
-  from: PointSchema.optional(),
-  to: PointSchema.optional(),
-  // Arc fields (only used when type='arc')
-  center: PointSchema.optional(),
-  radius: z.number().optional(),
-  startAngle: z.number().optional(),
-  endAngle: z.number().optional(),
-  // Text fields (only used when type='text')
-  position: PointSchema.optional(),
-  content: z.string().optional(),
-  // Common style field
-  style: z.union([StyleSchema, TextStyleSchema]).optional(),
-});
-
-const EntityGroupSchema = z.object({
-  label: z.string(),
-  entities: z.array(GeometricEntitySchema),
-});
-
 const GeometricDiagramSchema = z.object({
   width: z.number(),
   height: z.number(),
-  groups: z.array(EntityGroupSchema),
+  commands: z.array(z.string()),
 });
 
 const GenerateSimilarQuestionInputSchema = z.object({
@@ -62,7 +22,7 @@ const GenerateSimilarQuestionInputSchema = z.object({
   topicName: z.string(),
   topicDescription: z.string(),
   originalObjectives: z.array(z.string()).optional(),
-  originalDiagramData: GeometricDiagramSchema.optional().describe('Original diagram as geometric primitives (lines, arcs, text)'),
+  originalDiagramData: GeometricDiagramSchema.optional().describe('Original diagram as geometric commands'),
 });
 export type GenerateSimilarQuestionInput = z.infer<typeof GenerateSimilarQuestionInputSchema>;
 
@@ -93,19 +53,22 @@ export async function generateSimilarQuestion(
       prompt: `You are an exam question generator. Create variant questions that test the same concepts with different values/contexts.
 
 GEOMETRIC DIAGRAM MODIFICATION:
-When modifying diagrams, you work with three primitives:
-- Line entities: type='line', from={x,y}, to={x,y}, optional style
-- Arc entities: type='arc', center={x,y}, radius, startAngle, endAngle (degrees, 0°=right, counterclockwise), optional style
-- Text entities: type='text', position={x,y}, content (plain text), optional style
+Diagrams are represented as geometric commands. When modifying, change coordinates, measurements, and labels to match your variant.
 
-Entity groups have descriptive labels explaining their purpose. Use these labels to understand what to modify and how.
+Command types:
+- Points: A=(0,0), B=(100,50)
+- Lines: Line(A,B), Segment(A,B)
+- Shapes: Triangle(A,B,C), Rectangle(A,B,C,D), Polygon(...)
+- Circles: Circle(O,50) [center, radius]
+- Arcs: Arc(O,50,0,90) [center, radius, start°, end°]
+- Labels: Label(A,"text"), Label(Midpoint(A,B),"5cm")
 
-MODIFICATION RULES:
-1. Change specific values, measurements, coordinates to match your variant
-2. Maintain the same structure and relationships between entities
-3. Update entity group labels if the context changes
-4. Keep canvas dimensions appropriate for the modified diagram
-5. Ensure all measurements in diagrams match the question text
+When modifying diagrams:
+1. Update point coordinates to create different dimensions
+2. Change measurements in labels to match new values
+3. Maintain the same structure and relationships
+4. Keep canvas dimensions appropriate
+5. Ensure diagram measurements match question text
 
 OBJECTIVE ADAPTATION:
 - If markscheme provided: adapt each objective to match variant values
@@ -122,8 +85,11 @@ Original Question:
 {{#if originalDiagramData}}
 Original Diagram:
 Canvas: {{originalDiagramData.width}}x{{originalDiagramData.height}}
-Groups: {{originalDiagramData.groups.length}} entity groups
-(Note: Modify coordinates, measurements, and labels to match your variant)
+Commands: {{originalDiagramData.commands.length}} geometric commands
+Example commands from original:
+{{#each originalDiagramData.commands}}
+  {{this}}
+{{/each}}
 {{/if}}
 
 {{#if originalObjectives}}
@@ -136,7 +102,7 @@ Original Objectives:
 Generate a similar question that:
 1. Tests the same concepts with different values/context
 2. Maintains the same structure and difficulty
-3. {{#if originalDiagramData}}Updates diagram coordinates, measurements, and labels to match new values{{/if}}
+3. {{#if originalDiagramData}}Modifies diagram commands to match new values{{/if}}
 4. {{#if originalObjectives}}Adapts objectives to match the variant{{else}}Creates appropriate marking objectives{{/if}}`,
     });
 

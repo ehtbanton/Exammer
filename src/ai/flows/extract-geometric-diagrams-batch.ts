@@ -1,12 +1,10 @@
 'use server';
 
 /**
- * @fileOverview Extracts geometric diagram representations from exam question images.
+ * @fileOverview Batch extraction of geometric diagrams from multiple questions in a single API call.
  *
- * - extractGeometricDiagram - Analyzes a question and returns a geometric representation if diagrams are present
- * - Uses Gemini 2.5 Flash Lite for efficient extraction
- * - Only extracts mathematically/scientifically relevant diagrams
- * - Uses command-based schema similar to GeoGebra but simplified
+ * - extractGeometricDiagramsBatch - Analyzes multiple questions and returns geometric representations
+ * - Much more efficient than calling extractGeometricDiagram separately for each question
  */
 
 import { genkit } from 'genkit';
@@ -21,28 +19,39 @@ const GeometricDiagramSchema = z.object({
   commands: z.array(z.string()).describe('Array of geometric command strings'),
 });
 
-const ExtractGeometricDiagramInputSchema = z.object({
+const QuestionInputSchema = z.object({
+  questionId: z.string().describe('Unique identifier for this question'),
   questionText: z.string().describe('The complete text of the question'),
-  examPaperDataUri: z.string().describe('The exam paper PDF as a data URI containing the question'),
 });
 
-const ExtractGeometricDiagramOutputSchema = z.object({
+const QuestionDiagramResultSchema = z.object({
+  questionId: z.string().describe('The question identifier'),
   hasDiagram: z.boolean().describe('Whether the question contains a mathematically/scientifically relevant diagram'),
   diagram: GeometricDiagramSchema.optional().describe('The geometric representation if a diagram exists'),
 });
 
-export type ExtractGeometricDiagramInput = z.infer<typeof ExtractGeometricDiagramInputSchema>;
-export type ExtractGeometricDiagramOutput = z.infer<typeof ExtractGeometricDiagramOutputSchema>;
+const ExtractGeometricDiagramsBatchInputSchema = z.object({
+  questions: z.array(QuestionInputSchema).describe('Array of questions to analyze'),
+  examPaperDataUri: z.string().describe('The exam paper PDF as a data URI containing all questions'),
+});
+
+const ExtractGeometricDiagramsBatchOutputSchema = z.object({
+  results: z.array(QuestionDiagramResultSchema).describe('Array of diagram extraction results, one per question'),
+});
+
+export type ExtractGeometricDiagramsBatchInput = z.infer<typeof ExtractGeometricDiagramsBatchInputSchema>;
+export type ExtractGeometricDiagramsBatchOutput = z.infer<typeof ExtractGeometricDiagramsBatchOutputSchema>;
 
 /**
- * Extract geometric diagram representation from an exam question.
+ * Extract geometric diagram representations from multiple questions in a single API call.
  * Only extracts diagrams that are relevant to the mathematical/scientific content.
  */
-export async function extractGeometricDiagram(
-  input: ExtractGeometricDiagramInput
-): Promise<ExtractGeometricDiagramOutput> {
+export async function extractGeometricDiagramsBatch(
+  input: ExtractGeometricDiagramsBatchInput
+): Promise<ExtractGeometricDiagramsBatchOutput> {
   const startTime = Date.now();
-  console.log('[Geometric Extraction] Analyzing question for diagrams...');
+  const questionCount = input.questions.length;
+  console.log(`[Batch Geometric Extraction] Analyzing ${questionCount} questions for diagrams...`);
 
   try {
     const result = await geminiApiKeyManager.withKey(async (apiKey) => {
@@ -52,10 +61,10 @@ export async function extractGeometricDiagram(
       });
 
       const prompt = aiInstance.definePrompt({
-        name: 'extractGeometricDiagramPrompt',
-        input: { schema: ExtractGeometricDiagramInputSchema },
-        output: { schema: ExtractGeometricDiagramOutputSchema },
-        prompt: `You are a mathematical diagram analyzer. Extract geometric diagrams as a sequence of declarative commands.
+        name: 'extractGeometricDiagramsBatchPrompt',
+        input: { schema: ExtractGeometricDiagramsBatchInputSchema },
+        output: { schema: ExtractGeometricDiagramsBatchOutputSchema },
+        prompt: `You are a mathematical diagram analyzer. Extract geometric diagrams for multiple questions from an exam paper.
 
 COMMAND SYNTAX:
 
@@ -99,42 +108,46 @@ EXTRACTION GUIDELINES:
 3. Finally add labels and text annotations
 4. ONLY extract mathematically/scientifically relevant diagrams
 5. IGNORE decorative images, logos, or irrelevant graphics
-6. If no relevant diagram exists, return hasDiagram: false
+6. If a question has no relevant diagram, return hasDiagram: false for that question
 7. Be precise with coordinates, angles, and measurements
 
-EXAMPLE:
+EXAMPLE DIAGRAM:
 For a right triangle with labeled vertices and sides:
 [
   "A=(50,200)",
   "B=(250,200)",
   "C=(250,50)",
   "Triangle(A,B,C)",
-  "Label(A,\"A\")",
-  "Label(B,\"B\")",
-  "Label(C,\"C\")",
-  "Label(Midpoint(A,B),\"6cm\")",
-  "Label(Midpoint(B,C),\"4cm\")",
-  "Label(Midpoint(C,A),\"7.2cm\")"
+  "Label(A,\\"A\\")",
+  "Label(B,\\"B\\")",
+  "Label(C,\\"C\\")",
+  "Label(Midpoint(A,B),\\"6cm\\")",
+  "Label(Midpoint(B,C),\\"4cm\\")",
+  "Label(Midpoint(C,A),\\"7.2cm\\")"
 ]
 
-Question text:
+QUESTIONS TO ANALYZE:
+{{#each questions}}
+Question {{questionId}}:
 {{questionText}}
 
-Exam paper (containing the question and any diagrams):
+{{/each}}
+
+Exam paper (containing all questions and diagrams):
 {{media url=examPaperDataUri}}
 
-Analyze this question. If it contains a mathematically/scientifically relevant diagram, extract it as geometric commands. If no relevant diagram exists, return hasDiagram: false.`,
+For each question, determine if it contains a mathematically/scientifically relevant diagram. If yes, extract it as geometric commands. Return results in the same order as the questions.`,
       });
 
       const flow = aiInstance.defineFlow(
         {
-          name: 'extractGeometricDiagramFlow',
-          inputSchema: ExtractGeometricDiagramInputSchema,
-          outputSchema: ExtractGeometricDiagramOutputSchema,
+          name: 'extractGeometricDiagramsBatchFlow',
+          inputSchema: ExtractGeometricDiagramsBatchInputSchema,
+          outputSchema: ExtractGeometricDiagramsBatchOutputSchema,
         },
         async (input) => {
           const response = await prompt(input);
-          return response.output ?? { hasDiagram: false };
+          return response.output ?? { results: [] };
         }
       );
 
@@ -144,18 +157,14 @@ Analyze this question. If it contains a mathematically/scientifically relevant d
     const endTime = Date.now();
     const duration = ((endTime - startTime) / 1000).toFixed(2);
 
-    if (result.hasDiagram && result.diagram) {
-      const commandCount = result.diagram.commands.length;
-      console.log(`[Geometric Extraction] Completed in ${duration}s - Extracted diagram with ${commandCount} commands`);
-    } else {
-      console.log(`[Geometric Extraction] Completed in ${duration}s - No diagram found`);
-    }
+    const diagramCount = result.results.filter(r => r.hasDiagram).length;
+    console.log(`[Batch Geometric Extraction] Completed in ${duration}s - Extracted ${diagramCount}/${questionCount} diagrams`);
 
     return result;
   } catch (error) {
     const endTime = Date.now();
     const duration = ((endTime - startTime) / 1000).toFixed(2);
-    console.error(`[Geometric Extraction] Error after ${duration}s:`, error);
+    console.error(`[Batch Geometric Extraction] Error after ${duration}s:`, error);
     throw error;
   }
 }

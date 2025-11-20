@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth-helpers';
 import { extractPaperQuestions } from '@/ai/flows/extract-paper-questions';
 import { extractMarkschemesSolutions } from '@/ai/flows/extract-markscheme-solutions';
-import { extractGeometricDiagram } from '@/ai/flows/extract-geometric-diagram';
+import { extractGeometricDiagramsBatch } from '@/ai/flows/extract-geometric-diagrams-batch';
 import { db } from '@/lib/db';
 
 export const maxDuration = 300; // 5 minutes max for batch processing
@@ -391,48 +391,55 @@ export async function POST(req: NextRequest) {
     const lowConfidenceCount = questionsToSave.filter(q => q.categorizationConfidence < 70).length;
     console.log(`[Batch Extraction] Processing complete: ${questionsToSave.length} questions total (${questionsWithSolutions} with solutions, ${questionsWithoutSolutions} without), ${lowConfidenceCount} low confidence (<70%), ${unmatchedSolutions.length} unmatched solutions`);
 
-    // Step 2.5: Extract diagrams for all questions in parallel
+    // Step 2.5: Extract diagrams for all questions (batch by paper for efficiency)
     console.log(`[Batch Extraction] Step 2.5: Extracting diagrams for ${questionsToSave.length} questions...`);
     const diagramExtractionStart = Date.now();
 
-    // Map paper index to data URI for diagram extraction
-    const paperDataUriMap = new Map<number, string>();
-    examPapersDataUris.forEach((uri, index) => {
-      paperDataUriMap.set(index, uri);
-    });
+    // Group questions by paper index for batch extraction
+    const questionsByPaper = new Map<number, typeof questionsToSave>();
+    for (const question of questionsToSave) {
+      if (!questionsByPaper.has(question.paperIndex)) {
+        questionsByPaper.set(question.paperIndex, []);
+      }
+      questionsByPaper.get(question.paperIndex)!.push(question);
+    }
 
-    // Extract diagrams in parallel (max 5 concurrent to avoid overwhelming API)
-    const DIAGRAM_BATCH_SIZE = 5;
     let diagramsExtracted = 0;
 
-    for (let i = 0; i < questionsToSave.length; i += DIAGRAM_BATCH_SIZE) {
-      const batch = questionsToSave.slice(i, Math.min(i + DIAGRAM_BATCH_SIZE, questionsToSave.length));
+    // Extract diagrams for each paper in a single API call
+    for (const [paperIndex, paperQuestions] of questionsByPaper) {
+      try {
+        const paperDataUri = examPapersDataUris[paperIndex];
+        if (!paperDataUri) {
+          console.warn(`[Diagram Extraction] No data URI found for paper index ${paperIndex}`);
+          continue;
+        }
 
-      await Promise.all(batch.map(async (question) => {
-        try {
-          const paperDataUri = paperDataUriMap.get(question.paperIndex);
-          if (!paperDataUri) {
-            console.warn(`[Diagram Extraction] No data URI found for paper index ${question.paperIndex}`);
-            return;
-          }
+        console.log(`[Diagram Extraction] Processing paper ${paperIndex + 1} with ${paperQuestions.length} questions...`);
 
-          const diagramResult = await extractGeometricDiagram({
-            questionText: question.questionText,
-            examPaperDataUri: paperDataUri,
-          });
+        const batchResult = await extractGeometricDiagramsBatch({
+          questions: paperQuestions.map(q => ({
+            questionId: q.questionId,
+            questionText: q.questionText,
+          })),
+          examPaperDataUri: paperDataUri,
+        });
 
-          if (diagramResult.hasDiagram && diagramResult.diagram) {
-            question.diagramData = diagramResult.diagram;
+        // Map results back to questions
+        for (const result of batchResult.results) {
+          const question = paperQuestions.find(q => q.questionId === result.questionId);
+          if (question && result.hasDiagram && result.diagram) {
+            question.diagramData = result.diagram;
             diagramsExtracted++;
           }
-        } catch (error) {
-          console.error(`[Diagram Extraction] Error for question ${question.questionId}:`, error);
         }
-      }));
+      } catch (error) {
+        console.error(`[Diagram Extraction] Error for paper ${paperIndex}:`, error);
+      }
     }
 
     const diagramExtractionTime = ((Date.now() - diagramExtractionStart) / 1000).toFixed(2);
-    console.log(`[Batch Extraction] Diagram extraction complete: ${diagramsExtracted} diagrams found in ${diagramExtractionTime}s`);
+    console.log(`[Batch Extraction] Diagram extraction complete: ${diagramsExtracted} diagrams found in ${diagramExtractionTime}s (${questionsByPaper.size} API calls)`);
 
     // Step 3: Save all questions to database
     console.log(`[Batch Extraction] Step 3: Saving ${questionsToSave.length} questions to database...`);
