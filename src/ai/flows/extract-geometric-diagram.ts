@@ -127,15 +127,17 @@ metadata.relationships: List important geometric relationships you observe
   Example: "Segments AB and BC have equal length (both 5cm)"
 
 metadata.variableElements: List what can be changed in variants
-  Example: "PQ diameter length can change (currently 22cm)"
-  Example: "Angle QPR can change (currently 35°)"
-  Example: "Side lengths can scale proportionally"
+  Example: "PQ diameter length can change (currently 22cm in both question text and diagram label)"
+  Example: "Angle QPR can change (currently 35° in both question text and diagram label)"
+  Example: "BC length can change (currently 15cm - appears in question text AND Label(Midpoint(B,C), '15 cm'))"
+  IMPORTANT: If a value appears in both question text and diagram, mention BOTH locations
 
 metadata.constraints: List what MUST be preserved in variants
-  Example: "Angle PRQ must remain 90°"
+  Example: "Angle PRQ must remain 90° (appears in question text and should appear in diagram)"
   Example: "PQ must remain the diameter"
   Example: "AB must stay perpendicular to BC"
   Example: "Triangle must remain inscribed in circle"
+  Example: "If BC value changes, it must change in BOTH question text and diagram label"
 
 EXAMPLE:
 For a right triangle with labeled vertices and sides:
@@ -160,20 +162,21 @@ For a right triangle with labeled vertices and sides:
       "AB is horizontal (base)",
       "BC is vertical (height)",
       "AB and BC are perpendicular (right angle at B)",
-      "AB length is 6cm",
-      "BC length is 4cm",
-      "AC (hypotenuse) length is √52 cm by Pythagoras"
+      "AB length is 6cm (shown in both question text and Label(Midpoint(A,B), '6cm'))",
+      "BC length is 4cm (shown in both question text and Label(Midpoint(B,C), '4cm'))",
+      "AC (hypotenuse) length is √52 cm by Pythagoras (shown in Label(Midpoint(C,A), '$\\\\sqrt{52}$ cm'))"
     ],
     "variableElements": [
-      "AB length can change (currently 6cm)",
-      "BC length can change (currently 4cm)",
+      "AB length can change (currently 6cm in question text and diagram label - MUST update BOTH)",
+      "BC length can change (currently 4cm in question text and diagram label - MUST update BOTH)",
       "Overall scale can change"
     ],
     "constraints": [
       "AB must remain horizontal",
       "BC must remain vertical",
       "AB and BC must stay perpendicular (right angle at B)",
-      "AC length must equal √(AB² + BC²)"
+      "AC length must equal √(AB² + BC²)",
+      "If AB or BC changes, update the value in BOTH question text and corresponding diagram label"
     ]
   }
 }

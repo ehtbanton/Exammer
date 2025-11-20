@@ -79,11 +79,35 @@ When modifying diagrams:
 3. Only modify variableElements listed in metadata (safe to change)
 4. Maintain all geometric relationships described in metadata
 5. Update point coordinates to match new values while preserving constraints
-6. Change measurements in labels to match new values
-7. Keep canvas dimensions appropriate
-8. Ensure diagram measurements match question text
-9. Use LaTeX for mathematical symbols: $\\theta$, $\\pi$, $\\frac{1}{2}$, $\\sqrt{2}$, etc.
-10. Include updated metadata for the variant diagram
+6. Use LaTeX for mathematical symbols: $\\theta$, $\\pi$, $\\frac{1}{2}$, $\\sqrt{2}$, etc.
+7. Include updated metadata for the variant diagram
+
+CRITICAL - VALUE SYNCHRONIZATION:
+If a measurement appears in BOTH the question text AND the diagram, they MUST match exactly:
+- If question says "BC = 15 cm", the diagram label must show "15 cm" (not 12cm, not 15m, exactly 15 cm)
+- If question says "angle ABC = 40°", the diagram label must show "40°"
+- If question says "area = 1500 cm³", any area labels in diagram must show "1500 cm³"
+
+VALUE UPDATE CHECKLIST:
+1. List all measurements in the original question text (lengths, angles, areas, etc.)
+2. Decide which measurements to change for the variant
+3. Update those measurements in the question text
+4. Find the corresponding labels in diagram commands (e.g., Label(..., "15 cm"))
+5. Update those labels to match the new values EXACTLY
+6. Double-check: every measurement in question text must match its diagram label
+7. If a value changed, update it EVERYWHERE (question text, diagram labels, objectives, metadata)
+
+EXAMPLE - Correct Value Synchronization:
+
+Original Question: "angle ABC is 40°, and BC = 15 cm"
+Original Commands: ["Label(B, \"40°\")", "Label(Midpoint(B,C), \"15 cm\")"]
+
+Variant Question: "angle ABC is 35°, and BC = 12 cm"  ← Changed 40°→35°, 15cm→12cm
+Variant Commands: ["Label(B, \"35°\")", "Label(Midpoint(B,C), \"12 cm\")"]  ← MUST match!
+
+WRONG (values don't match):
+Variant Question: "angle ABC is 35°, and BC = 12 cm"
+Variant Commands: ["Label(B, \"40°\")", "Label(Midpoint(B,C), \"15 cm\")"]  ← Still has old values!
 
 OBJECTIVE ADAPTATION:
 - If markscheme provided: adapt each objective to match variant values
