@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { requireAuth } from '@/lib/auth-helpers';
-import { checkClassJoinRateLimit } from '@/lib/rate-limiter';
+import { checkClassJoinRateLimit, createRateLimitHeaders } from '@/lib/rate-limiter';
+
+const CLASS_JOIN_RATE_LIMIT = 10; // matches the limit in rate-limiter.ts
 
 export const dynamic = 'force-dynamic';
 
@@ -67,11 +69,20 @@ export async function POST(req: NextRequest) {
           [classData.id, user.id]
         );
 
-        return NextResponse.json({
-          message: 'Join request resubmitted successfully',
-          className: classData.name,
-          classId: classData.id
-        }, { status: 200 });
+        // Include rate limit headers
+        const rateLimitHeaders = createRateLimitHeaders(rateLimit, CLASS_JOIN_RATE_LIMIT);
+
+        return NextResponse.json(
+          {
+            message: 'Join request resubmitted successfully',
+            className: classData.name,
+            classId: classData.id
+          },
+          {
+            status: 200,
+            headers: rateLimitHeaders
+          }
+        );
       }
     }
 
@@ -82,11 +93,20 @@ export async function POST(req: NextRequest) {
       [classData.id, user.id]
     );
 
-    return NextResponse.json({
-      message: 'Join request submitted successfully',
-      className: classData.name,
-      classId: classData.id
-    }, { status: 201 });
+    // Include rate limit headers
+    const rateLimitHeaders = createRateLimitHeaders(rateLimit, CLASS_JOIN_RATE_LIMIT);
+
+    return NextResponse.json(
+      {
+        message: 'Join request submitted successfully',
+        className: classData.name,
+        classId: classData.id
+      },
+      {
+        status: 201,
+        headers: rateLimitHeaders
+      }
+    );
   } catch (error: any) {
     console.error('Error joining class:', error);
     return NextResponse.json({ error: error.message || 'Failed to join class' }, { status: 500 });

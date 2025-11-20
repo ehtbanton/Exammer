@@ -1,8 +1,25 @@
 import {genkit, Genkit} from 'genkit';
 import {googleAI} from '@genkit-ai/google-genai';
 import {geminiApiKeyManager} from '@root/gemini-api-key-manager';
-import {checkAITokenBudget, recordAITokenUsage} from '@/lib/rate-limiter';
+import {
+  checkAITokenBudget,
+  recordAITokenUsage,
+  reserveAITokens,
+  completeTokenReservation,
+  cancelTokenReservation,
+  logAdminBypass,
+} from '@/lib/rate-limiter';
 import {getUserWithAccessLevel} from '@/lib/auth-helpers';
+
+// Default estimated tokens for different flow types
+// These are conservative estimates to prevent race conditions
+export const ESTIMATED_TOKENS = {
+  SIMPLE_QUERY: 1000,      // Simple question/answer
+  DOCUMENT_ANALYSIS: 5000, // Analyzing documents
+  BATCH_OPERATION: 10000,  // Batch processing
+  INTERVIEW: 3000,         // Interview generation
+  SIMILAR_QUESTION: 2000,  // Generate similar questions
+} as const;
 
 // Default AI instance using the first available key
 export const ai = genkit({
@@ -37,49 +54,88 @@ interface TokenUsageContext {
  * @param flowFn - The flow function to execute
  * @param input - Input to the flow
  * @param userId - User ID for rate limiting (optional - if not provided, no rate limiting applied)
+ * @param estimatedTokens - Estimated tokens for this operation (used for pessimistic locking)
  */
 export async function executeWithManagedKey<TInput, TOutput>(
   flowFn: (ai: Genkit, input: TInput) => Promise<TOutput>,
   input: TInput,
-  userId?: string
+  userId?: string,
+  estimatedTokens: number = ESTIMATED_TOKENS.SIMPLE_QUERY
 ): Promise<TOutput> {
   // Check if user is admin (level 3) - admins bypass rate limits
   let isAdmin = false;
   if (userId) {
     const user = await getUserWithAccessLevel(userId);
     isAdmin = user?.access_level === 3;
-  }
 
-  // Check token budget before executing (if userId provided and not admin)
-  if (userId && !isAdmin) {
-    const budget = checkAITokenBudget(userId);
-    if (!budget.allowed) {
-      const retryAfter = Math.max(0, budget.resetAt - Math.floor(Date.now() / 1000));
-      const minutesUntilReset = Math.ceil(retryAfter / 60);
-      throw new Error(
-        `AI token limit exceeded. You've used ${budget.limit.toLocaleString()} tokens today. ` +
-        `Please try again in ${minutesUntilReset} minutes.`
-      );
+    if (isAdmin) {
+      // Log admin bypass for audit purposes
+      logAdminBypass(userId, 'AI_TOKEN_LIMIT', {
+        estimatedTokens,
+        flowType: 'executeWithManagedKey',
+      });
     }
   }
 
-  return geminiApiKeyManager.withKey(async (apiKey) => {
-    const aiInstance = createGenkitInstance(apiKey);
+  let reservationId: string | undefined;
 
-    // Create a wrapped AI instance that tracks token usage (still track for admins for monitoring)
-    const wrappedAi = createTokenTrackingWrapper(aiInstance, userId);
+  // Reserve tokens before executing (if userId provided and not admin)
+  if (userId && !isAdmin) {
+    const reservation = reserveAITokens(userId, estimatedTokens);
 
-    const result = await flowFn(wrappedAi, input);
+    if (!reservation.success) {
+      const retryAfter = Math.max(0, reservation.resetAt - Math.floor(Date.now() / 1000));
+      const minutesUntilReset = Math.ceil(retryAfter / 60);
+      throw new Error(
+        `AI token limit exceeded. ${reservation.error || ''} ` +
+        `Please try again in ${minutesUntilReset} minutes.`
+      );
+    }
+
+    reservationId = reservation.reservationId;
+  }
+
+  try {
+    let totalTokensUsed = 0;
+
+    const result = await geminiApiKeyManager.withKey(async (apiKey) => {
+      const aiInstance = createGenkitInstance(apiKey);
+
+      // Create a wrapped AI instance that tracks token usage
+      const wrappedAi = createTokenTrackingWrapper(aiInstance, userId, (tokens) => {
+        totalTokensUsed += tokens;
+      });
+
+      return await flowFn(wrappedAi, input);
+    });
+
+    // Complete the reservation with actual usage
+    if (reservationId) {
+      completeTokenReservation(reservationId, totalTokensUsed);
+    } else if (userId && isAdmin && totalTokensUsed > 0) {
+      // Still record admin usage for monitoring (but don't count against limit)
+      recordAITokenUsage(userId, totalTokensUsed);
+    }
 
     return result;
-  });
+  } catch (error) {
+    // Cancel reservation if execution fails
+    if (reservationId) {
+      cancelTokenReservation(reservationId);
+    }
+    throw error;
+  }
 }
 
 /**
  * Create a wrapper around Genkit that tracks token usage
  */
-function createTokenTrackingWrapper(ai: Genkit, userId?: string): Genkit {
-  if (!userId) {
+function createTokenTrackingWrapper(
+  ai: Genkit,
+  userId?: string,
+  onTokensUsed?: (tokens: number) => void
+): Genkit {
+  if (!userId && !onTokensUsed) {
     return ai; // No tracking needed
   }
 
@@ -96,7 +152,10 @@ function createTokenTrackingWrapper(ai: Genkit, userId?: string): Genkit {
       const totalTokens = inputTokens + outputTokens;
 
       if (totalTokens > 0) {
-        recordAITokenUsage(userId, totalTokens);
+        // Call the callback to track tokens
+        if (onTokensUsed) {
+          onTokensUsed(totalTokens);
+        }
       }
     }
 
@@ -118,37 +177,70 @@ function createTokenTrackingWrapper(ai: Genkit, userId?: string): Genkit {
 export async function executeWithManagedKeyAndTracking<TInput, TOutput>(
   flowFn: (ai: Genkit, input: TInput, trackTokens: (tokens: number) => void) => Promise<TOutput>,
   input: TInput,
-  userId: string
+  userId: string,
+  estimatedTokens: number = ESTIMATED_TOKENS.SIMPLE_QUERY
 ): Promise<TOutput> {
   // Check if user is admin (level 3) - admins bypass rate limits
   const user = await getUserWithAccessLevel(userId);
   const isAdmin = user?.access_level === 3;
 
-  // Check token budget before executing (unless admin)
+  if (isAdmin) {
+    // Log admin bypass for audit purposes
+    logAdminBypass(userId, 'AI_TOKEN_LIMIT', {
+      estimatedTokens,
+      flowType: 'executeWithManagedKeyAndTracking',
+    });
+  }
+
+  let reservationId: string | undefined;
+  let totalTokensUsed = 0;
+
+  // Reserve tokens before executing (unless admin)
   if (!isAdmin) {
-    const budget = checkAITokenBudget(userId);
-    if (!budget.allowed) {
-      const retryAfter = Math.max(0, budget.resetAt - Math.floor(Date.now() / 1000));
+    const reservation = reserveAITokens(userId, estimatedTokens);
+
+    if (!reservation.success) {
+      const retryAfter = Math.max(0, reservation.resetAt - Math.floor(Date.now() / 1000));
       const minutesUntilReset = Math.ceil(retryAfter / 60);
       throw new Error(
-        `AI token limit exceeded. You've used ${budget.limit.toLocaleString()} tokens today. ` +
+        `AI token limit exceeded. ${reservation.error || ''} ` +
         `Please try again in ${minutesUntilReset} minutes.`
       );
     }
+
+    reservationId = reservation.reservationId;
   }
 
-  return geminiApiKeyManager.withKey(async (apiKey) => {
-    const aiInstance = createGenkitInstance(apiKey);
+  try {
+    const result = await geminiApiKeyManager.withKey(async (apiKey) => {
+      const aiInstance = createGenkitInstance(apiKey);
 
-    // Token tracking function
-    const trackTokens = (tokens: number) => {
-      if (tokens > 0) {
-        recordAITokenUsage(userId, tokens);
-      }
-    };
+      // Token tracking function
+      const trackTokens = (tokens: number) => {
+        if (tokens > 0) {
+          totalTokensUsed += tokens;
+        }
+      };
 
-    return flowFn(aiInstance, input, trackTokens);
-  });
+      return flowFn(aiInstance, input, trackTokens);
+    });
+
+    // Complete the reservation with actual usage
+    if (reservationId) {
+      completeTokenReservation(reservationId, totalTokensUsed);
+    } else if (isAdmin && totalTokensUsed > 0) {
+      // Still record admin usage for monitoring
+      recordAITokenUsage(userId, totalTokensUsed);
+    }
+
+    return result;
+  } catch (error) {
+    // Cancel reservation if execution fails
+    if (reservationId) {
+      cancelTokenReservation(reservationId);
+    }
+    throw error;
+  }
 }
 
 // Export the manager for direct use if needed

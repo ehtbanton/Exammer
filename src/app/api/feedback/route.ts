@@ -8,7 +8,9 @@ import type {
   FeedbackWithDetails,
 } from '@/lib/types';
 import { z } from 'zod';
-import { checkFeedbackRateLimit, getClientIP } from '@/lib/rate-limiter';
+import { checkFeedbackRateLimit, getClientIP, createRateLimitHeaders } from '@/lib/rate-limiter';
+
+const FEEDBACK_RATE_LIMIT = 5; // matches the limit in rate-limiter.ts
 
 export const dynamic = 'force-dynamic';
 
@@ -113,10 +115,18 @@ export async function POST(req: NextRequest): Promise<NextResponse<CreateFeedbac
       resolvedAt: feedback.resolved_at,
     };
 
-    return NextResponse.json({
-      success: true,
-      feedback: transformedFeedback,
-    });
+    // Include rate limit headers in successful response
+    const rateLimitHeaders = createRateLimitHeaders(rateLimit, FEEDBACK_RATE_LIMIT);
+
+    return NextResponse.json(
+      {
+        success: true,
+        feedback: transformedFeedback,
+      },
+      {
+        headers: rateLimitHeaders
+      }
+    );
   } catch (error) {
     console.error('Error creating feedback:', error);
     return NextResponse.json(

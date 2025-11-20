@@ -6,6 +6,18 @@
 import Database from 'better-sqlite3';
 import path from 'path';
 
+// List of trusted proxy IPs (add your reverse proxy/load balancer IPs here)
+// For Vercel, this should include Vercel's edge network IPs
+const TRUSTED_PROXY_IPS = new Set([
+  // Add your trusted proxy IPs here
+  // e.g., '10.0.0.1', '192.168.1.1'
+  // For Vercel deployment, Vercel handles this automatically
+]);
+
+// Whether we're behind a trusted proxy (Vercel, Cloudflare, etc.)
+// Set this via environment variable in production
+const TRUST_PROXY = process.env.TRUST_PROXY === 'true' || process.env.VERCEL === '1';
+
 // Initialize SQLite database for rate limiting
 const dbPath = path.join(process.cwd(), 'db', 'rate-limits.db');
 let db: Database.Database | null = null;
@@ -310,18 +322,103 @@ export function checkAPIRateLimit(ip: string): RateLimitResult {
 }
 
 /**
+ * Validate that an IP address has a valid format
+ */
+function isValidIP(ip: string): boolean {
+  // IPv4 validation
+  const ipv4Regex = /^(\d{1,3}\.){3}\d{1,3}$/;
+  if (ipv4Regex.test(ip)) {
+    const parts = ip.split('.').map(Number);
+    return parts.every(part => part >= 0 && part <= 255);
+  }
+
+  // IPv6 validation (simplified)
+  const ipv6Regex = /^([0-9a-fA-F]{0,4}:){2,7}[0-9a-fA-F]{0,4}$/;
+  return ipv6Regex.test(ip);
+}
+
+/**
+ * Sanitize IP address to prevent injection attacks
+ */
+function sanitizeIP(ip: string): string {
+  // Remove any potentially dangerous characters
+  const sanitized = ip.trim().replace(/[^0-9a-fA-F.:]/g, '');
+
+  // Limit length to prevent DoS via long strings
+  if (sanitized.length > 45) { // Max IPv6 length
+    return sanitized.substring(0, 45);
+  }
+
+  return sanitized;
+}
+
+/**
  * Helper to get IP from Next.js request
+ * Includes security measures against IP spoofing
  */
 export function getClientIP(req: Request): string {
-  const forwarded = req.headers.get('x-forwarded-for');
-  if (forwarded) {
-    return forwarded.split(',')[0].trim();
+  // Only trust proxy headers if we're configured to do so
+  if (TRUST_PROXY) {
+    const forwarded = req.headers.get('x-forwarded-for');
+    if (forwarded) {
+      // Take the first IP (client IP) from the chain
+      const clientIP = forwarded.split(',')[0].trim();
+      const sanitized = sanitizeIP(clientIP);
+
+      if (isValidIP(sanitized)) {
+        return sanitized;
+      }
+      // If the forwarded IP is invalid, log it and fall through
+      console.warn(`[Rate Limit] Invalid x-forwarded-for IP: ${clientIP}`);
+    }
+
+    const realIP = req.headers.get('x-real-ip');
+    if (realIP) {
+      const sanitized = sanitizeIP(realIP);
+      if (isValidIP(sanitized)) {
+        return sanitized;
+      }
+      console.warn(`[Rate Limit] Invalid x-real-ip: ${realIP}`);
+    }
   }
-  const realIP = req.headers.get('x-real-ip');
-  if (realIP) {
-    return realIP;
+
+  // Fallback: Try to get direct connection IP
+  // Note: This may not work in all environments
+  const connectionIP = (req as unknown as { ip?: string }).ip;
+  if (connectionIP) {
+    const sanitized = sanitizeIP(connectionIP);
+    if (isValidIP(sanitized)) {
+      return sanitized;
+    }
   }
-  return 'unknown';
+
+  // Final fallback with warning
+  console.warn('[Rate Limit] Could not determine client IP, using fallback. Consider setting TRUST_PROXY=true if behind a proxy.');
+  return '0.0.0.0';
+}
+
+/**
+ * Log admin rate limit bypass for audit purposes
+ */
+export function logAdminBypass(
+  userId: string,
+  action: string,
+  details?: Record<string, unknown>
+): void {
+  const timestamp = new Date().toISOString();
+  const logEntry = {
+    timestamp,
+    type: 'ADMIN_RATE_LIMIT_BYPASS',
+    userId,
+    action,
+    ...details,
+  };
+
+  // Log to console (in production, this should go to a proper logging service)
+  console.log(`[AUDIT] ${JSON.stringify(logEntry)}`);
+
+  // You can also store in database for persistent audit trail
+  // TODO: Implement database audit logging if needed
 }
 
 /**
@@ -342,4 +439,241 @@ export function rateLimitResponse(resetAt: number): Response {
       },
     }
   );
+}
+
+/**
+ * Create rate limit headers for successful responses
+ * This helps clients understand their current rate limit status
+ */
+export function createRateLimitHeaders(result: RateLimitResult, limit: number): Record<string, string> {
+  const resetSeconds = Math.max(0, result.resetAt - Math.floor(Date.now() / 1000));
+  return {
+    'X-RateLimit-Limit': limit.toString(),
+    'X-RateLimit-Remaining': result.remaining.toString(),
+    'X-RateLimit-Reset': result.resetAt.toString(),
+    'X-RateLimit-Reset-After': resetSeconds.toString(),
+  };
+}
+
+/**
+ * Token reservation system for pessimistic locking
+ * Prevents race conditions by reserving tokens before execution
+ */
+
+interface TokenReservation {
+  userId: string;
+  reservationId: string;
+  estimatedTokens: number;
+  createdAt: number;
+}
+
+// In-memory reservations (short-lived, cleaned up on completion or timeout)
+const activeReservations = new Map<string, TokenReservation>();
+
+// Reservation timeout (5 minutes)
+const RESERVATION_TIMEOUT_MS = 5 * 60 * 1000;
+
+// Cleanup expired reservations periodically
+setInterval(() => {
+  const now = Date.now();
+  for (const [id, reservation] of activeReservations.entries()) {
+    if (now - reservation.createdAt > RESERVATION_TIMEOUT_MS) {
+      console.warn(`[AI Token] Reservation ${id} expired without being completed`);
+      activeReservations.delete(id);
+    }
+  }
+}, 60 * 1000); // Cleanup every minute
+
+/**
+ * Reserve tokens before AI execution (pessimistic locking)
+ * This deducts the estimated tokens immediately to prevent race conditions
+ */
+export function reserveAITokens(
+  userId: string,
+  estimatedTokens: number
+): {
+  success: boolean;
+  reservationId?: string;
+  remainingTokens: number;
+  resetAt: number;
+  error?: string;
+} {
+  const database = getDb();
+  const now = Math.floor(Date.now() / 1000);
+  const duration = 24 * 60 * 60;
+
+  const key = `ai-tokens:${userId}`;
+
+  // Use a transaction for atomic read-modify-write
+  const result = database.transaction(() => {
+    // Get current record
+    const record = database.prepare(
+      'SELECT points as tokens, expire_at FROM rate_limits WHERE key = ?'
+    ).get(key) as TokenUsageRecord | undefined;
+
+    let currentUsage = 0;
+    let expireAt = now + duration;
+
+    if (record && record.expire_at >= now) {
+      currentUsage = record.tokens;
+      expireAt = record.expire_at;
+    }
+
+    const remainingTokens = AI_TOKEN_LIMIT_PER_DAY - currentUsage;
+
+    // Check if there's enough budget
+    if (remainingTokens < estimatedTokens) {
+      return {
+        success: false,
+        remainingTokens,
+        resetAt: expireAt,
+        error: `Insufficient token budget. Need ${estimatedTokens.toLocaleString()}, have ${remainingTokens.toLocaleString()}`,
+      };
+    }
+
+    // Pre-deduct the estimated tokens
+    const newUsage = currentUsage + estimatedTokens;
+    database.prepare(
+      'INSERT OR REPLACE INTO rate_limits (key, points, expire_at) VALUES (?, ?, ?)'
+    ).run(key, newUsage, expireAt);
+
+    // Create reservation
+    const reservationId = `${userId}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+    return {
+      success: true,
+      reservationId,
+      remainingTokens: AI_TOKEN_LIMIT_PER_DAY - newUsage,
+      resetAt: expireAt,
+      preDeductedTokens: estimatedTokens,
+    };
+  })();
+
+  // Store reservation in memory
+  if (result.success && result.reservationId) {
+    activeReservations.set(result.reservationId, {
+      userId,
+      reservationId: result.reservationId,
+      estimatedTokens,
+      createdAt: Date.now(),
+    });
+  }
+
+  return result;
+}
+
+/**
+ * Complete a token reservation and adjust for actual usage
+ * Call this after AI execution completes
+ */
+export function completeTokenReservation(
+  reservationId: string,
+  actualTokensUsed: number
+): {
+  success: boolean;
+  adjusted: number;
+  totalUsed: number;
+  remaining: number;
+} {
+  const reservation = activeReservations.get(reservationId);
+
+  if (!reservation) {
+    console.warn(`[AI Token] Reservation ${reservationId} not found (may have expired)`);
+    return {
+      success: false,
+      adjusted: 0,
+      totalUsed: 0,
+      remaining: 0,
+    };
+  }
+
+  activeReservations.delete(reservationId);
+
+  const database = getDb();
+  const now = Math.floor(Date.now() / 1000);
+  const key = `ai-tokens:${reservation.userId}`;
+
+  // Calculate adjustment (positive = used less than estimated, negative = used more)
+  const adjustment = reservation.estimatedTokens - actualTokensUsed;
+
+  // Adjust the token count
+  const result = database.transaction(() => {
+    const record = database.prepare(
+      'SELECT points as tokens, expire_at FROM rate_limits WHERE key = ?'
+    ).get(key) as TokenUsageRecord | undefined;
+
+    if (!record || record.expire_at < now) {
+      // Record expired during execution, just log actual usage
+      const expireAt = now + 24 * 60 * 60;
+      database.prepare(
+        'INSERT OR REPLACE INTO rate_limits (key, points, expire_at) VALUES (?, ?, ?)'
+      ).run(key, actualTokensUsed, expireAt);
+
+      return {
+        totalUsed: actualTokensUsed,
+        remaining: AI_TOKEN_LIMIT_PER_DAY - actualTokensUsed,
+      };
+    }
+
+    // Adjust: subtract reserved, add actual
+    const newUsage = Math.max(0, record.tokens - reservation.estimatedTokens + actualTokensUsed);
+    database.prepare(
+      'UPDATE rate_limits SET points = ? WHERE key = ?'
+    ).run(newUsage, key);
+
+    return {
+      totalUsed: newUsage,
+      remaining: Math.max(0, AI_TOKEN_LIMIT_PER_DAY - newUsage),
+    };
+  })();
+
+  console.log(
+    `[AI Token] Reservation ${reservationId} completed. ` +
+    `Estimated: ${reservation.estimatedTokens}, Actual: ${actualTokensUsed}, ` +
+    `Adjusted: ${adjustment > 0 ? '+' : ''}${adjustment} tokens`
+  );
+
+  return {
+    success: true,
+    adjusted: adjustment,
+    ...result,
+  };
+}
+
+/**
+ * Cancel a token reservation (refund the pre-deducted tokens)
+ */
+export function cancelTokenReservation(reservationId: string): boolean {
+  const reservation = activeReservations.get(reservationId);
+
+  if (!reservation) {
+    return false;
+  }
+
+  activeReservations.delete(reservationId);
+
+  const database = getDb();
+  const now = Math.floor(Date.now() / 1000);
+  const key = `ai-tokens:${reservation.userId}`;
+
+  // Refund the reserved tokens
+  database.transaction(() => {
+    const record = database.prepare(
+      'SELECT points as tokens, expire_at FROM rate_limits WHERE key = ?'
+    ).get(key) as TokenUsageRecord | undefined;
+
+    if (record && record.expire_at >= now) {
+      const newUsage = Math.max(0, record.tokens - reservation.estimatedTokens);
+      database.prepare(
+        'UPDATE rate_limits SET points = ? WHERE key = ?'
+      ).run(newUsage, key);
+    }
+  })();
+
+  console.log(
+    `[AI Token] Reservation ${reservationId} cancelled. ` +
+    `Refunded ${reservation.estimatedTokens} tokens for user ${reservation.userId}`
+  );
+
+  return true;
 }
