@@ -1,8 +1,27 @@
 import { NextResponse } from 'next/server'
 import { geminiApiKeyManager } from '@root/gemini-api-key-manager'
+import { requireAuth } from '@/lib/auth-helpers'
+import { checkGeminiTokenRateLimit } from '@/lib/rate-limiter'
 
 export async function GET() {
   try {
+    // SECURITY: Require authentication to access API keys
+    const user = await requireAuth();
+
+    // Rate limiting: 10 requests per hour per user
+    const rateLimit = checkGeminiTokenRateLimit(user.id);
+
+    if (!rateLimit.success) {
+      const retryAfter = Math.max(0, rateLimit.resetAt - Math.floor(Date.now() / 1000));
+      return NextResponse.json(
+        { error: 'Too many requests. Please try again later.' },
+        {
+          status: 429,
+          headers: { 'Retry-After': retryAfter.toString() }
+        }
+      )
+    }
+
     // Get keys directly without acquire/release since this is for client-side WebSocket usage
     // The key manager's acquire/release pattern is for server-side API calls
     const keys = geminiApiKeyManager.getAllKeys()
@@ -16,7 +35,13 @@ export async function GET() {
 
     // Return the first available key for client-side Gemini Live connection
     return NextResponse.json({ apiKey: keys[0] })
-  } catch (error) {
+  } catch (error: any) {
+    if (error.message === 'Unauthorized') {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      )
+    }
     console.error('Error getting API key:', error)
     return NextResponse.json(
       { error: 'Failed to get API key' },

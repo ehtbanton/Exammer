@@ -10,6 +10,7 @@
 
 import {z} from 'genkit';
 import {executeWithManagedKey} from '@/ai/genkit';
+import {requireAuth} from '@/lib/auth-helpers';
 
 const AIPoweredInterviewInputSchema = z.object({
   subsection: z.string().describe('The specific subsection/topic context for the question.'),
@@ -50,7 +51,10 @@ const GenerateQuestionOutputSchema = z.object({
 export type GenerateQuestionOutput = z.infer<typeof GenerateQuestionOutputSchema>;
 
 export async function aiPoweredInterview(input: AIPoweredInterviewInput): Promise<AIPoweredInterviewOutput> {
-  // Use the global API key manager to execute this flow
+  // Require authentication for rate limiting
+  const user = await requireAuth();
+
+  // Use the global API key manager to execute this flow with token-based rate limiting
   return executeWithManagedKey(async (ai, flowInput) => {
     const prompt = ai.definePrompt({
       name: 'aiPoweredInterviewPrompt',
@@ -273,11 +277,14 @@ Use your knowledge of the subject matter to assess the answer fairly.`},
       hints: output.hints,
       chatHistory: updatedChatHistory,
     };
-  }, input);
+  }, input, user.id);
 }
 
 export async function generateQuestion(input: GenerateQuestionInput): Promise<GenerateQuestionOutput> {
-  // Use the global API key manager to execute this flow
+  // Require authentication for rate limiting
+  const user = await requireAuth();
+
+  // Use the global API key manager to execute this flow with token-based rate limiting
   return executeWithManagedKey(async (ai, flowInput) => {
     const questionGenerationPrompt = ai.definePrompt({
       name: 'questionGenerationPrompt',
@@ -315,5 +322,5 @@ Output only the question in the 'question' field.`,
     return {
       question: output.question,
     };
-  }, input);
+  }, input, user.id);
 }

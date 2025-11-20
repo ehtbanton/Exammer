@@ -10,6 +10,7 @@
 
 import {z} from 'genkit';
 import {executeWithManagedKey} from '@/ai/genkit';
+import {requireAuth} from '@/lib/auth-helpers';
 
 const GenerateSimilarQuestionInputSchema = z.object({
   originalQuestionText: z.string().describe('The original exam question to base the variant on.'),
@@ -138,6 +139,9 @@ Validate and correct the text now.`,
 export async function generateSimilarQuestion(
   input: GenerateSimilarQuestionInput
 ): Promise<GenerateSimilarQuestionOutput> {
+  // Require authentication for rate limiting
+  const user = await requireAuth();
+
   const startTime = Date.now();
   const hasObjectives = input.originalObjectives && input.originalObjectives.length > 0;
   console.log('[Process C] Starting similar question generation...');
@@ -155,7 +159,7 @@ export async function generateSimilarQuestion(
   }
   console.log('[Process C] ================================================');
 
-  // Use the global API key manager to execute this flow
+  // Use the global API key manager to execute this flow with token-based rate limiting
 
   const result = await executeWithManagedKey(async (ai, flowInput) => {
     const prompt = ai.definePrompt({
@@ -341,7 +345,7 @@ Generate the similar question, adapted marking objectives{{#if originalDiagramMe
       solutionObjectives: output.solutionObjectives,
       diagramMermaid: output.diagramMermaid,
     };
-  }, input);
+  }, input, user.id);
 
   const endTime = Date.now();
   const duration = ((endTime - startTime) / 1000).toFixed(2);

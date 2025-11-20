@@ -4,9 +4,25 @@ import { db } from '@/lib/db';
 import type { User } from '@/lib/db';
 import { createVerificationToken } from '@/lib/verification-tokens';
 import { sendVerificationEmail } from '@/lib/email';
+import { checkSignupRateLimit, getClientIP } from '@/lib/rate-limiter';
 
 export async function POST(req: NextRequest) {
   try {
+    // Rate limiting: 3 signups per hour per IP
+    const ip = getClientIP(req);
+    const rateLimit = checkSignupRateLimit(ip);
+
+    if (!rateLimit.success) {
+      const retryAfter = Math.max(0, rateLimit.resetAt - Math.floor(Date.now() / 1000));
+      return NextResponse.json(
+        { error: 'Too many signup attempts. Please try again later.' },
+        {
+          status: 429,
+          headers: { 'Retry-After': retryAfter.toString() }
+        }
+      );
+    }
+
     const { email, password, name } = await req.json();
 
     // Validate input

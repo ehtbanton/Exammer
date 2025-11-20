@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { requireAuth } from '@/lib/auth-helpers';
+import { checkClassJoinRateLimit } from '@/lib/rate-limiter';
 
 export const dynamic = 'force-dynamic';
 
@@ -8,6 +9,21 @@ export const dynamic = 'force-dynamic';
 export async function POST(req: NextRequest) {
   try {
     const user = await requireAuth();
+
+    // Rate limiting: 10 attempts per hour per user
+    const rateLimit = checkClassJoinRateLimit(user.id);
+
+    if (!rateLimit.success) {
+      const retryAfter = Math.max(0, rateLimit.resetAt - Math.floor(Date.now() / 1000));
+      return NextResponse.json(
+        { error: 'Too many join attempts. Please try again later.' },
+        {
+          status: 429,
+          headers: { 'Retry-After': retryAfter.toString() }
+        }
+      );
+    }
+
     const body = await req.json();
     const { classroomCode } = body;
 

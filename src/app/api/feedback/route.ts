@@ -8,6 +8,7 @@ import type {
   FeedbackWithDetails,
 } from '@/lib/types';
 import { z } from 'zod';
+import { checkFeedbackRateLimit, getClientIP } from '@/lib/rate-limiter';
 
 export const dynamic = 'force-dynamic';
 
@@ -24,6 +25,24 @@ const createFeedbackSchema = z.object({
 // POST /api/feedback - Submit feedback (authenticated or anonymous)
 export async function POST(req: NextRequest): Promise<NextResponse<CreateFeedbackResponse>> {
   try {
+    // Rate limiting: 5 submissions per hour per IP
+    const ip = getClientIP(req);
+    const rateLimit = checkFeedbackRateLimit(ip);
+
+    if (!rateLimit.success) {
+      const retryAfter = Math.max(0, rateLimit.resetAt - Math.floor(Date.now() / 1000));
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Too many feedback submissions. Please try again later.'
+        },
+        {
+          status: 429,
+          headers: { 'Retry-After': retryAfter.toString() }
+        }
+      );
+    }
+
     // Get current user (optional - feedback can be submitted by anonymous users)
     const user = await getCurrentUser();
     const userId = user?.id || null;
