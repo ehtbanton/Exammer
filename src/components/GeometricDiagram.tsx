@@ -78,29 +78,39 @@ export function GeometricDiagram({ diagram, className }: GeometricDiagramProps) 
   const points: Record<string, Point> = {};
 
   // Helper to get a point (either from map or parse coordinate)
-  const getPoint = (ref: string): Point => {
-    // Check if it's a Midpoint function
-    const midpointMatch = ref.match(/^Midpoint\(([^,]+),([^)]+)\)$/);
-    if (midpointMatch) {
-      const p1 = getPoint(midpointMatch[1].trim());
-      const p2 = getPoint(midpointMatch[2].trim());
-      return {
-        x: (p1.x + p2.x) / 2,
-        y: (p1.y + p2.y) / 2,
-      };
-    }
+  const getPoint = (ref: string): Point | null => {
+    try {
+      // Check if it's a Midpoint function
+      const midpointMatch = ref.match(/^Midpoint\(([^,]+),([^)]+)\)$/);
+      if (midpointMatch) {
+        const p1 = getPoint(midpointMatch[1].trim());
+        const p2 = getPoint(midpointMatch[2].trim());
+        if (p1 && p2) {
+          return {
+            x: (p1.x + p2.x) / 2,
+            y: (p1.y + p2.y) / 2,
+          };
+        }
+        console.warn(`[GeometricDiagram] Could not resolve midpoint for ${ref}`);
+        return null;
+      }
 
-    // Check if it's a named point
-    if (points[ref]) {
-      return points[ref];
-    }
+      // Check if it's a named point
+      if (points[ref]) {
+        return points[ref];
+      }
 
-    // Try to parse as coordinate
-    if (ref.includes(',')) {
-      return parseCoord(ref);
-    }
+      // Try to parse as coordinate
+      if (ref.includes(',')) {
+        return parseCoord(ref);
+      }
 
-    throw new Error(`Unknown point reference: ${ref}`);
+      console.warn(`[GeometricDiagram] Unknown point reference: ${ref}`);
+      return null;
+    } catch (error) {
+      console.warn(`[GeometricDiagram] Error resolving point ${ref}:`, error);
+      return null;
+    }
   };
 
   // Parse commands and render elements
@@ -125,17 +135,19 @@ export function GeometricDiagram({ diagram, className }: GeometricDiagramProps) 
       if (args.length === 2) {
         const p1 = getPoint(args[0]);
         const p2 = getPoint(args[1]);
-        elements.push(
-          <line
-            key={`line-${elementIndex++}`}
-            x1={p1.x}
-            y1={p1.y}
-            x2={p2.x}
-            y2={p2.y}
-            stroke="black"
-            strokeWidth={2}
-          />
-        );
+        if (p1 && p2) {
+          elements.push(
+            <line
+              key={`line-${elementIndex++}`}
+              x1={p1.x}
+              y1={p1.y}
+              x2={p2.x}
+              y2={p2.y}
+              stroke="black"
+              strokeWidth={2}
+            />
+          );
+        }
       }
       continue;
     }
@@ -145,17 +157,19 @@ export function GeometricDiagram({ diagram, className }: GeometricDiagramProps) 
     if (triangleMatch) {
       const args = parseArgs(triangleMatch[1]);
       if (args.length === 3) {
-        const points_arr = args.map(getPoint);
-        const pathData = `M ${points_arr[0].x} ${points_arr[0].y} L ${points_arr[1].x} ${points_arr[1].y} L ${points_arr[2].x} ${points_arr[2].y} Z`;
-        elements.push(
-          <path
-            key={`triangle-${elementIndex++}`}
-            d={pathData}
-            fill="none"
-            stroke="black"
-            strokeWidth={2}
-          />
-        );
+        const points_arr = args.map(getPoint).filter((p): p is Point => p !== null);
+        if (points_arr.length === 3) {
+          const pathData = `M ${points_arr[0].x} ${points_arr[0].y} L ${points_arr[1].x} ${points_arr[1].y} L ${points_arr[2].x} ${points_arr[2].y} Z`;
+          elements.push(
+            <path
+              key={`triangle-${elementIndex++}`}
+              d={pathData}
+              fill="none"
+              stroke="black"
+              strokeWidth={2}
+            />
+          );
+        }
       }
       continue;
     }
@@ -165,17 +179,19 @@ export function GeometricDiagram({ diagram, className }: GeometricDiagramProps) 
     if (rectangleMatch) {
       const args = parseArgs(rectangleMatch[1]);
       if (args.length === 4) {
-        const points_arr = args.map(getPoint);
-        const pathData = `M ${points_arr[0].x} ${points_arr[0].y} L ${points_arr[1].x} ${points_arr[1].y} L ${points_arr[2].x} ${points_arr[2].y} L ${points_arr[3].x} ${points_arr[3].y} Z`;
-        elements.push(
-          <path
-            key={`rectangle-${elementIndex++}`}
-            d={pathData}
-            fill="none"
-            stroke="black"
-            strokeWidth={2}
-          />
-        );
+        const points_arr = args.map(getPoint).filter((p): p is Point => p !== null);
+        if (points_arr.length === 4) {
+          const pathData = `M ${points_arr[0].x} ${points_arr[0].y} L ${points_arr[1].x} ${points_arr[1].y} L ${points_arr[2].x} ${points_arr[2].y} L ${points_arr[3].x} ${points_arr[3].y} Z`;
+          elements.push(
+            <path
+              key={`rectangle-${elementIndex++}`}
+              d={pathData}
+              fill="none"
+              stroke="black"
+              strokeWidth={2}
+            />
+          );
+        }
       }
       continue;
     }
@@ -185,17 +201,19 @@ export function GeometricDiagram({ diagram, className }: GeometricDiagramProps) 
     if (polygonMatch) {
       const args = parseArgs(polygonMatch[1]);
       if (args.length >= 3) {
-        const points_arr = args.map(getPoint);
-        const pathData = 'M ' + points_arr.map(p => `${p.x} ${p.y}`).join(' L ') + ' Z';
-        elements.push(
-          <path
-            key={`polygon-${elementIndex++}`}
-            d={pathData}
-            fill="none"
-            stroke="black"
-            strokeWidth={2}
-          />
-        );
+        const points_arr = args.map(getPoint).filter((p): p is Point => p !== null);
+        if (points_arr.length >= 3) {
+          const pathData = 'M ' + points_arr.map(p => `${p.x} ${p.y}`).join(' L ') + ' Z';
+          elements.push(
+            <path
+              key={`polygon-${elementIndex++}`}
+              d={pathData}
+              fill="none"
+              stroke="black"
+              strokeWidth={2}
+            />
+          );
+        }
       }
       continue;
     }
@@ -205,17 +223,19 @@ export function GeometricDiagram({ diagram, className }: GeometricDiagramProps) 
     if (circleMatch) {
       const center = getPoint(circleMatch[1].trim());
       const radius = parseFloat(circleMatch[2]);
-      elements.push(
-        <circle
-          key={`circle-${elementIndex++}`}
-          cx={center.x}
-          cy={center.y}
-          r={radius}
-          fill="none"
-          stroke="black"
-          strokeWidth={2}
-        />
-      );
+      if (center) {
+        elements.push(
+          <circle
+            key={`circle-${elementIndex++}`}
+            cx={center.x}
+            cy={center.y}
+            r={radius}
+            fill="none"
+            stroke="black"
+            strokeWidth={2}
+          />
+        );
+      }
       continue;
     }
 
@@ -227,40 +247,55 @@ export function GeometricDiagram({ diagram, className }: GeometricDiagramProps) 
       const startAngle = parseFloat(arcMatch[3]);
       const endAngle = parseFloat(arcMatch[4]);
 
-      // Convert angles to radians (0° = right, counterclockwise)
-      const startRad = (startAngle * Math.PI) / 180;
-      const endRad = (endAngle * Math.PI) / 180;
+      if (center) {
+        // Convert angles to radians (0° = right, counterclockwise)
+        const startRad = (startAngle * Math.PI) / 180;
+        const endRad = (endAngle * Math.PI) / 180;
 
-      // Calculate start and end points
-      const startX = center.x + radius * Math.cos(startRad);
-      const startY = center.y - radius * Math.sin(startRad); // Subtract because SVG Y increases downward
-      const endX = center.x + radius * Math.cos(endRad);
-      const endY = center.y - radius * Math.sin(endRad);
+        // Calculate start and end points
+        const startX = center.x + radius * Math.cos(startRad);
+        const startY = center.y - radius * Math.sin(startRad); // Subtract because SVG Y increases downward
+        const endX = center.x + radius * Math.cos(endRad);
+        const endY = center.y - radius * Math.sin(endRad);
 
-      // Determine if we need the large arc flag
-      const angleDiff = ((endAngle - startAngle + 360) % 360);
-      const largeArcFlag = angleDiff > 180 ? 1 : 0;
+        // Determine if we need the large arc flag
+        const angleDiff = ((endAngle - startAngle + 360) % 360);
+        const largeArcFlag = angleDiff > 180 ? 1 : 0;
 
-      const pathData = `M ${startX} ${startY} A ${radius} ${radius} 0 ${largeArcFlag} 0 ${endX} ${endY}`;
+        const pathData = `M ${startX} ${startY} A ${radius} ${radius} 0 ${largeArcFlag} 0 ${endX} ${endY}`;
 
-      elements.push(
-        <path
-          key={`arc-${elementIndex++}`}
-          d={pathData}
-          fill="none"
-          stroke="black"
-          strokeWidth={2}
-        />
-      );
+        elements.push(
+          <path
+            key={`arc-${elementIndex++}`}
+            d={pathData}
+            fill="none"
+            stroke="black"
+            strokeWidth={2}
+          />
+        );
+      }
       continue;
     }
 
-    // Label: Label(A,"text") or Label(Midpoint(A,B),"text")
-    // Use a more flexible pattern that handles nested function calls
-    const labelMatch = trimmed.match(/^Label\((.+?),"([^"]+)"\)$/);
+    // Meta-commands (e.g., Diagram_Note="text")
+    // These don't render but provide information
+    const metaMatch = trimmed.match(/^(\w+)="([^"]+)"$/);
+    if (metaMatch) {
+      console.log(`[GeometricDiagram] Meta: ${metaMatch[1]} = ${metaMatch[2]}`);
+      continue;
+    }
+
+    // Label: Label(A,"text") or Label(Midpoint(A,B), "text")
+    // Handle nested functions and optional spaces after comma
+    const labelMatch = trimmed.match(/^Label\((.+?),\s*"([^"]+)"\)$/);
     if (labelMatch) {
       const position = getPoint(labelMatch[1].trim());
       const text = labelMatch[2];
+
+      if (!position) {
+        console.warn(`[GeometricDiagram] Could not resolve position for label: ${trimmed}`);
+        continue;
+      }
 
       // Check if text contains LaTeX (wrapped in $...$)
       const hasLatex = text.includes('$');
