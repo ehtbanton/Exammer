@@ -6,7 +6,7 @@ import { createVerificationToken } from '@/lib/verification-tokens';
 import { sendVerificationEmail } from '@/lib/email';
 import { checkSignupRateLimit, getClientIP, createRateLimitHeaders } from '@/lib/rate-limiter';
 
-const SIGNUP_RATE_LIMIT = 3; // matches the limit in rate-limiter.ts
+const SIGNUP_RATE_LIMIT = 9; // matches the limit in rate-limiter.ts
 
 export async function POST(req: NextRequest) {
   try {

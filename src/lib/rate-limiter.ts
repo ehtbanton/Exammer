@@ -136,51 +136,51 @@ export function checkRateLimit(
  * Pre-configured rate limiters for different use cases
  */
 
-// Auth rate limiter: 5 attempts per 15 minutes, block for 1 hour if exceeded
+// Auth rate limiter: 15 attempts per 15 minutes, block for 1 hour if exceeded
 export function checkAuthRateLimit(identifier: string): RateLimitResult {
   return checkRateLimit(`auth:${identifier}`, {
-    points: 5,
+    points: 15,
     duration: 15 * 60, // 15 minutes
     blockDuration: 60 * 60, // 1 hour block
   });
 }
 
-// Signup rate limiter: 3 signups per hour per IP
+// Signup rate limiter: 9 signups per hour per IP
 export function checkSignupRateLimit(ip: string): RateLimitResult {
   return checkRateLimit(`signup:${ip}`, {
-    points: 3,
+    points: 9,
     duration: 60 * 60, // 1 hour
   });
 }
 
-// Batch extraction rate limiter: 50 batches per day per user
+// Batch extraction rate limiter: 20 batches per day per user
 export function checkBatchExtractionRateLimit(userId: string): RateLimitResult {
   return checkRateLimit(`batch:${userId}`, {
-    points: 50,
+    points: 20,
     duration: 24 * 60 * 60, // 24 hours
   });
 }
 
-// Feedback rate limiter: 5 submissions per hour per IP
+// Feedback rate limiter: 15 submissions per hour per IP
 export function checkFeedbackRateLimit(ip: string): RateLimitResult {
   return checkRateLimit(`feedback:${ip}`, {
-    points: 5,
+    points: 15,
     duration: 60 * 60, // 1 hour
   });
 }
 
-// Class join rate limiter: 10 attempts per hour per user
+// Class join rate limiter: 30 attempts per hour per user
 export function checkClassJoinRateLimit(userId: string): RateLimitResult {
   return checkRateLimit(`class-join:${userId}`, {
-    points: 10,
+    points: 30,
     duration: 60 * 60, // 1 hour
   });
 }
 
-// Gemini token rate limiter: 10 requests per hour per user
+// Gemini token rate limiter: 30 requests per hour per user
 export function checkGeminiTokenRateLimit(userId: string): RateLimitResult {
   return checkRateLimit(`gemini-token:${userId}`, {
-    points: 10,
+    points: 30,
     duration: 60 * 60, // 1 hour
   });
 }
@@ -313,10 +313,10 @@ export function getAITokenUsage(userId: string): {
   };
 }
 
-// API general rate limiter: 100 requests per minute per IP
+// API general rate limiter: 300 requests per minute per IP
 export function checkAPIRateLimit(ip: string): RateLimitResult {
   return checkRateLimit(`api:${ip}`, {
-    points: 100,
+    points: 300,
     duration: 60, // 1 minute
   });
 }

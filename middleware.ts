@@ -65,7 +65,7 @@ function checkGlobalRateLimit(ip: string): { allowed: boolean; retryAfter?: numb
 
   const now = Date.now();
   const windowMs = 60000; // 1 minute window
-  const maxRequests = 100; // 100 requests per minute per IP
+  const maxRequests = 300; // 300 requests per minute per IP
 
   const record = ipRequestCounts.get(ip);
 

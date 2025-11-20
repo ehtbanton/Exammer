@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { requireAuth } from '@/lib/auth-helpers';
-import { checkClassJoinRateLimit, createRateLimitHeaders } from '@/lib/rate-limiter';
+import { requireAuth, getUserWithAccessLevel } from '@/lib/auth-helpers';
+import { checkClassJoinRateLimit, createRateLimitHeaders, logAdminBypass } from '@/lib/rate-limiter';
 
-const CLASS_JOIN_RATE_LIMIT = 10; // matches the limit in rate-limiter.ts
+const CLASS_JOIN_RATE_LIMIT = 30; // matches the limit in rate-limiter.ts
 
 export const dynamic = 'force-dynamic';
 
@@ -12,18 +12,28 @@ export async function POST(req: NextRequest) {
   try {
     const user = await requireAuth();
 
-    // Rate limiting: 10 attempts per hour per user
-    const rateLimit = checkClassJoinRateLimit(user.id);
+    // Check if user is admin (level 3) - admins bypass rate limits
+    const fullUser = await getUserWithAccessLevel(user.id);
+    const isAdmin = fullUser?.access_level === 3;
 
-    if (!rateLimit.success) {
-      const retryAfter = Math.max(0, rateLimit.resetAt - Math.floor(Date.now() / 1000));
-      return NextResponse.json(
-        { error: 'Too many join attempts. Please try again later.' },
-        {
-          status: 429,
-          headers: { 'Retry-After': retryAfter.toString() }
-        }
-      );
+    // Rate limiting: 30 attempts per hour per user (unless admin)
+    let rateLimit = { success: true, remaining: CLASS_JOIN_RATE_LIMIT, resetAt: 0 };
+
+    if (!isAdmin) {
+      rateLimit = checkClassJoinRateLimit(user.id);
+
+      if (!rateLimit.success) {
+        const retryAfter = Math.max(0, rateLimit.resetAt - Math.floor(Date.now() / 1000));
+        return NextResponse.json(
+          { error: 'Too many join attempts. Please try again later.' },
+          {
+            status: 429,
+            headers: { 'Retry-After': retryAfter.toString() }
+          }
+        );
+      }
+    } else {
+      logAdminBypass(user.id, 'CLASS_JOIN_RATE_LIMIT');
     }
 
     const body = await req.json();

@@ -1,25 +1,33 @@
 import { NextResponse } from 'next/server'
 import { geminiApiKeyManager } from '@root/gemini-api-key-manager'
-import { requireAuth } from '@/lib/auth-helpers'
-import { checkGeminiTokenRateLimit } from '@/lib/rate-limiter'
+import { requireAuth, getUserWithAccessLevel } from '@/lib/auth-helpers'
+import { checkGeminiTokenRateLimit, logAdminBypass } from '@/lib/rate-limiter'
 
 export async function GET() {
   try {
     // SECURITY: Require authentication to access API keys
     const user = await requireAuth();
 
-    // Rate limiting: 10 requests per hour per user
-    const rateLimit = checkGeminiTokenRateLimit(user.id);
+    // Check if user is admin (level 3) - admins bypass rate limits
+    const fullUser = await getUserWithAccessLevel(user.id);
+    const isAdmin = fullUser?.access_level === 3;
 
-    if (!rateLimit.success) {
-      const retryAfter = Math.max(0, rateLimit.resetAt - Math.floor(Date.now() / 1000));
-      return NextResponse.json(
-        { error: 'Too many requests. Please try again later.' },
-        {
-          status: 429,
-          headers: { 'Retry-After': retryAfter.toString() }
-        }
-      )
+    // Rate limiting: 30 requests per hour per user (unless admin)
+    if (!isAdmin) {
+      const rateLimit = checkGeminiTokenRateLimit(user.id);
+
+      if (!rateLimit.success) {
+        const retryAfter = Math.max(0, rateLimit.resetAt - Math.floor(Date.now() / 1000));
+        return NextResponse.json(
+          { error: 'Too many requests. Please try again later.' },
+          {
+            status: 429,
+            headers: { 'Retry-After': retryAfter.toString() }
+          }
+        )
+      }
+    } else {
+      logAdminBypass(user.id, 'GEMINI_TOKEN_RATE_LIMIT');
     }
 
     // Get keys directly without acquire/release since this is for client-side WebSocket usage
