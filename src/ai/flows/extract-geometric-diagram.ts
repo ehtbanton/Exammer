@@ -73,6 +73,7 @@ Points (define once, reference everywhere):
   A=(0,0)
   B=(100,50)
   O=(150,150)
+  Center=(200,200)      // Use actual coordinates, NOT variables
 
 Lines and Segments:
   Line(A,B)         // Infinite line through A and B
@@ -84,8 +85,9 @@ Shapes:
   Polygon(A,B,C,D,...)  // Any polygon with 3+ points
 
 Circles and Arcs:
-  Circle(O,50)          // Center point O, radius 50
+  Circle(O,50)          // Center point O, radius 50 (use actual number!)
   Arc(O,50,0,90)        // Center O, radius 50, from 0° to 90°
+  Arc(O,100,180,0)      // Semicircle from left to right (180° to 0°)
   // Angles: 0°=right, 90°=up, 180°=left, 270°=down
 
 Labels and Text:
@@ -96,6 +98,12 @@ Labels and Text:
 
 Helper Functions:
   Midpoint(A,B)         // Returns point halfway between A and B
+
+CRITICAL RULES:
+1. NO VARIABLES: Do NOT use Radius=100 or similar. Use actual numbers: Circle(O,100)
+2. ALL POINTS MUST BE DEFINED: Before using "Center", you must define it: Center=(200,200)
+3. USE CONCRETE VALUES: Arc(Center, Radius, 180, 0) is WRONG. Use Arc(Center, 100, 180, 0)
+4. DEFINE BEFORE USE: Every point must be defined with coordinates before being referenced
 
 COORDINATE SYSTEM:
 - Origin at top-left

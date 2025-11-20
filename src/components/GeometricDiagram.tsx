@@ -289,13 +289,55 @@ export function GeometricDiagram({ diagram, className }: GeometricDiagramProps) 
     // Handle nested functions and optional spaces after comma
     const labelMatch = trimmed.match(/^Label\((.+?),\s*"([^"]+)"\)$/);
     if (labelMatch) {
-      const position = getPoint(labelMatch[1].trim());
+      const positionRef = labelMatch[1].trim();
       const text = labelMatch[2];
+      const position = getPoint(positionRef);
 
       if (!position) {
         console.warn(`[GeometricDiagram] Could not resolve position for label: ${trimmed}`);
         continue;
       }
+
+      // Calculate smart offset for label positioning
+      // For Midpoint labels, offset perpendicular to the line
+      // For point labels, offset diagonally away
+      let offsetX = 0;
+      let offsetY = -20; // Default: above the point
+
+      const midpointMatch = positionRef.match(/^Midpoint\(([^,]+),\s*([^)]+)\)$/);
+      if (midpointMatch) {
+        // This is a line measurement - position perpendicular to line
+        const p1 = getPoint(midpointMatch[1].trim());
+        const p2 = getPoint(midpointMatch[2].trim());
+        if (p1 && p2) {
+          const dx = p2.x - p1.x;
+          const dy = p2.y - p1.y;
+          const len = Math.sqrt(dx * dx + dy * dy);
+          if (len > 0) {
+            // Perpendicular vector (rotated 90°)
+            const perpX = -dy / len;
+            const perpY = dx / len;
+            offsetX = perpX * 15;
+            offsetY = perpY * 15;
+          }
+        }
+      } else if (text.length <= 2 && /^[A-Z]$/.test(text)) {
+        // Single letter point label - offset diagonally
+        // Use the point's position to decide direction
+        if (position.x < width / 3) {
+          offsetX = -15; // Left side - offset left
+        } else if (position.x > (2 * width) / 3) {
+          offsetX = 15; // Right side - offset right
+        }
+        if (position.y < height / 3) {
+          offsetY = -15; // Top - offset up
+        } else if (position.y > (2 * height) / 3) {
+          offsetY = 15; // Bottom - offset down
+        }
+      }
+
+      const labelX = position.x + offsetX;
+      const labelY = position.y + offsetY;
 
       // Check if text contains LaTeX (wrapped in $...$)
       const hasLatex = text.includes('$');
@@ -306,9 +348,9 @@ export function GeometricDiagram({ diagram, className }: GeometricDiagramProps) 
         elements.push(
           <foreignObject
             key={`label-${elementIndex++}`}
-            x={position.x - 50}
-            y={position.y - 15}
-            width={100}
+            x={labelX - 60}
+            y={labelY - 15}
+            width={120}
             height={30}
             style={{ overflow: 'visible', pointerEvents: 'none' }}
           >
@@ -316,10 +358,11 @@ export function GeometricDiagram({ diagram, className }: GeometricDiagramProps) 
               display: 'flex',
               justifyContent: 'center',
               alignItems: 'center',
-              fontSize: '14px',
+              fontSize: '16px',
               textAlign: 'center',
               width: '100%',
-              height: '100%'
+              height: '100%',
+              fontFamily: 'Arial, sans-serif'
             }}>
               {parts.map((part, i) => {
                 if (part.startsWith('$') && part.endsWith('$')) {
@@ -334,20 +377,38 @@ export function GeometricDiagram({ diagram, className }: GeometricDiagramProps) 
           </foreignObject>
         );
       } else {
-        // Plain text label - always render these
+        // Plain text label with background for readability
+        const textKey = `label-text-${elementIndex}`;
+        const bgKey = `label-bg-${elementIndex}`;
+        elementIndex++;
+
+        // Estimate text width (rough approximation)
+        const textWidth = text.length * 8;
+
         elements.push(
-          <text
-            key={`label-${elementIndex++}`}
-            x={position.x}
-            y={position.y}
-            fill="black"
-            fontSize={14}
-            textAnchor="middle"
-            dominantBaseline="middle"
-            fontFamily="Arial, sans-serif"
-          >
-            {text}
-          </text>
+          <g key={textKey}>
+            <rect
+              key={bgKey}
+              x={labelX - textWidth / 2 - 3}
+              y={labelY - 10}
+              width={textWidth + 6}
+              height={20}
+              fill="white"
+              fillOpacity={0.8}
+              stroke="none"
+            />
+            <text
+              x={labelX}
+              y={labelY}
+              fill="black"
+              fontSize={16}
+              textAnchor="middle"
+              dominantBaseline="middle"
+              fontFamily="Arial, sans-serif"
+            >
+              {text}
+            </text>
+          </g>
         );
       }
       continue;

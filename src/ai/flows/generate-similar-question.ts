@@ -66,12 +66,18 @@ GEOMETRIC DIAGRAM MODIFICATION:
 Diagrams are represented as geometric commands. When modifying, change coordinates, measurements, and labels to match your variant.
 
 Command types:
-- Points: A=(0,0), B=(100,50)
+- Points: A=(0,0), B=(100,50), Center=(200,200)
 - Lines: Line(A,B), Segment(A,B)
 - Shapes: Triangle(A,B,C), Rectangle(A,B,C,D), Polygon(...)
-- Circles: Circle(O,50) [center, radius]
-- Arcs: Arc(O,50,0,90) [center, radius, start°, end°]
+- Circles: Circle(O,50) [center, radius - use actual number!]
+- Arcs: Arc(O,50,0,90) [center, radius, start°, end° - use actual numbers!]
 - Labels: Label(A,"text"), Label(Midpoint(A,B),"5cm"), Label(O,"$\\theta$") [LaTeX supported!]
+
+CRITICAL RULES FOR DIAGRAM COMMANDS:
+1. NO VARIABLES: Do NOT use Radius=100 or similar. Use actual numbers: Circle(O,100)
+2. ALL POINTS MUST BE DEFINED: Before using "Center", you must define it: Center=(200,200)
+3. USE CONCRETE VALUES: Arc(Center, Radius, 180, 0) is WRONG. Use Arc(Center, 100, 180, 0)
+4. DEFINE BEFORE USE: Every point must be defined with coordinates before being referenced
 
 When modifying diagrams:
 1. READ THE METADATA CAREFULLY - it tells you what can and cannot change
