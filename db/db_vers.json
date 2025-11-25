@@ -1,5 +1,5 @@
 {
-  "currentVersion": 10,
+  "currentVersion": 11,
   "versions": {
     "0": {
       "description": "Initial schema - subjects owned by users",
@@ -380,6 +380,143 @@
             "action": "add_column",
             "table": "users",
             "sql": "ALTER TABLE users ADD COLUMN email_verification_sent_at INTEGER DEFAULT NULL"
+          }
+        ]
+      }
+    },
+    "11": {
+      "description": "Add careers pathway planning system - brainstorming, university goals, and personalized pathways",
+      "schema": {
+        "career_sessions": {
+          "columns": ["id", "user_id", "session_type", "cv_file_path", "cv_parsed_data", "current_school", "current_year_group", "target_application_year", "use_exammer_data", "brainstorm_complete", "created_at", "updated_at"],
+          "note": "Main session container for career planning. session_type: 'explore' or 'direct'"
+        },
+        "brainstorm_nodes": {
+          "columns": ["id", "session_id", "node_id", "parent_node_id", "label", "level", "selected", "position_x", "position_y", "created_at"],
+          "note": "Interactive mindmap nodes. node_id is React Flow ID, level 0 = root question"
+        },
+        "career_goals": {
+          "columns": ["id", "session_id", "university_name", "course_name", "entry_requirements", "typical_offer", "university_url", "is_primary", "ai_confidence_score", "created_at", "updated_at"],
+          "note": "University/course goals. entry_requirements is JSON object"
+        },
+        "pathways": {
+          "columns": ["id", "goal_id", "pathway_name", "pathway_type", "description", "generation_prompt", "is_active", "created_at", "updated_at"],
+          "note": "Generated pathways. pathway_type: 'primary', 'alternative', 'regenerated'"
+        },
+        "pathway_milestones": {
+          "columns": ["id", "pathway_id", "milestone_month", "milestone_year", "milestone_type", "title", "description", "status", "completion_notes", "completed_at", "order_index"],
+          "note": "Month-by-month milestones. milestone_type: 'academic', 'extracurricular', 'application', 'general'. status: 'pending', 'in_progress', 'completed', 'failed', 'skipped'"
+        },
+        "subject_grade_targets": {
+          "columns": ["id", "pathway_id", "subject_name", "current_grade", "target_grade", "current_percentage", "target_percentage", "priority", "notes"],
+          "note": "Per-subject grade targets. priority: 'low', 'medium', 'high', 'critical'"
+        },
+        "topic_improvement_links": {
+          "columns": ["id", "milestone_id", "subject_name", "topic_id", "topic_name", "topic_description", "improvement_reason", "current_score", "target_score", "exammer_link"],
+          "note": "Links Exammer topics to pathway milestones. topic_id may be NULL if topic doesn't exist yet"
+        },
+        "pathway_regeneration_history": {
+          "columns": ["id", "pathway_id", "regeneration_reason", "failed_milestone_ids", "prompt_adjustments", "created_at"],
+          "note": "Tracks pathway adaptations. failed_milestone_ids is JSON array"
+        }
+      },
+      "migration": {
+        "from": 10,
+        "steps": [
+          {
+            "action": "create_table",
+            "table": "career_sessions",
+            "sql": "CREATE TABLE IF NOT EXISTS career_sessions (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, session_type TEXT NOT NULL CHECK(session_type IN ('explore', 'direct')), cv_file_path TEXT, cv_parsed_data TEXT, current_school TEXT, current_year_group TEXT, target_application_year INTEGER, use_exammer_data INTEGER DEFAULT 0, brainstorm_complete INTEGER DEFAULT 0, created_at INTEGER DEFAULT (unixepoch()), updated_at INTEGER DEFAULT (unixepoch()), FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE)"
+          },
+          {
+            "action": "create_index",
+            "table": "career_sessions",
+            "sql": "CREATE INDEX IF NOT EXISTS idx_career_sessions_user_id ON career_sessions(user_id)"
+          },
+          {
+            "action": "create_table",
+            "table": "brainstorm_nodes",
+            "sql": "CREATE TABLE IF NOT EXISTS brainstorm_nodes (id INTEGER PRIMARY KEY AUTOINCREMENT, session_id INTEGER NOT NULL, node_id TEXT UNIQUE NOT NULL, parent_node_id TEXT, label TEXT NOT NULL, level INTEGER NOT NULL, selected INTEGER DEFAULT 0, position_x REAL NOT NULL, position_y REAL NOT NULL, created_at INTEGER DEFAULT (unixepoch()), FOREIGN KEY (session_id) REFERENCES career_sessions(id) ON DELETE CASCADE)"
+          },
+          {
+            "action": "create_index",
+            "table": "brainstorm_nodes",
+            "sql": "CREATE INDEX IF NOT EXISTS idx_brainstorm_nodes_session_id ON brainstorm_nodes(session_id)"
+          },
+          {
+            "action": "create_index",
+            "table": "brainstorm_nodes",
+            "sql": "CREATE INDEX IF NOT EXISTS idx_brainstorm_nodes_parent ON brainstorm_nodes(parent_node_id)"
+          },
+          {
+            "action": "create_table",
+            "table": "career_goals",
+            "sql": "CREATE TABLE IF NOT EXISTS career_goals (id INTEGER PRIMARY KEY AUTOINCREMENT, session_id INTEGER NOT NULL, university_name TEXT NOT NULL, course_name TEXT NOT NULL, entry_requirements TEXT, typical_offer TEXT, university_url TEXT, is_primary INTEGER DEFAULT 0, ai_confidence_score INTEGER, created_at INTEGER DEFAULT (unixepoch()), updated_at INTEGER DEFAULT (unixepoch()), FOREIGN KEY (session_id) REFERENCES career_sessions(id) ON DELETE CASCADE)"
+          },
+          {
+            "action": "create_index",
+            "table": "career_goals",
+            "sql": "CREATE INDEX IF NOT EXISTS idx_career_goals_session_id ON career_goals(session_id)"
+          },
+          {
+            "action": "create_table",
+            "table": "pathways",
+            "sql": "CREATE TABLE IF NOT EXISTS pathways (id INTEGER PRIMARY KEY AUTOINCREMENT, goal_id INTEGER NOT NULL, pathway_name TEXT NOT NULL, pathway_type TEXT NOT NULL CHECK(pathway_type IN ('primary', 'alternative', 'regenerated')), description TEXT, generation_prompt TEXT, is_active INTEGER DEFAULT 1, created_at INTEGER DEFAULT (unixepoch()), updated_at INTEGER DEFAULT (unixepoch()), FOREIGN KEY (goal_id) REFERENCES career_goals(id) ON DELETE CASCADE)"
+          },
+          {
+            "action": "create_index",
+            "table": "pathways",
+            "sql": "CREATE INDEX IF NOT EXISTS idx_pathways_goal_id ON pathways(goal_id)"
+          },
+          {
+            "action": "create_table",
+            "table": "pathway_milestones",
+            "sql": "CREATE TABLE IF NOT EXISTS pathway_milestones (id INTEGER PRIMARY KEY AUTOINCREMENT, pathway_id INTEGER NOT NULL, milestone_month INTEGER NOT NULL, milestone_year INTEGER NOT NULL, milestone_type TEXT NOT NULL CHECK(milestone_type IN ('academic', 'extracurricular', 'application', 'general')), title TEXT NOT NULL, description TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending', 'in_progress', 'completed', 'failed', 'skipped')), completion_notes TEXT, completed_at INTEGER, order_index INTEGER NOT NULL, FOREIGN KEY (pathway_id) REFERENCES pathways(id) ON DELETE CASCADE)"
+          },
+          {
+            "action": "create_index",
+            "table": "pathway_milestones",
+            "sql": "CREATE INDEX IF NOT EXISTS idx_pathway_milestones_pathway_id ON pathway_milestones(pathway_id)"
+          },
+          {
+            "action": "create_index",
+            "table": "pathway_milestones",
+            "sql": "CREATE INDEX IF NOT EXISTS idx_pathway_milestones_month ON pathway_milestones(milestone_month, milestone_year)"
+          },
+          {
+            "action": "create_table",
+            "table": "subject_grade_targets",
+            "sql": "CREATE TABLE IF NOT EXISTS subject_grade_targets (id INTEGER PRIMARY KEY AUTOINCREMENT, pathway_id INTEGER NOT NULL, subject_name TEXT NOT NULL, current_grade TEXT, target_grade TEXT NOT NULL, current_percentage INTEGER, target_percentage INTEGER NOT NULL, priority TEXT NOT NULL DEFAULT 'medium' CHECK(priority IN ('low', 'medium', 'high', 'critical')), notes TEXT, FOREIGN KEY (pathway_id) REFERENCES pathways(id) ON DELETE CASCADE)"
+          },
+          {
+            "action": "create_index",
+            "table": "subject_grade_targets",
+            "sql": "CREATE INDEX IF NOT EXISTS idx_subject_grade_targets_pathway_id ON subject_grade_targets(pathway_id)"
+          },
+          {
+            "action": "create_table",
+            "table": "topic_improvement_links",
+            "sql": "CREATE TABLE IF NOT EXISTS topic_improvement_links (id INTEGER PRIMARY KEY AUTOINCREMENT, milestone_id INTEGER NOT NULL, subject_name TEXT NOT NULL, topic_id INTEGER, topic_name TEXT NOT NULL, topic_description TEXT, improvement_reason TEXT, current_score INTEGER, target_score INTEGER NOT NULL, exammer_link TEXT, FOREIGN KEY (milestone_id) REFERENCES pathway_milestones(id) ON DELETE CASCADE, FOREIGN KEY (topic_id) REFERENCES topics(id) ON DELETE SET NULL)"
+          },
+          {
+            "action": "create_index",
+            "table": "topic_improvement_links",
+            "sql": "CREATE INDEX IF NOT EXISTS idx_topic_improvement_links_milestone_id ON topic_improvement_links(milestone_id)"
+          },
+          {
+            "action": "create_index",
+            "table": "topic_improvement_links",
+            "sql": "CREATE INDEX IF NOT EXISTS idx_topic_improvement_links_topic_id ON topic_improvement_links(topic_id)"
+          },
+          {
+            "action": "create_table",
+            "table": "pathway_regeneration_history",
+            "sql": "CREATE TABLE IF NOT EXISTS pathway_regeneration_history (id INTEGER PRIMARY KEY AUTOINCREMENT, pathway_id INTEGER NOT NULL, regeneration_reason TEXT NOT NULL, failed_milestone_ids TEXT, prompt_adjustments TEXT, created_at INTEGER DEFAULT (unixepoch()), FOREIGN KEY (pathway_id) REFERENCES pathways(id) ON DELETE CASCADE)"
+          },
+          {
+            "action": "create_index",
+            "table": "pathway_regeneration_history",
+            "sql": "CREATE INDEX IF NOT EXISTS idx_pathway_regeneration_history_pathway_id ON pathway_regeneration_history(pathway_id)"
           }
         ]
       }

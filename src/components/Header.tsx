@@ -15,7 +15,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { LogOut, User, Terminal, ArrowLeft, Users, Home } from 'lucide-react';
+import { LogOut, User, Terminal, ArrowLeft, Users, Home, Target } from 'lucide-react';
 import { ThemeToggle } from './theme-toggle';
 import FeedbackButton from './FeedbackButton';
 import DonationButton from './DonationButton';
@@ -102,6 +102,17 @@ export default function Header() {
                       <Link href={accessLevel === 1 ? "/classes/join" : "/classes"}>
                         <Users className="h-4 w-4 mr-2" />
                         Classes
+                      </Link>
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      asChild
+                      className={pathname?.startsWith('/workspace/careers') ? "shadow-[0_0_0_2px_rgb(55,65,81)] dark:shadow-[0_0_0_2px_white]" : ""}
+                    >
+                      <Link href="/workspace/careers">
+                        <Target className="h-4 w-4 mr-2" />
+                        Careers
                       </Link>
                     </Button>
                   </>

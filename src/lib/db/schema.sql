@@ -253,6 +253,131 @@ CREATE INDEX IF NOT EXISTS idx_feedback_created_at ON feedback(created_at);
 CREATE INDEX IF NOT EXISTS idx_feedback_notes_feedback_id ON feedback_notes(feedback_id);
 CREATE INDEX IF NOT EXISTS idx_feedback_status_history_feedback_id ON feedback_status_history(feedback_id);
 
+-- Careers pathway planning tables
+CREATE TABLE IF NOT EXISTS career_sessions (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL,
+  session_type TEXT NOT NULL CHECK(session_type IN ('explore', 'direct')),
+  cv_file_path TEXT,
+  cv_parsed_data TEXT,
+  current_school TEXT,
+  current_year_group TEXT,
+  target_application_year INTEGER,
+  use_exammer_data INTEGER DEFAULT 0,
+  brainstorm_complete INTEGER DEFAULT 0,
+  created_at INTEGER DEFAULT (unixepoch()),
+  updated_at INTEGER DEFAULT (unixepoch()),
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS brainstorm_nodes (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  session_id INTEGER NOT NULL,
+  node_id TEXT UNIQUE NOT NULL,
+  parent_node_id TEXT,
+  label TEXT NOT NULL,
+  level INTEGER NOT NULL,
+  selected INTEGER DEFAULT 0,
+  position_x REAL NOT NULL,
+  position_y REAL NOT NULL,
+  created_at INTEGER DEFAULT (unixepoch()),
+  FOREIGN KEY (session_id) REFERENCES career_sessions(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS career_goals (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  session_id INTEGER NOT NULL,
+  university_name TEXT NOT NULL,
+  course_name TEXT NOT NULL,
+  entry_requirements TEXT,
+  typical_offer TEXT,
+  university_url TEXT,
+  is_primary INTEGER DEFAULT 0,
+  ai_confidence_score INTEGER,
+  created_at INTEGER DEFAULT (unixepoch()),
+  updated_at INTEGER DEFAULT (unixepoch()),
+  FOREIGN KEY (session_id) REFERENCES career_sessions(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS pathways (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  goal_id INTEGER NOT NULL,
+  pathway_name TEXT NOT NULL,
+  pathway_type TEXT NOT NULL CHECK(pathway_type IN ('primary', 'alternative', 'regenerated')),
+  description TEXT,
+  generation_prompt TEXT,
+  is_active INTEGER DEFAULT 1,
+  created_at INTEGER DEFAULT (unixepoch()),
+  updated_at INTEGER DEFAULT (unixepoch()),
+  FOREIGN KEY (goal_id) REFERENCES career_goals(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS pathway_milestones (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  pathway_id INTEGER NOT NULL,
+  milestone_month INTEGER NOT NULL,
+  milestone_year INTEGER NOT NULL,
+  milestone_type TEXT NOT NULL CHECK(milestone_type IN ('academic', 'extracurricular', 'application', 'general')),
+  title TEXT NOT NULL,
+  description TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending', 'in_progress', 'completed', 'failed', 'skipped')),
+  completion_notes TEXT,
+  completed_at INTEGER,
+  order_index INTEGER NOT NULL,
+  FOREIGN KEY (pathway_id) REFERENCES pathways(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS subject_grade_targets (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  pathway_id INTEGER NOT NULL,
+  subject_name TEXT NOT NULL,
+  current_grade TEXT,
+  target_grade TEXT NOT NULL,
+  current_percentage INTEGER,
+  target_percentage INTEGER NOT NULL,
+  priority TEXT NOT NULL DEFAULT 'medium' CHECK(priority IN ('low', 'medium', 'high', 'critical')),
+  notes TEXT,
+  FOREIGN KEY (pathway_id) REFERENCES pathways(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS topic_improvement_links (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  milestone_id INTEGER NOT NULL,
+  subject_name TEXT NOT NULL,
+  topic_id INTEGER,
+  topic_name TEXT NOT NULL,
+  topic_description TEXT,
+  improvement_reason TEXT,
+  current_score INTEGER,
+  target_score INTEGER NOT NULL,
+  exammer_link TEXT,
+  FOREIGN KEY (milestone_id) REFERENCES pathway_milestones(id) ON DELETE CASCADE,
+  FOREIGN KEY (topic_id) REFERENCES topics(id) ON DELETE SET NULL
+);
+
+CREATE TABLE IF NOT EXISTS pathway_regeneration_history (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  pathway_id INTEGER NOT NULL,
+  regeneration_reason TEXT NOT NULL,
+  failed_milestone_ids TEXT,
+  prompt_adjustments TEXT,
+  created_at INTEGER DEFAULT (unixepoch()),
+  FOREIGN KEY (pathway_id) REFERENCES pathways(id) ON DELETE CASCADE
+);
+
+-- Create indexes for careers tables
+CREATE INDEX IF NOT EXISTS idx_career_sessions_user_id ON career_sessions(user_id);
+CREATE INDEX IF NOT EXISTS idx_brainstorm_nodes_session_id ON brainstorm_nodes(session_id);
+CREATE INDEX IF NOT EXISTS idx_brainstorm_nodes_parent ON brainstorm_nodes(parent_node_id);
+CREATE INDEX IF NOT EXISTS idx_career_goals_session_id ON career_goals(session_id);
+CREATE INDEX IF NOT EXISTS idx_pathways_goal_id ON pathways(goal_id);
+CREATE INDEX IF NOT EXISTS idx_pathway_milestones_pathway_id ON pathway_milestones(pathway_id);
+CREATE INDEX IF NOT EXISTS idx_pathway_milestones_month ON pathway_milestones(milestone_month, milestone_year);
+CREATE INDEX IF NOT EXISTS idx_subject_grade_targets_pathway_id ON subject_grade_targets(pathway_id);
+CREATE INDEX IF NOT EXISTS idx_topic_improvement_links_milestone_id ON topic_improvement_links(milestone_id);
+CREATE INDEX IF NOT EXISTS idx_topic_improvement_links_topic_id ON topic_improvement_links(topic_id);
+CREATE INDEX IF NOT EXISTS idx_pathway_regeneration_history_pathway_id ON pathway_regeneration_history(pathway_id);
+
 -- Database version tracking table
 CREATE TABLE IF NOT EXISTS db_version (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
