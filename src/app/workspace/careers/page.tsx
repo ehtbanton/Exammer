@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Target, Sparkles, ArrowRight } from 'lucide-react';
 import LoadingSpinner from '@/components/LoadingSpinner';
+import OnboardingWizard from '@/components/careers/OnboardingWizard';
 
 export default function CareersPage() {
   return (
@@ -20,6 +21,8 @@ function CareersPageContent() {
   const { data: session } = useSession();
   const [hasSession, setHasSession] = useState<boolean | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  const [onboardingType, setOnboardingType] = useState<'explore' | 'direct'>('explore');
 
   useEffect(() => {
     const checkSession = async () => {
@@ -42,6 +45,13 @@ function CareersPageContent() {
     checkSession();
   }, []);
 
+  const handleOnboardingComplete = (sessionId: number) => {
+    setShowOnboarding(false);
+    setHasSession(true);
+    // Reload to show dashboard with new session
+    window.location.reload();
+  };
+
   if (isLoading) {
     return (
       <div className="container mx-auto px-4 py-8">
@@ -50,53 +60,42 @@ function CareersPageContent() {
     );
   }
 
+  // Show onboarding wizard if user selected a path
+  if (showOnboarding) {
+    return (
+      <OnboardingWizard
+        sessionType={onboardingType}
+        onComplete={handleOnboardingComplete}
+      />
+    );
+  }
+
   // Show welcome screen if no session exists
   if (hasSession === false) {
-    return <WelcomeScreen />;
+    return (
+      <WelcomeScreen
+        onStartExploring={() => {
+          setOnboardingType('explore');
+          setShowOnboarding(true);
+        }}
+        onKnowMyGoal={() => {
+          setOnboardingType('direct');
+          setShowOnboarding(true);
+        }}
+      />
+    );
   }
 
   // Show careers dashboard if session exists
   return <CareersDashboard />;
 }
 
-function WelcomeScreen() {
-  const [isCreatingSession, setIsCreatingSession] = useState(false);
+interface WelcomeScreenProps {
+  onStartExploring: () => void;
+  onKnowMyGoal: () => void;
+}
 
-  const handleStartExploring = async () => {
-    setIsCreatingSession(true);
-    try {
-      const response = await fetch('/api/careers/sessions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sessionType: 'explore' }),
-      });
-
-      if (response.ok) {
-        window.location.reload();
-      }
-    } catch (error) {
-      console.error('Error creating session:', error);
-      setIsCreatingSession(false);
-    }
-  };
-
-  const handleKnowMyGoal = async () => {
-    setIsCreatingSession(true);
-    try {
-      const response = await fetch('/api/careers/sessions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sessionType: 'direct' }),
-      });
-
-      if (response.ok) {
-        window.location.reload();
-      }
-    } catch (error) {
-      console.error('Error creating session:', error);
-      setIsCreatingSession(false);
-    }
-  };
+function WelcomeScreen({ onStartExploring, onKnowMyGoal }: WelcomeScreenProps) {
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-5xl">
@@ -139,12 +138,11 @@ function WelcomeScreen() {
               </li>
             </ul>
             <Button
-              onClick={handleStartExploring}
-              disabled={isCreatingSession}
+              onClick={onStartExploring}
               className="w-full"
               size="lg"
             >
-              {isCreatingSession ? 'Starting...' : 'Start Exploring'}
+              Start Exploring
             </Button>
           </CardContent>
         </Card>
@@ -175,13 +173,12 @@ function WelcomeScreen() {
               </li>
             </ul>
             <Button
-              onClick={handleKnowMyGoal}
-              disabled={isCreatingSession}
+              onClick={onKnowMyGoal}
               variant="outline"
               className="w-full"
               size="lg"
             >
-              {isCreatingSession ? 'Starting...' : 'Set My Goal'}
+              Set My Goal
             </Button>
           </CardContent>
         </Card>
