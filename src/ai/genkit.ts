@@ -139,35 +139,38 @@ function createTokenTrackingWrapper(
     return ai; // No tracking needed
   }
 
-  // Create a proxy that intercepts generate calls to track usage
-  const originalGenerate = ai.generate.bind(ai);
+  // Use a Proxy to intercept method calls while preserving all other functionality
+  return new Proxy(ai, {
+    get(target, prop, receiver) {
+      const value = Reflect.get(target, prop, receiver);
 
-  const wrappedGenerate = async (...args: Parameters<typeof originalGenerate>) => {
-    const response = await originalGenerate(...args);
+      // Only wrap the generate method
+      if (prop === 'generate' && typeof value === 'function') {
+        return async (...args: any[]) => {
+          const response = await value.apply(target, args);
 
-    // Extract token usage from response
-    if (response.usage) {
-      const inputTokens = response.usage.inputTokens || 0;
-      const outputTokens = response.usage.outputTokens || 0;
-      const totalTokens = inputTokens + outputTokens;
+          // Extract token usage from response
+          if (response.usage) {
+            const inputTokens = response.usage.inputTokens || 0;
+            const outputTokens = response.usage.outputTokens || 0;
+            const totalTokens = inputTokens + outputTokens;
 
-      if (totalTokens > 0) {
-        // Call the callback to track tokens
-        if (onTokensUsed) {
-          onTokensUsed(totalTokens);
-        }
+            if (totalTokens > 0) {
+              // Call the callback to track tokens
+              if (onTokensUsed) {
+                onTokensUsed(totalTokens);
+              }
+            }
+          }
+
+          return response;
+        };
       }
+
+      // Return all other properties/methods as-is
+      return value;
     }
-
-    return response;
-  };
-
-  // Return a new object with the wrapped generate function
-  // We need to be careful here to preserve all other Genkit functionality
-  return {
-    ...ai,
-    generate: wrappedGenerate,
-  } as Genkit;
+  }) as Genkit;
 }
 
 /**
