@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { BookOpen, Users, MessageSquare, Bot } from 'lucide-react';
 import { UnderstandingIndicator } from '@/components/ui/understanding-indicator';
 import { Progress } from '@/components/ui/progress';
+import Footer from '@/components/Footer';
 
 export default function HomePage() {
   return (
@@ -297,18 +298,8 @@ export default function HomePage() {
         </Link>
       </div>
 
-      {/* Contact Section */}
-      <div className="container mx-auto px-4 pb-12 text-center">
-        <p className="text-xl text-muted-foreground">
-          Got questions? Contact the app's creator at{' '}
-          <a
-            href="mailto:anton.may@new.ox.ac.uk"
-            className="text-primary hover:underline"
-          >
-            anton.may@new.ox.ac.uk
-          </a>
-        </p>
-      </div>
+      {/* Footer */}
+      <Footer />
     </div>
   );
 }

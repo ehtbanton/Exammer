@@ -4,15 +4,39 @@ import { AppProvider } from '@/app/context/AppContext';
 import { SessionProvider } from '@/components/SessionProvider';
 import { Toaster } from '@/components/ui/toaster';
 import Header from '@/components/Header';
+import CookieConsent from '@/components/CookieConsent';
 import { BackgroundTaskIndicator } from '@/components/BackgroundTaskIndicator';
 import { ThemeProvider } from '@/components/theme-provider';
 import { cn } from '@/lib/utils';
 
 export const metadata: Metadata = {
+  metadataBase: new URL('https://exammer.co.uk'),
   title: 'Exammer',
   description: 'AI-Powered Exam Preparation Tool',
   icons: {
     icon: '/exammer.png',
+  },
+  openGraph: {
+    title: 'Exammer - Get hooked on Revision',
+    description: 'AI framework that turns past papers into a structured revision plan, using an interactive tutor and gamified progress tracking.',
+    url: 'https://exammer.co.uk',
+    siteName: 'Exammer',
+    images: [
+      {
+        url: '/exammer.png',
+        width: 800,
+        height: 800,
+        alt: 'Exammer Logo',
+      },
+    ],
+    locale: 'en_GB',
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary',
+    title: 'Exammer - Get hooked on Revision',
+    description: 'AI framework that turns past papers into a structured revision plan.',
+    images: ['/exammer.png'],
   },
 };
 
@@ -40,6 +64,7 @@ export default function RootLayout({
                 </main>
               </div>
               <BackgroundTaskIndicator />
+              <CookieConsent />
               <Toaster />
             </AppProvider>
           </SessionProvider>
