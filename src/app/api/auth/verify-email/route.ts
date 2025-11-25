@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyEmailToken } from '@/lib/verification-tokens';
+import { db } from '@/lib/db';
+import crypto from 'crypto';
 
 export async function GET(req: NextRequest) {
   try {
@@ -23,9 +25,19 @@ export async function GET(req: NextRequest) {
       );
     }
 
+    // Create a one-time auto-login token (expires in 5 minutes)
+    const autoLoginToken = crypto.randomBytes(32).toString('hex');
+    const expiresAt = Math.floor(Date.now() / 1000) + (5 * 60); // 5 minutes
+
+    await db.run(
+      'INSERT INTO verification_tokens (identifier, token, expires) VALUES (?, ?, ?)',
+      [`autologin:${result.email}`, autoLoginToken, expiresAt]
+    );
+
     return NextResponse.json({
-      message: 'Email verified successfully! You can now sign in.',
-      email: result.email
+      message: 'Email verified successfully! Logging you in...',
+      email: result.email,
+      autoLoginToken
     });
   } catch (error) {
     console.error('Email verification error:', error);

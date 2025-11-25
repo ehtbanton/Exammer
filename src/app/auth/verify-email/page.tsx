@@ -2,6 +2,7 @@
 
 import { useEffect, useState, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
+import { signIn } from 'next-auth/react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -34,10 +35,22 @@ function VerifyEmailContent() {
           setMessage(data.message);
           setEmail(data.email);
 
-          // Redirect to signin after 3 seconds
-          setTimeout(() => {
-            router.push('/auth/signin');
-          }, 3000);
+          // Auto-login with the token and redirect to workspace
+          if (data.autoLoginToken) {
+            const result = await signIn('credentials', {
+              email: data.email,
+              autoLoginToken: data.autoLoginToken,
+              redirect: false,
+            });
+
+            if (result?.ok) {
+              // Successfully logged in, redirect to workspace
+              router.push('/home');
+            } else {
+              setStatus('error');
+              setMessage('Verification successful but auto-login failed. Please sign in manually.');
+            }
+          }
         } else {
           setStatus('error');
           setMessage(data.error || 'Verification failed');
@@ -88,7 +101,7 @@ function VerifyEmailContent() {
                 </AlertDescription>
               </Alert>
               <p className="text-sm text-muted-foreground text-center">
-                Redirecting to sign in page...
+                Logging you in and redirecting to workspace...
               </p>
             </div>
           )}
@@ -109,9 +122,9 @@ function VerifyEmailContent() {
         </CardContent>
         <CardFooter className="flex gap-2">
           {status === 'success' && (
-            <Link href="/auth/signin" className="w-full">
+            <Link href="/home" className="w-full">
               <Button className="w-full">
-                Continue to Sign In
+                Continue to Workspace
               </Button>
             </Link>
           )}

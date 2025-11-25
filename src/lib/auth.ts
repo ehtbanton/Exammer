@@ -12,11 +12,12 @@ export const authOptions: NextAuthOptions = {
       name: 'credentials',
       credentials: {
         email: { label: 'Email', type: 'email' },
-        password: { label: 'Password', type: 'password' }
+        password: { label: 'Password', type: 'password' },
+        autoLoginToken: { label: 'Auto Login Token', type: 'text' }
       },
       async authorize(credentials) {
-        if (!credentials?.email || !credentials?.password) {
-          throw new Error('Please enter your email and password');
+        if (!credentials?.email) {
+          throw new Error('Please enter your email');
         }
 
         const user = await db.get<User>(
@@ -24,7 +25,47 @@ export const authOptions: NextAuthOptions = {
           [credentials.email]
         );
 
-        if (!user || !user.password_hash) {
+        if (!user) {
+          throw new Error('EMAIL_NOT_FOUND');
+        }
+
+        // Check for auto-login token (used after email verification)
+        if (credentials.autoLoginToken) {
+          const now = Math.floor(Date.now() / 1000);
+          const tokenRecord = await db.get<{ expires: number }>(
+            'SELECT expires FROM verification_tokens WHERE identifier = ? AND token = ?',
+            [`autologin:${credentials.email}`, credentials.autoLoginToken]
+          );
+
+          if (!tokenRecord || tokenRecord.expires < now) {
+            throw new Error('Invalid or expired auto-login token');
+          }
+
+          // Delete the used token (one-time use)
+          await db.run(
+            'DELETE FROM verification_tokens WHERE identifier = ? AND token = ?',
+            [`autologin:${credentials.email}`, credentials.autoLoginToken]
+          );
+
+          // Check if user has access (access_level > 0)
+          if (!user.access_level || user.access_level === 0) {
+            throw new Error('EMAIL_NOT_VERIFIED');
+          }
+
+          return {
+            id: user.id.toString(),
+            email: user.email,
+            name: user.name || null,
+            image: user.image || null,
+          };
+        }
+
+        // Regular password-based login
+        if (!credentials?.password) {
+          throw new Error('Please enter your password');
+        }
+
+        if (!user.password_hash) {
           throw new Error('EMAIL_NOT_FOUND');
         }
 
