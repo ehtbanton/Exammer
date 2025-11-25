@@ -23,7 +23,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { sessionId } = body;
+    const { sessionId, replanReason, replanReasonType } = body;
 
     if (!sessionId) {
       return NextResponse.json(
@@ -222,10 +222,31 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Store replanning history if this is a replan
+    if (replanReason) {
+      await db.run(
+        `INSERT INTO pathway_regeneration_history (
+          goal_id,
+          old_pathway_id,
+          new_pathway_id,
+          reason,
+          reason_type,
+          regenerated_at
+        ) VALUES (?, ?, ?, ?, ?, unixepoch())`,
+        [
+          goal.id,
+          null, // We don't track old pathway ID in this simple implementation
+          pathwayId,
+          replanReason,
+          replanReasonType || 'other',
+        ]
+      );
+    }
+
     return NextResponse.json({
       pathwayId,
       pathway,
-      message: 'Pathway generated successfully',
+      message: replanReason ? 'Pathway replanned successfully' : 'Pathway generated successfully',
     }, { status: 201 });
   } catch (error) {
     console.error('Error generating pathway:', error);

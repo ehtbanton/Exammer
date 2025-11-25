@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
+import ReplanDialog from './ReplanDialog';
 
 interface Milestone {
   id: number;
@@ -64,6 +65,7 @@ export default function PathwayDashboard({
   const [pathway, setPathway] = useState<Pathway | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [showReplanDialog, setShowReplanDialog] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -85,19 +87,23 @@ export default function PathwayDashboard({
     }
   };
 
-  const handleGeneratePathway = async () => {
+  const handleGeneratePathway = async (reason?: string, reasonType?: string) => {
     setIsGenerating(true);
     try {
       const response = await fetch('/api/careers/pathways', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sessionId }),
+        body: JSON.stringify({
+          sessionId,
+          replanReason: reason,
+          replanReasonType: reasonType,
+        }),
       });
 
       if (response.ok) {
         toast({
-          title: 'Pathway generated!',
-          description: 'Your personalized pathway is ready',
+          title: reason ? 'Pathway replanned!' : 'Pathway generated!',
+          description: reason ? 'Your pathway has been updated' : 'Your personalized pathway is ready',
         });
         await loadPathway();
       } else {
@@ -113,6 +119,10 @@ export default function PathwayDashboard({
     } finally {
       setIsGenerating(false);
     }
+  };
+
+  const handleReplan = async (reason: string, reasonType: string) => {
+    await handleGeneratePathway(reason, reasonType);
   };
 
   const handleToggleMilestone = async (milestoneId: number, currentStatus: string) => {
@@ -224,16 +234,20 @@ export default function PathwayDashboard({
             <h1 className="text-3xl font-bold mb-2">{pathway.title}</h1>
             <p className="text-muted-foreground">{pathway.overview_summary}</p>
           </div>
-          <Button variant="outline" onClick={handleGeneratePathway} disabled={isGenerating}>
+          <Button
+            variant="outline"
+            onClick={() => setShowReplanDialog(true)}
+            disabled={isGenerating}
+          >
             {isGenerating ? (
               <>
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Regenerating...
+                Replanning...
               </>
             ) : (
               <>
                 <Sparkles className="w-4 h-4 mr-2" />
-                Regenerate
+                Replan
               </>
             )}
           </Button>
@@ -406,6 +420,13 @@ export default function PathwayDashboard({
           )}
         </TabsContent>
       </Tabs>
+
+      {/* Replan Dialog */}
+      <ReplanDialog
+        open={showReplanDialog}
+        onOpenChange={setShowReplanDialog}
+        onReplan={handleReplan}
+      />
     </div>
   );
 }
