@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Target, Sparkles, ArrowRight } from 'lucide-react';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import OnboardingWizard from '@/components/careers/OnboardingWizard';
+import BrainstormMindmap from '@/components/careers/BrainstormMindmap';
 
 export default function CareersPage() {
   return (
@@ -17,9 +18,18 @@ export default function CareersPage() {
   );
 }
 
+interface CareerSession {
+  id: number;
+  session_type: 'explore' | 'direct';
+  brainstorm_complete: number;
+  current_school: string | null;
+  current_year_group: string | null;
+  target_application_year: number | null;
+}
+
 function CareersPageContent() {
   const { data: session } = useSession();
-  const [hasSession, setHasSession] = useState<boolean | null>(null);
+  const [currentSession, setCurrentSession] = useState<CareerSession | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [onboardingType, setOnboardingType] = useState<'explore' | 'direct'>('explore');
@@ -30,13 +40,18 @@ function CareersPageContent() {
         const response = await fetch('/api/careers/sessions');
         if (response.ok) {
           const data = await response.json();
-          setHasSession(data.sessions && data.sessions.length > 0);
+          if (data.sessions && data.sessions.length > 0) {
+            // Get the most recent session
+            setCurrentSession(data.sessions[0]);
+          } else {
+            setCurrentSession(null);
+          }
         } else {
-          setHasSession(false);
+          setCurrentSession(null);
         }
       } catch (error) {
         console.error('Error checking career session:', error);
-        setHasSession(false);
+        setCurrentSession(null);
       } finally {
         setIsLoading(false);
       }
@@ -47,8 +62,12 @@ function CareersPageContent() {
 
   const handleOnboardingComplete = (sessionId: number) => {
     setShowOnboarding(false);
-    setHasSession(true);
-    // Reload to show dashboard with new session
+    // Reload to show next step
+    window.location.reload();
+  };
+
+  const handleBrainstormComplete = () => {
+    // Reload to show dashboard
     window.location.reload();
   };
 
@@ -71,7 +90,7 @@ function CareersPageContent() {
   }
 
   // Show welcome screen if no session exists
-  if (hasSession === false) {
+  if (!currentSession) {
     return (
       <WelcomeScreen
         onStartExploring={() => {
@@ -86,8 +105,26 @@ function CareersPageContent() {
     );
   }
 
-  // Show careers dashboard if session exists
-  return <CareersDashboard />;
+  // Show brainstorming mindmap if explore session hasn't completed brainstorming
+  if (currentSession.session_type === 'explore' && !currentSession.brainstorm_complete) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <div className="mb-6">
+          <h1 className="text-3xl font-bold mb-2">Explore Your Interests</h1>
+          <p className="text-muted-foreground">
+            Click on any term to explore related career paths and academic subjects
+          </p>
+        </div>
+        <BrainstormMindmap
+          sessionId={currentSession.id}
+          onComplete={handleBrainstormComplete}
+        />
+      </div>
+    );
+  }
+
+  // Show careers dashboard if session exists and brainstorm is complete (or direct session)
+  return <CareersDashboard session={currentSession} />;
 }
 
 interface WelcomeScreenProps {
@@ -219,15 +256,29 @@ function WelcomeScreen({ onStartExploring, onKnowMyGoal }: WelcomeScreenProps) {
   );
 }
 
-function CareersDashboard() {
+interface CareersDashboardProps {
+  session: CareerSession;
+}
+
+function CareersDashboard({ session }: CareersDashboardProps) {
   return (
     <div className="container mx-auto px-4 py-8">
       <h1 className="text-3xl font-bold mb-6">Your Career Pathway</h1>
       <Card>
         <CardContent className="pt-6">
-          <p className="text-muted-foreground">
-            Careers dashboard coming soon! This is where you'll see your brainstorming sessions, goals, and pathways.
-          </p>
+          <div className="space-y-4">
+            <p className="text-muted-foreground">
+              Careers dashboard coming soon! This is where you'll see your goals and pathways.
+            </p>
+            <div className="text-sm">
+              <p><strong>Session Type:</strong> {session.session_type === 'explore' ? 'Exploration' : 'Direct Goal'}</p>
+              {session.current_school && <p><strong>School:</strong> {session.current_school}</p>}
+              {session.current_year_group && <p><strong>Year:</strong> {session.current_year_group}</p>}
+              {session.brainstorm_complete === 1 && (
+                <p className="text-green-600">✓ Brainstorming Complete</p>
+              )}
+            </div>
+          </div>
         </CardContent>
       </Card>
     </div>
