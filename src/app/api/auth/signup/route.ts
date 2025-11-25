@@ -5,6 +5,7 @@ import type { User } from '@/lib/db';
 import { createVerificationToken } from '@/lib/verification-tokens';
 import { sendVerificationEmail } from '@/lib/email';
 import { checkSignupRateLimit, getClientIP, createRateLimitHeaders } from '@/lib/rate-limiter';
+import { syncNewUser } from '@/lib/user-access-sync';
 
 const SIGNUP_RATE_LIMIT = 9; // matches the limit in rate-limiter.ts
 
@@ -58,11 +59,14 @@ export async function POST(req: NextRequest) {
     // Hash password
     const hashedPassword = await hash(password, 12);
 
-    // Create user with email NOT verified (NULL/0) but with level 1 access (student)
+    // Create user with email NOT verified and access_level 0 (no access until verified)
     const result = await db.run(
       'INSERT INTO users (email, password_hash, name, email_verified, access_level) VALUES (?, ?, ?, ?, ?)',
-      [email, hashedPassword, name || null, 0, 1]
+      [email, hashedPassword, name || null, 0, 0]
     );
+
+    // Sync user to users.json immediately
+    await syncNewUser();
 
     // Create verification token
     const token = await createVerificationToken(email);

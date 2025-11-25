@@ -34,8 +34,8 @@ export const authOptions: NextAuthOptions = {
           throw new Error('Invalid email or password');
         }
 
-        // Check if email is verified
-        if (!user.email_verified || user.email_verified === 0) {
+        // Check if user has access (access_level > 0)
+        if (!user.access_level || user.access_level === 0) {
           throw new Error('EMAIL_NOT_VERIFIED');
         }
 
