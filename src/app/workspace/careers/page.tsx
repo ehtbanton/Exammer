@@ -10,6 +10,7 @@ import LoadingSpinner from '@/components/LoadingSpinner';
 import OnboardingWizard from '@/components/careers/OnboardingWizard';
 import BrainstormMindmap from '@/components/careers/BrainstormMindmap';
 import GoalSetting from '@/components/careers/GoalSetting';
+import PathwayDashboard from '@/components/careers/PathwayDashboard';
 
 export default function CareersPage() {
   return (
@@ -28,9 +29,17 @@ interface CareerSession {
   target_application_year: number | null;
 }
 
+interface CareerGoal {
+  id: number;
+  university_name: string;
+  course_name: string;
+  entry_requirements: string | null;
+}
+
 function CareersPageContent() {
   const { data: session } = useSession();
   const [currentSession, setCurrentSession] = useState<CareerSession | null>(null);
+  const [currentGoal, setCurrentGoal] = useState<CareerGoal | null>(null);
   const [hasGoal, setHasGoal] = useState<boolean | null>(null);
   const [brainstormInterests, setBrainstormInterests] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -52,6 +61,9 @@ function CareersPageContent() {
             if (goalResponse.ok) {
               const goalData = await goalResponse.json();
               setHasGoal(!!goalData.goal);
+              if (goalData.goal) {
+                setCurrentGoal(goalData.goal);
+              }
             }
 
             // If explore session with completed brainstorm, load interests
@@ -168,7 +180,18 @@ function CareersPageContent() {
   }
 
   // Show careers dashboard if session exists and goal is set
-  return <CareersDashboard session={currentSession} />;
+  if (currentGoal) {
+    return (
+      <PathwayDashboard
+        sessionId={currentSession.id}
+        universityName={currentGoal.university_name}
+        courseName={currentGoal.course_name}
+      />
+    );
+  }
+
+  // Fallback (should not reach here)
+  return <LoadingSpinner />;
 }
 
 interface WelcomeScreenProps {
@@ -300,31 +323,3 @@ function WelcomeScreen({ onStartExploring, onKnowMyGoal }: WelcomeScreenProps) {
   );
 }
 
-interface CareersDashboardProps {
-  session: CareerSession;
-}
-
-function CareersDashboard({ session }: CareersDashboardProps) {
-  return (
-    <div className="container mx-auto px-4 py-8">
-      <h1 className="text-3xl font-bold mb-6">Your Career Pathway</h1>
-      <Card>
-        <CardContent className="pt-6">
-          <div className="space-y-4">
-            <p className="text-muted-foreground">
-              Careers dashboard coming soon! This is where you'll see your goals and pathways.
-            </p>
-            <div className="text-sm">
-              <p><strong>Session Type:</strong> {session.session_type === 'explore' ? 'Exploration' : 'Direct Goal'}</p>
-              {session.current_school && <p><strong>School:</strong> {session.current_school}</p>}
-              {session.current_year_group && <p><strong>Year:</strong> {session.current_year_group}</p>}
-              {session.brainstorm_complete === 1 && (
-                <p className="text-green-600">✓ Brainstorming Complete</p>
-              )}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
-  );
-}
