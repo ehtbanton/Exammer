@@ -136,7 +136,7 @@ export default function ClassDashboardPage({ params }: { params: Promise<{ class
 
   const fetchAvailableSubjects = async () => {
     try {
-      const response = await fetch('/api/subjects');
+      const response = await fetch('/api/subjects/list');
       if (response.ok) {
         const data = await response.json();
         setAvailableSubjects(data.map((s: any) => ({ id: s.id, name: s.name })));
@@ -454,26 +454,43 @@ export default function ClassDashboardPage({ params }: { params: Promise<{ class
               <CardDescription>Assign subjects for students to access</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="flex gap-2">
-                <Select value={selectedSubject} onValueChange={setSelectedSubject}>
-                  <SelectTrigger className="flex-1">
-                    <SelectValue placeholder="Select a subject..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {availableSubjects
-                      .filter(s => !subjects.find(cs => cs.id === s.id))
-                      .map((subject) => (
-                        <SelectItem key={subject.id} value={subject.id.toString()}>
-                          {subject.name}
-                        </SelectItem>
-                      ))}
-                  </SelectContent>
-                </Select>
-                <Button onClick={handleAddSubject} disabled={addingSubject || !selectedSubject}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Subject
-                </Button>
-              </div>
+              {availableSubjects.length === 0 ? (
+                <div className="text-center py-4 text-muted-foreground">
+                  <p>No subjects available in your workspace.</p>
+                  <p className="text-sm mt-2">
+                    Add subjects to your workspace first from the{' '}
+                    <a href="/workspace" className="text-primary hover:underline">
+                      Workspace page
+                    </a>
+                    .
+                  </p>
+                </div>
+              ) : availableSubjects.filter(s => !subjects.find(cs => cs.id === s.id)).length === 0 ? (
+                <div className="text-center py-4 text-muted-foreground">
+                  All available subjects have been added to this class.
+                </div>
+              ) : (
+                <div className="flex gap-2">
+                  <Select value={selectedSubject} onValueChange={setSelectedSubject}>
+                    <SelectTrigger className="flex-1">
+                      <SelectValue placeholder="Select a subject..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availableSubjects
+                        .filter(s => !subjects.find(cs => cs.id === s.id))
+                        .map((subject) => (
+                          <SelectItem key={subject.id} value={subject.id.toString()}>
+                            {subject.name}
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                  <Button onClick={handleAddSubject} disabled={addingSubject || !selectedSubject}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Subject
+                  </Button>
+                </div>
+              )}
             </CardContent>
           </Card>
 
