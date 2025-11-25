@@ -9,6 +9,7 @@ import { Target, Sparkles, ArrowRight } from 'lucide-react';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import OnboardingWizard from '@/components/careers/OnboardingWizard';
 import BrainstormMindmap from '@/components/careers/BrainstormMindmap';
+import GoalSetting from '@/components/careers/GoalSetting';
 
 export default function CareersPage() {
   return (
@@ -30,19 +31,41 @@ interface CareerSession {
 function CareersPageContent() {
   const { data: session } = useSession();
   const [currentSession, setCurrentSession] = useState<CareerSession | null>(null);
+  const [hasGoal, setHasGoal] = useState<boolean | null>(null);
+  const [brainstormInterests, setBrainstormInterests] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [onboardingType, setOnboardingType] = useState<'explore' | 'direct'>('explore');
 
   useEffect(() => {
-    const checkSession = async () => {
+    const checkSessionAndGoal = async () => {
       try {
         const response = await fetch('/api/careers/sessions');
         if (response.ok) {
           const data = await response.json();
           if (data.sessions && data.sessions.length > 0) {
-            // Get the most recent session
-            setCurrentSession(data.sessions[0]);
+            const sessionData = data.sessions[0];
+            setCurrentSession(sessionData);
+
+            // Check if goal exists
+            const goalResponse = await fetch(`/api/careers/goals?sessionId=${sessionData.id}`);
+            if (goalResponse.ok) {
+              const goalData = await goalResponse.json();
+              setHasGoal(!!goalData.goal);
+            }
+
+            // If explore session with completed brainstorm, load interests
+            if (sessionData.session_type === 'explore' && sessionData.brainstorm_complete) {
+              const nodesResponse = await fetch(`/api/careers/brainstorm/nodes?sessionId=${sessionData.id}`);
+              if (nodesResponse.ok) {
+                const nodesData = await nodesResponse.json();
+                // Extract leaf node labels as interests
+                const interests = nodesData.nodes
+                  .filter((n: any) => !n.isRoot)
+                  .map((n: any) => n.label);
+                setBrainstormInterests(interests);
+              }
+            }
           } else {
             setCurrentSession(null);
           }
@@ -57,7 +80,7 @@ function CareersPageContent() {
       }
     };
 
-    checkSession();
+    checkSessionAndGoal();
   }, []);
 
   const handleOnboardingComplete = (sessionId: number) => {
@@ -67,6 +90,11 @@ function CareersPageContent() {
   };
 
   const handleBrainstormComplete = () => {
+    // Reload to show goal setting
+    window.location.reload();
+  };
+
+  const handleGoalComplete = () => {
     // Reload to show dashboard
     window.location.reload();
   };
@@ -123,7 +151,23 @@ function CareersPageContent() {
     );
   }
 
-  // Show careers dashboard if session exists and brainstorm is complete (or direct session)
+  // Show goal setting if session exists but no goal set yet
+  if (hasGoal === false) {
+    return (
+      <GoalSetting
+        sessionId={currentSession.id}
+        sessionType={currentSession.session_type}
+        brainstormData={
+          currentSession.session_type === 'explore'
+            ? { interests: brainstormInterests }
+            : undefined
+        }
+        onComplete={handleGoalComplete}
+      />
+    );
+  }
+
+  // Show careers dashboard if session exists and goal is set
   return <CareersDashboard session={currentSession} />;
 }
 
