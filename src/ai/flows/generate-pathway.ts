@@ -85,16 +85,17 @@ export type GeneratePathwayOutput = z.infer<typeof GeneratePathwayOutputSchema>;
 export async function generatePathway(
   input: GeneratePathwayInput
 ): Promise<GeneratePathwayOutput> {
-  return await executeWithManagedKey(async (ai) => {
-    const generatePrompt = ai.definePrompt({
-      name: 'generatePathway',
-      input: {
-        schema: GeneratePathwayInputSchema,
-      },
-      output: {
-        schema: GeneratePathwayOutputSchema,
-      },
-      prompt: `You are an expert university admissions advisor creating a personalized pathway plan for a UK student.
+  return await executeWithManagedKey(
+    async (ai, flowInput) => {
+      const generatePrompt = ai.definePrompt({
+        name: 'generatePathway',
+        input: {
+          schema: GeneratePathwayInputSchema,
+        },
+        output: {
+          schema: GeneratePathwayOutputSchema,
+        },
+        prompt: `You are an expert university admissions advisor creating a personalized pathway plan for a UK student.
 
 **University Goal:**
 - University: {{universityName}}
@@ -180,10 +181,14 @@ Generate a comprehensive, actionable pathway from **now** until the UCAS applica
 }
 
 Generate the complete pathway now.`,
-    }, { model: 'googleai/gemini-2.0-flash-exp' });
+      });
 
-    const result = await generatePrompt(input);
+      const result = await generatePrompt(flowInput, {
+        model: 'googleai/gemini-flash-lite-latest',
+      });
 
-    return result.output;
-  });
+      return result.output;
+    },
+    input
+  );
 }

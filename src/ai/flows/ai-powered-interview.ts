@@ -253,7 +253,7 @@ Use your knowledge of the subject matter to assess the answer fairly.`},
       solutionObjectives,
       previouslyCompletedObjectives,
     }, {
-      model: 'googleai/gemini-2.5-flash-lite',
+      model: 'googleai/gemini-flash-lite-latest',
     });
 
     if (!output) {
@@ -312,7 +312,7 @@ Output only the question in the 'question' field.`,
       subsection,
       pastPapers,
     }, {
-      model: 'googleai/gemini-2.5-flash-lite',
+      model: 'googleai/gemini-flash-lite-latest',
     });
 
     if (!output) {

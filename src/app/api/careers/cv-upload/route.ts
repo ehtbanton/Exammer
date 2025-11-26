@@ -4,7 +4,7 @@ import { authOptions } from '@/lib/auth';
 import { writeFile, mkdir, readFile } from 'fs/promises';
 import { join } from 'path';
 import { existsSync } from 'fs';
-import pdfParse from 'pdf-parse';
+const pdfParse = require('pdf-parse');
 import mammoth from 'mammoth';
 import { extractCvData } from '@/ai/flows/extract-cv-data';
 

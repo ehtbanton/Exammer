@@ -24,7 +24,7 @@ export const ESTIMATED_TOKENS = {
 // Default AI instance using the first available key
 export const ai = genkit({
   plugins: [googleAI()],
-  model: 'googleai/gemini-2.5-flash-lite',
+  model: 'googleai/gemini-flash-lite-latest',
 });
 
 /**
@@ -34,7 +34,7 @@ export const ai = genkit({
 export function createGenkitInstance(apiKey: string): Genkit {
   return genkit({
     plugins: [googleAI({apiKey})],
-    model: 'googleai/gemini-2.5-flash-lite',
+    model: 'googleai/gemini-flash-lite-latest',
   });
 }
 

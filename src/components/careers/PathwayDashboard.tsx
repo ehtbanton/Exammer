@@ -17,6 +17,7 @@ import {
   Sparkles,
   TrendingUp,
   Loader2,
+  RotateCcw,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
@@ -125,6 +126,25 @@ export default function PathwayDashboard({
     await handleGeneratePathway(reason, reasonType);
   };
 
+  const handleReset = async () => {
+    if (!confirm('Are you sure you want to start over? This will delete your current progress.')) return;
+    
+    try {
+      await fetch('/api/careers/sessions/reset', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId }),
+      });
+      window.location.reload();
+    } catch (error) {
+      console.error('Error resetting:', error);
+      toast({
+        title: 'Failed to reset',
+        variant: 'destructive',
+      });
+    }
+  };
+
   const handleToggleMilestone = async (milestoneId: number, currentStatus: string) => {
     const newStatus = currentStatus === 'completed' ? 'pending' : 'completed';
 
@@ -168,8 +188,14 @@ export default function PathwayDashboard({
   // Show generate button if no pathway exists
   if (!pathway) {
     return (
-      <div className="container mx-auto px-4 py-8 max-w-3xl">
-        <Card className="text-center p-12">
+      <div className="container mx-auto px-4 py-8 max-w-3xl relative">
+        <div className="absolute top-0 right-4">
+          <Button variant="ghost" onClick={handleReset} className="text-muted-foreground hover:text-destructive flex gap-2">
+            <RotateCcw className="w-4 h-4" />
+            Start Over
+          </Button>
+        </div>
+        <Card className="text-center p-12 mt-8">
           <Sparkles className="w-16 h-16 mx-auto mb-4 text-primary" />
           <h2 className="text-2xl font-bold mb-4">Ready to Generate Your Pathway</h2>
           <p className="text-muted-foreground mb-2">
@@ -185,7 +211,7 @@ export default function PathwayDashboard({
           </p>
           <Button
             size="lg"
-            onClick={handleGeneratePathway}
+            onClick={() => handleGeneratePathway()}
             disabled={isGenerating}
           >
             {isGenerating ? (
@@ -234,23 +260,28 @@ export default function PathwayDashboard({
             <h1 className="text-3xl font-bold mb-2">{pathway.title}</h1>
             <p className="text-muted-foreground">{pathway.overview_summary}</p>
           </div>
-          <Button
-            variant="outline"
-            onClick={() => setShowReplanDialog(true)}
-            disabled={isGenerating}
-          >
-            {isGenerating ? (
-              <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Replanning...
-              </>
-            ) : (
-              <>
-                <Sparkles className="w-4 h-4 mr-2" />
-                Replan
-              </>
-            )}
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setShowReplanDialog(true)}
+              disabled={isGenerating}
+            >
+              {isGenerating ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Replanning...
+                </>
+              ) : (
+                <>
+                  <Sparkles className="w-4 h-4 mr-2" />
+                  Replan
+                </>
+              )}
+            </Button>
+            <Button variant="ghost" onClick={handleReset} className="text-muted-foreground hover:text-destructive">
+              <RotateCcw className="w-4 h-4" />
+            </Button>
+          </div>
         </div>
 
         {/* Progress bar */}

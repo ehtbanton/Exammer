@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter }
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Upload, ArrowRight, ArrowLeft } from 'lucide-react';
@@ -22,12 +23,13 @@ export default function OnboardingWizard({ sessionType, onComplete }: Onboarding
 
   // Form data
   const [cvFile, setCvFile] = useState<File | null>(null);
+  const [userInterests, setUserInterests] = useState('');
   const [currentSchool, setCurrentSchool] = useState('');
   const [currentYearGroup, setCurrentYearGroup] = useState('');
   const [targetApplicationYear, setTargetApplicationYear] = useState('');
   const [useExammerData, setUseExammerData] = useState(true);
 
-  const totalSteps = sessionType === 'explore' ? 3 : 3;
+  const totalSteps = sessionType === 'explore' ? 3 : 4;
 
   const handleCvUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -92,6 +94,7 @@ export default function OnboardingWizard({ sessionType, onComplete }: Onboarding
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           sessionType,
+          userInterests,
           currentSchool,
           currentYearGroup,
           targetApplicationYear: parseInt(targetApplicationYear) || null,
@@ -137,8 +140,11 @@ export default function OnboardingWizard({ sessionType, onComplete }: Onboarding
           </div>
           <CardDescription>
             {step === 1 && 'Optional: Upload your CV for personalized recommendations'}
-            {step === 2 && 'Tell us about your current situation'}
-            {step === 3 && 'Final step: Configure your preferences'}
+            {step === 2 && sessionType === 'direct' && 'Tell us about your interests'}
+            {step === 2 && sessionType === 'explore' && 'Tell us about your current situation'}
+            {step === 3 && sessionType === 'direct' && 'Tell us about your current situation'}
+            {step === 3 && sessionType === 'explore' && 'Final step: Configure your preferences'}
+            {step === 4 && 'Final step: Configure your preferences'}
           </CardDescription>
         </CardHeader>
 
@@ -170,8 +176,27 @@ export default function OnboardingWizard({ sessionType, onComplete }: Onboarding
             </div>
           )}
 
-          {/* Step 2: Current Situation */}
-          {step === 2 && (
+          {/* Step 2: User Interests (Direct path only) */}
+          {step === 2 && sessionType === 'direct' && (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="interests">What subjects or activities do you enjoy?</Label>
+                <Textarea
+                  id="interests"
+                  rows={4}
+                  placeholder="E.g., I love solving complex math problems, coding projects, and analyzing data..."
+                  value={userInterests}
+                  onChange={(e) => setUserInterests(e.target.value)}
+                />
+                <p className="text-xs text-muted-foreground">
+                  This helps us provide better pathway recommendations, even though you know your goal.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Step 2/3: Current Situation */}
+          {((step === 2 && sessionType === 'explore') || (step === 3 && sessionType === 'direct')) && (
             <div className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="school">Current School/College</Label>
@@ -217,8 +242,8 @@ export default function OnboardingWizard({ sessionType, onComplete }: Onboarding
             </div>
           )}
 
-          {/* Step 3: Preferences */}
-          {step === 3 && (
+          {/* Step 3/4: Preferences */}
+          {((step === 3 && sessionType === 'explore') || (step === 4 && sessionType === 'direct')) && (
             <div className="space-y-4">
               <div className="flex items-center justify-between p-4 border rounded-lg">
                 <div className="space-y-0.5">

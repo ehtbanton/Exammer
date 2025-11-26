@@ -34,10 +34,11 @@ export async function POST(req: NextRequest) {
     // Verify user owns this session
     const careerSession = await db.get<{
       user_id: number;
+      user_interests: string | null;
       current_year_group: string | null;
       cv_parsed_data: string | null;
     }>(
-      'SELECT user_id, current_year_group, cv_parsed_data FROM career_sessions WHERE id = ?',
+      'SELECT user_id, user_interests, current_year_group, cv_parsed_data FROM career_sessions WHERE id = ?',
       [sessionId]
     );
 
@@ -62,6 +63,7 @@ export async function POST(req: NextRequest) {
     const result = await suggestUniversities({
       brainstormInterests,
       directInput,
+      userInterests: careerSession.user_interests || undefined,
       currentYearGroup: careerSession.current_year_group || undefined,
       cvData,
     });

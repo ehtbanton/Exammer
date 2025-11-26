@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Loader2, Target, Sparkles, CheckCircle2 } from 'lucide-react';
+import { Loader2, Target, Sparkles, CheckCircle2, RotateCcw } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 interface UniversitySuggestion {
@@ -75,13 +75,34 @@ export default function GoalSetting({
         description: 'Please try entering your goal manually',
         variant: 'destructive',
       });
+      setIsCustom(true); // Auto-switch to manual entry on error
     } finally {
       setIsLoadingSuggestions(false);
     }
   };
 
+  const handleReset = async () => {
+    if (!confirm('Are you sure you want to start over? This will delete your brainstorming progress.')) return;
+    
+    try {
+      await fetch('/api/careers/sessions/reset', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId }),
+      });
+      window.location.reload();
+    } catch (error) {
+      console.error('Error resetting:', error);
+      toast({
+        title: 'Failed to reset',
+        variant: 'destructive',
+      });
+    }
+  };
+
   const handleSaveGoal = async () => {
-    const goalData = isCustom
+    const isManual = isCustom || sessionType === 'direct';
+    const goalData = isManual
       ? {
           university: customUniversity,
           course: customCourse,
@@ -154,13 +175,19 @@ export default function GoalSetting({
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-4xl">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold mb-2">Set Your University Goal</h1>
-        <p className="text-muted-foreground">
-          {sessionType === 'explore'
-            ? 'Based on your brainstorming, here are some university courses that match your interests'
-            : 'Enter the university and course you want to aim for'}
-        </p>
+      <div className="flex justify-between items-start mb-8">
+        <div>
+          <h1 className="text-3xl font-bold mb-2">Set Your University Goal</h1>
+          <p className="text-muted-foreground">
+            {sessionType === 'explore'
+              ? 'Based on your brainstorming, here are some university courses that match your interests'
+              : 'Enter the university and course you want to aim for'}
+          </p>
+        </div>
+        <Button variant="outline" onClick={handleReset} className="flex items-center gap-2">
+          <RotateCcw className="w-4 h-4" />
+          Start Over
+        </Button>
       </div>
 
       {/* AI Suggestions (for explore sessions) */}
@@ -233,7 +260,7 @@ export default function GoalSetting({
               <Target className="w-5 h-5" />
               Enter Your Goal
             </CardTitle>
-            {isCustom && (
+            {isCustom && sessionType === 'explore' && suggestions.length > 0 && (
               <Button
                 variant="ghost"
                 size="sm"

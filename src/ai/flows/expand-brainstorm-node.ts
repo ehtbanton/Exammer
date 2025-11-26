@@ -28,16 +28,17 @@ export type ExpandBrainstormNodeOutput = z.infer<typeof ExpandBrainstormNodeOutp
 export async function expandBrainstormNode(
   input: ExpandBrainstormNodeInput
 ): Promise<ExpandBrainstormNodeOutput> {
-  return await executeWithManagedKey(async (ai) => {
-    const expandPrompt = ai.definePrompt({
-      name: 'expandBrainstormNode',
-      input: {
-        schema: ExpandBrainstormNodeInputSchema,
-      },
-      output: {
-        schema: ExpandBrainstormNodeOutputSchema,
-      },
-      prompt: `You are a career guidance expert helping a student explore academic interests and career paths.
+  return await executeWithManagedKey(
+    async (ai, flowInput) => {
+      const expandPrompt = ai.definePrompt({
+        name: 'expandBrainstormNode',
+        input: {
+          schema: ExpandBrainstormNodeInputSchema,
+        },
+        output: {
+          schema: ExpandBrainstormNodeOutputSchema,
+        },
+        prompt: `You are a career guidance expert helping a student explore academic interests and career paths.
 
 Given a term or interest area, generate **exactly 5** related terms that help the student discover potential career paths and university subjects.
 
@@ -73,10 +74,14 @@ Input: "Helping People"
 Output: ["Medicine", "Psychology", "Social Work", "Teaching", "Law"]
 
 Generate 5 related terms that will help expand this brainstorming tree.`,
-    }, { model: 'googleai/gemini-2.0-flash-exp' });
+      });
 
-    const result = await expandPrompt(input);
+      const result = await expandPrompt(flowInput, {
+        model: 'googleai/gemini-flash-lite-latest',
+      });
 
-    return result.output;
-  });
+      return result.output;
+    },
+    input
+  );
 }

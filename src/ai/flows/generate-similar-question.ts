@@ -114,7 +114,7 @@ Validate and correct the text now.`,
   });
 
   const response = await validationPrompt({ questionText }, {
-    model: 'googleai/gemini-2.5-flash-lite',
+    model: 'googleai/gemini-flash-lite-latest',
   });
 
   const output = response.output;
@@ -312,7 +312,7 @@ Generate the similar question, adapted marking objectives{{#if originalDiagramMe
     });
 
     const response = await prompt(flowInput, {
-      model: 'googleai/gemini-2.5-flash-lite',
+      model: 'googleai/gemini-flash-lite-latest',
     });
     const output = response.output;
 

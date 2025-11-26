@@ -56,8 +56,9 @@ export async function POST(req: NextRequest) {
           position_x,
           position_y,
           is_root,
-          parent_node_id
-        ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+          parent_node_id,
+          level
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           sessionId,
           node.id,
@@ -66,6 +67,7 @@ export async function POST(req: NextRequest) {
           node.position.y,
           node.isRoot ? 1 : 0,
           null, // We'll set parent based on edges
+          node.isRoot ? 0 : 1
         ]
       );
     }

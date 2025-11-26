@@ -67,7 +67,7 @@ Keep descriptions concise - just enough to categorize exam questions later.`,
         });
 
         const response = await prompt(flowInput, {
-          model: 'googleai/gemini-2.5-flash-lite',
+          model: 'googleai/gemini-flash-lite-latest',
         });
         const output = response.output;
 

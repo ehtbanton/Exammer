@@ -80,7 +80,7 @@ IMPORTANT: Output exactly one match entry for each paper, in the same order as t
       });
 
       const response = await prompt(flowInput, {
-        model: 'googleai/gemini-2.5-flash-lite',
+        model: 'googleai/gemini-flash-lite-latest',
       });
       const output = response.output;
 

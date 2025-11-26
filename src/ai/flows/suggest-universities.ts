@@ -22,6 +22,7 @@ const UniversitySuggestionSchema = z.object({
 const SuggestUniversitiesInputSchema = z.object({
   brainstormInterests: z.array(z.string()).optional().describe('List of academic interests from brainstorming session'),
   directInput: z.string().optional().describe('Direct course/career interest provided by student'),
+  userInterests: z.string().optional().describe('User\'s academic interests and activities they enjoy'),
   currentYearGroup: z.string().optional().describe('Current year group (e.g., "Year 12")'),
   cvData: z.object({
     skills: z.array(z.string()).optional(),
@@ -42,16 +43,17 @@ export type SuggestUniversitiesOutput = z.infer<typeof SuggestUniversitiesOutput
 export async function suggestUniversities(
   input: SuggestUniversitiesInput
 ): Promise<SuggestUniversitiesOutput> {
-  return await executeWithManagedKey(async (ai) => {
-    const suggestPrompt = ai.definePrompt({
-      name: 'suggestUniversities',
-      input: {
-        schema: SuggestUniversitiesInputSchema,
-      },
-      output: {
-        schema: SuggestUniversitiesOutputSchema,
-      },
-      prompt: `You are a UCAS university admissions expert helping UK students find suitable universities and courses.
+  return await executeWithManagedKey(
+    async (ai, flowInput) => {
+      const suggestPrompt = ai.definePrompt({
+        name: 'suggestUniversities',
+        input: {
+          schema: SuggestUniversitiesInputSchema,
+        },
+        output: {
+          schema: SuggestUniversitiesOutputSchema,
+        },
+        prompt: `You are a UCAS university admissions expert helping UK students find suitable universities and courses.
 
 Your task is to suggest **exactly 5** university and undergraduate course combinations that match the student's interests and background.
 
@@ -63,6 +65,10 @@ Your task is to suggest **exactly 5** university and undergraduate course combin
 
 {{#if directInput}}
 **Direct Interest:** {{directInput}}
+{{/if}}
+
+{{#if userInterests}}
+**User Interests:** {{userInterests}}
 {{/if}}
 
 {{#if currentYearGroup}}
@@ -120,10 +126,14 @@ For a student interested in "Data Science", "Statistics", "Problem Solving":
 [Continue with 3 more diverse suggestions...]
 
 Now generate 5 university suggestions for this student.`,
-    }, { model: 'googleai/gemini-2.0-flash-exp' });
+      });
 
-    const result = await suggestPrompt(input);
+      const result = await suggestPrompt(flowInput, {
+        model: 'googleai/gemini-flash-lite-latest',
+      });
 
-    return result.output;
-  });
+      return result.output;
+    },
+    input
+  );
 }

@@ -5,12 +5,13 @@ import { useSession } from 'next-auth/react';
 import { AuthGuard } from '@/components/AuthGuard';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Target, Sparkles, ArrowRight } from 'lucide-react';
+import { Target, Sparkles, ArrowRight, Loader2 } from 'lucide-react';
 import LoadingSpinner from '@/components/LoadingSpinner';
-import OnboardingWizard from '@/components/careers/OnboardingWizard';
 import BrainstormMindmap from '@/components/careers/BrainstormMindmap';
 import GoalSetting from '@/components/careers/GoalSetting';
 import PathwayDashboard from '@/components/careers/PathwayDashboard';
+import AcademicOnboarding from '@/components/careers/AcademicOnboarding';
+import { useToast } from '@/hooks/use-toast';
 
 export default function CareersPage() {
   return (
@@ -24,6 +25,7 @@ interface CareerSession {
   id: number;
   session_type: 'explore' | 'direct';
   brainstorm_complete: number;
+  academic_profile_complete: number;
   current_school: string | null;
   current_year_group: string | null;
   target_application_year: number | null;
@@ -43,13 +45,12 @@ function CareersPageContent() {
   const [hasGoal, setHasGoal] = useState<boolean | null>(null);
   const [brainstormInterests, setBrainstormInterests] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [showOnboarding, setShowOnboarding] = useState(false);
-  const [onboardingType, setOnboardingType] = useState<'explore' | 'direct'>('explore');
+  const { toast } = useToast();
 
   useEffect(() => {
     const checkSessionAndGoal = async () => {
       try {
-        const response = await fetch('/api/careers/sessions');
+        const response = await fetch('/api/careers/sessions', { cache: 'no-store' });
         if (response.ok) {
           const data = await response.json();
           if (data.sessions && data.sessions.length > 0) {
@@ -57,7 +58,7 @@ function CareersPageContent() {
             setCurrentSession(sessionData);
 
             // Check if goal exists
-            const goalResponse = await fetch(`/api/careers/goals?sessionId=${sessionData.id}`);
+            const goalResponse = await fetch(`/api/careers/goals?sessionId=${sessionData.id}`, { cache: 'no-store' });
             if (goalResponse.ok) {
               const goalData = await goalResponse.json();
               setHasGoal(!!goalData.goal);
@@ -68,7 +69,7 @@ function CareersPageContent() {
 
             // If explore session with completed brainstorm, load interests
             if (sessionData.session_type === 'explore' && sessionData.brainstorm_complete) {
-              const nodesResponse = await fetch(`/api/careers/brainstorm/nodes?sessionId=${sessionData.id}`);
+              const nodesResponse = await fetch(`/api/careers/brainstorm/nodes?sessionId=${sessionData.id}`, { cache: 'no-store' });
               if (nodesResponse.ok) {
                 const nodesData = await nodesResponse.json();
                 // Extract leaf node labels as interests
@@ -95,19 +96,44 @@ function CareersPageContent() {
     checkSessionAndGoal();
   }, []);
 
-  const handleOnboardingComplete = (sessionId: number) => {
-    setShowOnboarding(false);
-    // Reload to show next step
-    window.location.reload();
+  const handleCreateSession = async (type: 'explore' | 'direct') => {
+    try {
+      const response = await fetch('/api/careers/sessions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sessionType: type,
+        }),
+      });
+
+      if (response.ok) {
+        window.location.reload();
+      } else {
+        toast({
+          title: 'Failed to start session',
+          description: 'Please try again',
+          variant: 'destructive',
+        });
+      }
+    } catch (error) {
+      console.error('Error creating session:', error);
+      toast({
+        title: 'Error',
+        description: 'Something went wrong',
+        variant: 'destructive',
+      });
+    }
   };
 
   const handleBrainstormComplete = () => {
-    // Reload to show goal setting
     window.location.reload();
   };
 
   const handleGoalComplete = () => {
-    // Reload to show dashboard
+    window.location.reload();
+  };
+
+  const handleAcademicProfileComplete = () => {
     window.location.reload();
   };
 
@@ -119,33 +145,12 @@ function CareersPageContent() {
     );
   }
 
-  // Show onboarding wizard if user selected a path
-  if (showOnboarding) {
-    return (
-      <OnboardingWizard
-        sessionType={onboardingType}
-        onComplete={handleOnboardingComplete}
-      />
-    );
-  }
-
-  // Show welcome screen if no session exists
+  // 1. Welcome Screen
   if (!currentSession) {
-    return (
-      <WelcomeScreen
-        onStartExploring={() => {
-          setOnboardingType('explore');
-          setShowOnboarding(true);
-        }}
-        onKnowMyGoal={() => {
-          setOnboardingType('direct');
-          setShowOnboarding(true);
-        }}
-      />
-    );
+    return <WelcomeScreen onCreateSession={handleCreateSession} />;
   }
 
-  // Show brainstorming mindmap if explore session hasn't completed brainstorming
+  // 2. Brainstorming (only for 'explore' type and not yet complete)
   if (currentSession.session_type === 'explore' && !currentSession.brainstorm_complete) {
     return (
       <div className="container mx-auto px-4 py-8">
@@ -163,7 +168,7 @@ function CareersPageContent() {
     );
   }
 
-  // Show goal setting if session exists but no goal set yet
+  // 3. Goal Setting
   if (hasGoal === false) {
     return (
       <GoalSetting
@@ -179,7 +184,17 @@ function CareersPageContent() {
     );
   }
 
-  // Show careers dashboard if session exists and goal is set
+  // 4. Academic Onboarding (New Step)
+  if (!currentSession.academic_profile_complete) {
+    return (
+      <AcademicOnboarding
+        sessionId={currentSession.id}
+        onComplete={handleAcademicProfileComplete}
+      />
+    );
+  }
+
+  // 5. Dashboard
   if (currentGoal) {
     return (
       <PathwayDashboard
@@ -190,16 +205,20 @@ function CareersPageContent() {
     );
   }
 
-  // Fallback (should not reach here)
   return <LoadingSpinner />;
 }
 
 interface WelcomeScreenProps {
-  onStartExploring: () => void;
-  onKnowMyGoal: () => void;
+  onCreateSession: (type: 'explore' | 'direct') => void;
 }
 
-function WelcomeScreen({ onStartExploring, onKnowMyGoal }: WelcomeScreenProps) {
+function WelcomeScreen({ onCreateSession }: WelcomeScreenProps) {
+  const [isCreating, setIsCreating] = useState<'explore' | 'direct' | null>(null);
+
+  const handleClick = (type: 'explore' | 'direct') => {
+    setIsCreating(type);
+    onCreateSession(type);
+  };
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-5xl">
@@ -242,11 +261,19 @@ function WelcomeScreen({ onStartExploring, onKnowMyGoal }: WelcomeScreenProps) {
               </li>
             </ul>
             <Button
-              onClick={onStartExploring}
+              onClick={() => handleClick('explore')}
               className="w-full"
               size="lg"
+              disabled={!!isCreating}
             >
-              Start Exploring
+              {isCreating === 'explore' ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Starting...
+                </>
+              ) : (
+                'Start Exploring'
+              )}
             </Button>
           </CardContent>
         </Card>
@@ -277,12 +304,20 @@ function WelcomeScreen({ onStartExploring, onKnowMyGoal }: WelcomeScreenProps) {
               </li>
             </ul>
             <Button
-              onClick={onKnowMyGoal}
+              onClick={() => handleClick('direct')}
               variant="outline"
               className="w-full"
               size="lg"
+              disabled={!!isCreating}
             >
-              Set My Goal
+              {isCreating === 'direct' ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Setting up...
+                </>
+              ) : (
+                'Set My Goal'
+              )}
             </Button>
           </CardContent>
         </Card>
@@ -322,4 +357,3 @@ function WelcomeScreen({ onStartExploring, onKnowMyGoal }: WelcomeScreenProps) {
     </div>
   );
 }
-

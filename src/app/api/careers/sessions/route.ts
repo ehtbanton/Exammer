@@ -3,6 +3,8 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { db } from '@/lib/db';
 
+export const dynamic = 'force-dynamic';
+
 // GET - List user's career sessions
 export async function GET(req: NextRequest) {
   try {
@@ -31,6 +33,7 @@ export async function GET(req: NextRequest) {
         target_application_year,
         use_exammer_data,
         brainstorm_complete,
+        academic_profile_complete,
         created_at,
         updated_at
       FROM career_sessions
@@ -70,6 +73,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const {
       sessionType,
+      userInterests,
       currentSchool,
       currentYearGroup,
       targetApplicationYear,
@@ -89,14 +93,16 @@ export async function POST(req: NextRequest) {
       `INSERT INTO career_sessions (
         user_id,
         session_type,
+        user_interests,
         current_school,
         current_year_group,
         target_application_year,
         use_exammer_data
-      ) VALUES (?, ?, ?, ?, ?, ?)`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
       [
         user.id,
         sessionType,
+        userInterests || null,
         currentSchool || null,
         currentYearGroup || null,
         targetApplicationYear || null,
@@ -114,6 +120,7 @@ export async function POST(req: NextRequest) {
         target_application_year,
         use_exammer_data,
         brainstorm_complete,
+        academic_profile_complete,
         created_at,
         updated_at
       FROM career_sessions

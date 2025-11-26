@@ -241,6 +241,7 @@ export class DatabaseMigrator {
           break;
 
         case 'drop_column_simulation':
+        case 'recreate_table':
           if (step.steps && Array.isArray(step.steps)) {
             for (let i = 0; i < step.steps.length; i++) {
               const sql = step.steps[i];

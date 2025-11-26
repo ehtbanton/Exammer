@@ -258,6 +258,7 @@ CREATE TABLE IF NOT EXISTS career_sessions (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   user_id INTEGER NOT NULL,
   session_type TEXT NOT NULL CHECK(session_type IN ('explore', 'direct')),
+  user_interests TEXT,
   cv_file_path TEXT,
   cv_parsed_data TEXT,
   current_school TEXT,
@@ -278,6 +279,7 @@ CREATE TABLE IF NOT EXISTS brainstorm_nodes (
   label TEXT NOT NULL,
   level INTEGER NOT NULL,
   selected INTEGER DEFAULT 0,
+  is_root INTEGER DEFAULT 0,
   position_x REAL NOT NULL,
   position_y REAL NOT NULL,
   created_at INTEGER DEFAULT (unixepoch()),
@@ -290,6 +292,7 @@ CREATE TABLE IF NOT EXISTS career_goals (
   university_name TEXT NOT NULL,
   course_name TEXT NOT NULL,
   entry_requirements TEXT,
+  required_subjects TEXT,
   typical_offer TEXT,
   university_url TEXT,
   is_primary INTEGER DEFAULT 0,
@@ -302,11 +305,9 @@ CREATE TABLE IF NOT EXISTS career_goals (
 CREATE TABLE IF NOT EXISTS pathways (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   goal_id INTEGER NOT NULL,
-  pathway_name TEXT NOT NULL,
-  pathway_type TEXT NOT NULL CHECK(pathway_type IN ('primary', 'alternative', 'regenerated')),
-  description TEXT,
-  generation_prompt TEXT,
-  is_active INTEGER DEFAULT 1,
+  title TEXT NOT NULL,
+  overview_summary TEXT,
+  application_timeline TEXT,
   created_at INTEGER DEFAULT (unixepoch()),
   updated_at INTEGER DEFAULT (unixepoch()),
   FOREIGN KEY (goal_id) REFERENCES career_goals(id) ON DELETE CASCADE
@@ -315,15 +316,13 @@ CREATE TABLE IF NOT EXISTS pathways (
 CREATE TABLE IF NOT EXISTS pathway_milestones (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   pathway_id INTEGER NOT NULL,
-  milestone_month INTEGER NOT NULL,
-  milestone_year INTEGER NOT NULL,
-  milestone_type TEXT NOT NULL CHECK(milestone_type IN ('academic', 'extracurricular', 'application', 'general')),
+  month TEXT NOT NULL,
   title TEXT NOT NULL,
   description TEXT NOT NULL,
+  category TEXT,
+  priority TEXT,
   status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending', 'in_progress', 'completed', 'failed', 'skipped')),
-  completion_notes TEXT,
   completed_at INTEGER,
-  order_index INTEGER NOT NULL,
   FOREIGN KEY (pathway_id) REFERENCES pathways(id) ON DELETE CASCADE
 );
 
@@ -331,12 +330,9 @@ CREATE TABLE IF NOT EXISTS subject_grade_targets (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   pathway_id INTEGER NOT NULL,
   subject_name TEXT NOT NULL,
-  current_grade TEXT,
+  current_level TEXT,
   target_grade TEXT NOT NULL,
-  current_percentage INTEGER,
-  target_percentage INTEGER NOT NULL,
-  priority TEXT NOT NULL DEFAULT 'medium' CHECK(priority IN ('low', 'medium', 'high', 'critical')),
-  notes TEXT,
+  key_focus_areas TEXT,
   FOREIGN KEY (pathway_id) REFERENCES pathways(id) ON DELETE CASCADE
 );
 
@@ -357,12 +353,13 @@ CREATE TABLE IF NOT EXISTS topic_improvement_links (
 
 CREATE TABLE IF NOT EXISTS pathway_regeneration_history (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  pathway_id INTEGER NOT NULL,
-  regeneration_reason TEXT NOT NULL,
-  failed_milestone_ids TEXT,
-  prompt_adjustments TEXT,
-  created_at INTEGER DEFAULT (unixepoch()),
-  FOREIGN KEY (pathway_id) REFERENCES pathways(id) ON DELETE CASCADE
+  goal_id INTEGER NOT NULL,
+  old_pathway_id INTEGER,
+  new_pathway_id INTEGER NOT NULL,
+  reason TEXT NOT NULL,
+  reason_type TEXT,
+  regenerated_at INTEGER DEFAULT (unixepoch()),
+  FOREIGN KEY (goal_id) REFERENCES career_goals(id) ON DELETE CASCADE
 );
 
 -- Create indexes for careers tables
@@ -372,11 +369,10 @@ CREATE INDEX IF NOT EXISTS idx_brainstorm_nodes_parent ON brainstorm_nodes(paren
 CREATE INDEX IF NOT EXISTS idx_career_goals_session_id ON career_goals(session_id);
 CREATE INDEX IF NOT EXISTS idx_pathways_goal_id ON pathways(goal_id);
 CREATE INDEX IF NOT EXISTS idx_pathway_milestones_pathway_id ON pathway_milestones(pathway_id);
-CREATE INDEX IF NOT EXISTS idx_pathway_milestones_month ON pathway_milestones(milestone_month, milestone_year);
 CREATE INDEX IF NOT EXISTS idx_subject_grade_targets_pathway_id ON subject_grade_targets(pathway_id);
 CREATE INDEX IF NOT EXISTS idx_topic_improvement_links_milestone_id ON topic_improvement_links(milestone_id);
 CREATE INDEX IF NOT EXISTS idx_topic_improvement_links_topic_id ON topic_improvement_links(topic_id);
-CREATE INDEX IF NOT EXISTS idx_pathway_regeneration_history_pathway_id ON pathway_regeneration_history(pathway_id);
+CREATE INDEX IF NOT EXISTS idx_pathway_regeneration_history_goal_id ON pathway_regeneration_history(goal_id);
 
 -- Database version tracking table
 CREATE TABLE IF NOT EXISTS db_version (

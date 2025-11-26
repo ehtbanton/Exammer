@@ -1,5 +1,5 @@
 {
-  "currentVersion": 11,
+  "currentVersion": 15,
   "versions": {
     "0": {
       "description": "Initial schema - subjects owned by users",
@@ -517,6 +517,166 @@
             "action": "create_index",
             "table": "pathway_regeneration_history",
             "sql": "CREATE INDEX IF NOT EXISTS idx_pathway_regeneration_history_pathway_id ON pathway_regeneration_history(pathway_id)"
+          }
+        ]
+      }
+    },
+    "12": {
+      "description": "Fix careers pathway schema mismatches - align database schema with API code expectations",
+      "schema": {
+        "brainstorm_nodes": {
+          "columns": ["id", "session_id", "node_id", "parent_node_id", "label", "level", "selected", "is_root", "position_x", "position_y", "created_at"],
+          "note": "Added is_root column to distinguish root question from child nodes"
+        },
+        "career_goals": {
+          "columns": ["id", "session_id", "university_name", "course_name", "entry_requirements", "required_subjects", "typical_offer", "university_url", "is_primary", "ai_confidence_score", "created_at", "updated_at"],
+          "note": "Added required_subjects column (JSON array) for course prerequisites"
+        },
+        "pathways": {
+          "columns": ["id", "goal_id", "title", "overview_summary", "application_timeline", "created_at", "updated_at"],
+          "note": "Renamed pathway_name→title, removed pathway_type/generation_prompt/is_active, added overview_summary and application_timeline"
+        },
+        "pathway_milestones": {
+          "columns": ["id", "pathway_id", "month", "title", "description", "category", "priority", "status", "completed_at"],
+          "note": "Renamed milestone_month→month, milestone_type→category, removed milestone_year/order_index/completion_notes, added priority"
+        },
+        "subject_grade_targets": {
+          "columns": ["id", "pathway_id", "subject_name", "current_level", "target_grade", "key_focus_areas"],
+          "note": "Renamed current_grade→current_level, removed current_percentage/target_percentage/priority/notes, added key_focus_areas (JSON)"
+        },
+        "pathway_regeneration_history": {
+          "columns": ["id", "goal_id", "old_pathway_id", "new_pathway_id", "reason", "reason_type", "regenerated_at"],
+          "note": "Complete schema redesign: now tracks goal_id instead of pathway_id, records old and new pathway IDs for replanning history"
+        }
+      },
+      "migration": {
+        "from": 11,
+        "steps": [
+          {
+            "action": "add_column",
+            "table": "brainstorm_nodes",
+            "sql": "ALTER TABLE brainstorm_nodes ADD COLUMN is_root INTEGER DEFAULT 0"
+          },
+          {
+            "action": "add_column",
+            "table": "career_goals",
+            "sql": "ALTER TABLE career_goals ADD COLUMN required_subjects TEXT"
+          },
+          {
+            "action": "recreate_table",
+            "table": "pathways",
+            "description": "Recreate pathways table with correct columns",
+            "steps": [
+              "CREATE TABLE pathways_new (id INTEGER PRIMARY KEY AUTOINCREMENT, goal_id INTEGER NOT NULL, title TEXT NOT NULL, overview_summary TEXT, application_timeline TEXT, created_at INTEGER DEFAULT (unixepoch()), updated_at INTEGER DEFAULT (unixepoch()), FOREIGN KEY (goal_id) REFERENCES career_goals(id) ON DELETE CASCADE)",
+              "INSERT INTO pathways_new (id, goal_id, title, created_at, updated_at) SELECT id, goal_id, pathway_name, created_at, updated_at FROM pathways",
+              "DROP TABLE pathways",
+              "ALTER TABLE pathways_new RENAME TO pathways",
+              "CREATE INDEX IF NOT EXISTS idx_pathways_goal_id ON pathways(goal_id)"
+            ]
+          },
+          {
+            "action": "recreate_table",
+            "table": "pathway_milestones",
+            "description": "Recreate pathway_milestones table with correct columns",
+            "steps": [
+              "CREATE TABLE pathway_milestones_new (id INTEGER PRIMARY KEY AUTOINCREMENT, pathway_id INTEGER NOT NULL, month TEXT NOT NULL, title TEXT NOT NULL, description TEXT NOT NULL, category TEXT, priority TEXT, status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending', 'in_progress', 'completed', 'failed', 'skipped')), completed_at INTEGER, FOREIGN KEY (pathway_id) REFERENCES pathways(id) ON DELETE CASCADE)",
+              "INSERT INTO pathway_milestones_new (id, pathway_id, month, title, description, status, completed_at) SELECT id, pathway_id, CAST(milestone_month AS TEXT), title, description, status, completed_at FROM pathway_milestones",
+              "DROP TABLE pathway_milestones",
+              "ALTER TABLE pathway_milestones_new RENAME TO pathway_milestones",
+              "CREATE INDEX IF NOT EXISTS idx_pathway_milestones_pathway_id ON pathway_milestones(pathway_id)"
+            ]
+          },
+          {
+            "action": "recreate_table",
+            "table": "subject_grade_targets",
+            "description": "Recreate subject_grade_targets table with correct columns",
+            "steps": [
+              "CREATE TABLE subject_grade_targets_new (id INTEGER PRIMARY KEY AUTOINCREMENT, pathway_id INTEGER NOT NULL, subject_name TEXT NOT NULL, current_level TEXT, target_grade TEXT NOT NULL, key_focus_areas TEXT, FOREIGN KEY (pathway_id) REFERENCES pathways(id) ON DELETE CASCADE)",
+              "INSERT INTO subject_grade_targets_new (id, pathway_id, subject_name, current_level, target_grade) SELECT id, pathway_id, subject_name, current_grade, target_grade FROM subject_grade_targets",
+              "DROP TABLE subject_grade_targets",
+              "ALTER TABLE subject_grade_targets_new RENAME TO subject_grade_targets",
+              "CREATE INDEX IF NOT EXISTS idx_subject_grade_targets_pathway_id ON subject_grade_targets(pathway_id)"
+            ]
+          },
+          {
+            "action": "recreate_table",
+            "table": "pathway_regeneration_history",
+            "description": "Recreate pathway_regeneration_history table with completely new schema",
+            "steps": [
+              "DROP TABLE pathway_regeneration_history",
+              "CREATE TABLE pathway_regeneration_history (id INTEGER PRIMARY KEY AUTOINCREMENT, goal_id INTEGER NOT NULL, old_pathway_id INTEGER, new_pathway_id INTEGER NOT NULL, reason TEXT NOT NULL, reason_type TEXT, regenerated_at INTEGER DEFAULT (unixepoch()), FOREIGN KEY (goal_id) REFERENCES career_goals(id) ON DELETE CASCADE)",
+              "CREATE INDEX IF NOT EXISTS idx_pathway_regeneration_history_goal_id ON pathway_regeneration_history(goal_id)"
+            ]
+          }
+        ]
+      }
+    },
+    "13": {
+      "description": "Add user_interests to career_sessions for better AI recommendations on both explore and direct paths",
+      "schema": {
+        "career_sessions": {
+          "columns": ["id", "user_id", "session_type", "user_interests", "cv_file_path", "cv_parsed_data", "current_school", "current_year_group", "target_application_year", "use_exammer_data", "brainstorm_complete", "created_at", "updated_at"],
+          "note": "Added user_interests column to store user's academic interests for both explore and direct session types"
+        }
+      },
+      "migration": {
+        "from": 12,
+        "steps": [
+          {
+            "action": "add_column",
+            "table": "career_sessions",
+            "sql": "ALTER TABLE career_sessions ADD COLUMN user_interests TEXT"
+          }
+        ]
+      }
+    },
+    "14": {
+      "description": "Add academic_profile to career_sessions for storing detailed subject and grade information",
+      "schema": {
+        "career_sessions": {
+          "columns": ["id", "user_id", "session_type", "user_interests", "academic_profile", "academic_profile_complete", "cv_file_path", "cv_parsed_data", "current_school", "current_year_group", "target_application_year", "use_exammer_data", "brainstorm_complete", "created_at", "updated_at"],
+          "note": "Added academic_profile (JSON) and academic_profile_complete flag"
+        }
+      },
+      "migration": {
+        "from": 13,
+        "steps": [
+          {
+            "action": "add_column",
+            "table": "career_sessions",
+            "sql": "ALTER TABLE career_sessions ADD COLUMN academic_profile TEXT"
+          },
+          {
+            "action": "add_column",
+            "table": "career_sessions",
+            "sql": "ALTER TABLE career_sessions ADD COLUMN academic_profile_complete INTEGER DEFAULT 0"
+          }
+        ]
+      }
+    },
+    "15": {
+      "description": "Fix brainstorm_nodes unique constraint - change from global node_id unique to composite (session_id, node_id) unique",
+      "schema": {
+        "brainstorm_nodes": {
+          "columns": ["id", "session_id", "node_id", "parent_node_id", "label", "level", "selected", "is_root", "position_x", "position_y", "created_at"],
+          "note": "Changed UNIQUE constraint to (session_id, node_id)"
+        }
+      },
+      "migration": {
+        "from": 14,
+        "steps": [
+          {
+            "action": "recreate_table",
+            "table": "brainstorm_nodes",
+            "description": "Recreate brainstorm_nodes with correct unique constraint",
+            "steps": [
+              "CREATE TABLE brainstorm_nodes_new (id INTEGER PRIMARY KEY AUTOINCREMENT, session_id INTEGER NOT NULL, node_id TEXT NOT NULL, parent_node_id TEXT, label TEXT NOT NULL, level INTEGER NOT NULL DEFAULT 0, selected INTEGER DEFAULT 0, is_root INTEGER DEFAULT 0, position_x REAL NOT NULL, position_y REAL NOT NULL, created_at INTEGER DEFAULT (unixepoch()), FOREIGN KEY (session_id) REFERENCES career_sessions(id) ON DELETE CASCADE, UNIQUE(session_id, node_id))",
+              "INSERT INTO brainstorm_nodes_new SELECT * FROM brainstorm_nodes",
+              "DROP TABLE brainstorm_nodes",
+              "ALTER TABLE brainstorm_nodes_new RENAME TO brainstorm_nodes",
+              "CREATE INDEX IF NOT EXISTS idx_brainstorm_nodes_session_id ON brainstorm_nodes(session_id)",
+              "CREATE INDEX IF NOT EXISTS idx_brainstorm_nodes_parent ON brainstorm_nodes(parent_node_id)"
+            ]
           }
         ]
       }
