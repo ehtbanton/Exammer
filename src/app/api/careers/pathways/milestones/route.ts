@@ -22,7 +22,7 @@ export async function PATCH(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { milestoneId, status } = body;
+    const { milestoneId, status, completionNotes } = body;
 
     if (!milestoneId || !status) {
       return NextResponse.json(
@@ -84,9 +84,10 @@ export async function PATCH(req: NextRequest) {
     await db.run(
       `UPDATE pathway_milestones
        SET status = ?,
+           completion_notes = ?,
            completed_at = ${completedAt}
        WHERE id = ?`,
-      [status, milestoneId]
+      [status, completionNotes || null, milestoneId]
     );
 
     return NextResponse.json({

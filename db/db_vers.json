@@ -1,5 +1,5 @@
 {
-  "currentVersion": 15,
+  "currentVersion": 16,
   "versions": {
     "0": {
       "description": "Initial schema - subjects owned by users",
@@ -677,6 +677,25 @@
               "CREATE INDEX IF NOT EXISTS idx_brainstorm_nodes_session_id ON brainstorm_nodes(session_id)",
               "CREATE INDEX IF NOT EXISTS idx_brainstorm_nodes_parent ON brainstorm_nodes(parent_node_id)"
             ]
+          }
+        ]
+      }
+    },
+    "16": {
+      "description": "Add completion_notes to pathway_milestones to store user results and grades",
+      "schema": {
+        "pathway_milestones": {
+          "columns": ["id", "pathway_id", "month", "title", "description", "category", "priority", "status", "completion_notes", "completed_at"],
+          "note": "Added completion_notes for storing user feedback/grades upon completion"
+        }
+      },
+      "migration": {
+        "from": 15,
+        "steps": [
+          {
+            "action": "add_column",
+            "table": "pathway_milestones",
+            "sql": "ALTER TABLE pathway_milestones ADD COLUMN completion_notes TEXT"
           }
         ]
       }

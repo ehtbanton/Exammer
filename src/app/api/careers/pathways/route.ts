@@ -124,6 +124,29 @@ export async function POST(req: NextRequest) {
         .map(n => n.label);
     }
 
+    // Get recent feedback from previous pathway
+    let recentFeedback: string[] = [];
+    const previousPathway = await db.get<{ id: number }>(
+      'SELECT id FROM pathways WHERE goal_id = ? ORDER BY created_at DESC LIMIT 1',
+      [goal.id]
+    );
+
+    if (previousPathway) {
+      const milestones = await db.all<{ title: string; completion_notes: string; status: string }>(
+        `SELECT title, completion_notes, status FROM pathway_milestones
+         WHERE pathway_id = ? AND completion_notes IS NOT NULL AND completion_notes != ''`,
+        [previousPathway.id]
+      );
+
+      recentFeedback = milestones.map(m =>
+        `Milestone: "${m.title}" - Status: ${m.status} - Note: "${m.completion_notes}"`
+      );
+    }
+
+    if (replanReason) {
+      recentFeedback.push(`User Request: ${replanReason}`);
+    }
+
     // Generate pathway with AI
     const pathway = await generatePathway({
       universityName: goal.university_name,
@@ -136,6 +159,7 @@ export async function POST(req: NextRequest) {
       weakTopics,
       cvData,
       interests: interests.length > 0 ? interests : undefined,
+      recentFeedback: recentFeedback.length > 0 ? recentFeedback : undefined,
     });
 
     // Store pathway in database

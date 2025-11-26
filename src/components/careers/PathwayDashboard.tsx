@@ -22,6 +22,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
 import ReplanDialog from './ReplanDialog';
+import MilestoneDetailDialog from './MilestoneDetailDialog';
 
 interface Milestone {
   id: number;
@@ -32,6 +33,7 @@ interface Milestone {
   priority: 'essential' | 'important' | 'optional';
   status: 'pending' | 'in_progress' | 'completed';
   completed_at: number | null;
+  completion_notes?: string;
 }
 
 interface SubjectTarget {
@@ -67,6 +69,7 @@ export default function PathwayDashboard({
   const [isLoading, setIsLoading] = useState(true);
   const [isGenerating, setIsGenerating] = useState(false);
   const [showReplanDialog, setShowReplanDialog] = useState(false);
+  const [selectedMilestone, setSelectedMilestone] = useState<Milestone | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -145,25 +148,26 @@ export default function PathwayDashboard({
     }
   };
 
-  const handleToggleMilestone = async (milestoneId: number, currentStatus: string) => {
-    const newStatus = currentStatus === 'completed' ? 'pending' : 'completed';
-
+  const handleUpdateMilestone = async (milestoneId: number, status: string, notes: string) => {
     try {
       const response = await fetch('/api/careers/pathways/milestones', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           milestoneId,
-          status: newStatus,
+          status,
+          completionNotes: notes,
         }),
       });
 
       if (response.ok) {
         await loadPathway();
         toast({
-          title: newStatus === 'completed' ? 'Milestone completed!' : 'Milestone reopened',
-          description: newStatus === 'completed' ? 'Great progress!' : 'Milestone marked as pending',
+          title: 'Milestone updated',
+          description: status === 'completed' ? 'Great progress!' : 'Status updated',
         });
+      } else {
+        throw new Error('Failed to update milestone');
       }
     } catch (error) {
       console.error('Error updating milestone:', error);
@@ -327,17 +331,30 @@ export default function PathwayDashboard({
               return (
                 <Card
                   key={milestone.id}
-                  className={milestone.status === 'completed' ? 'opacity-60' : ''}
+                  className={`cursor-pointer transition-all hover:shadow-md 
+                    ${milestone.status === 'completed' ? 'opacity-60 bg-muted/50' : ''}
+                    ${milestone.status === 'in_progress' ? 'border-blue-500 border-2' : ''}
+                  `}
+                  onClick={() => setSelectedMilestone(milestone)}
                 >
                   <CardHeader>
                     <div className="flex items-start justify-between">
                       <div className="flex items-start gap-3 flex-1">
                         <button
-                          onClick={() => handleToggleMilestone(milestone.id, milestone.status)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleUpdateMilestone(
+                              milestone.id,
+                              milestone.status === 'completed' ? 'pending' : 'completed',
+                              milestone.completion_notes || ''
+                            );
+                          }}
                           className="mt-1 hover:scale-110 transition-transform"
                         >
                           {milestone.status === 'completed' ? (
                             <CheckCircle2 className="w-6 h-6 text-green-600" />
+                          ) : milestone.status === 'in_progress' ? (
+                            <Clock className="w-6 h-6 text-blue-500" />
                           ) : (
                             <Circle className="w-6 h-6 text-muted-foreground" />
                           )}
@@ -358,6 +375,11 @@ export default function PathwayDashboard({
                           <CardDescription className="mt-2">
                             {milestone.description}
                           </CardDescription>
+                          {milestone.completion_notes && (
+                            <div className="mt-3 text-sm bg-muted/50 p-2 rounded-md border-l-2 border-primary">
+                              <strong>Note:</strong> {milestone.completion_notes}
+                            </div>
+                          )}
                         </div>
                         <Icon className="w-5 h-5 text-muted-foreground shrink-0 mt-1" />
                       </div>
@@ -408,12 +430,23 @@ export default function PathwayDashboard({
         <TabsContent value="activities" className="space-y-4">
           {ongoingActivities.length > 0 ? (
             ongoingActivities.map((activity) => (
-              <Card key={activity.id}>
+              <Card 
+                key={activity.id}
+                className={`cursor-pointer transition-all hover:shadow-md ${activity.status === 'completed' ? 'opacity-60' : ''}`}
+                onClick={() => setSelectedMilestone(activity)}
+              >
                 <CardHeader>
                   <div className="flex items-start justify-between">
                     <div className="flex items-start gap-3 flex-1">
                       <button
-                        onClick={() => handleToggleMilestone(activity.id, activity.status)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleUpdateMilestone(
+                            activity.id,
+                            activity.status === 'completed' ? 'pending' : 'completed',
+                            activity.completion_notes || ''
+                          );
+                        }}
                         className="mt-1 hover:scale-110 transition-transform"
                       >
                         {activity.status === 'completed' ? (
@@ -434,6 +467,11 @@ export default function PathwayDashboard({
                         <CardDescription className="mt-2">
                           {activity.description}
                         </CardDescription>
+                        {activity.completion_notes && (
+                          <div className="mt-3 text-sm bg-muted/50 p-2 rounded-md border-l-2 border-primary">
+                            <strong>Note:</strong> {activity.completion_notes}
+                          </div>
+                        )}
                       </div>
                       <Award className="w-5 h-5 text-muted-foreground shrink-0 mt-1" />
                     </div>
@@ -452,11 +490,18 @@ export default function PathwayDashboard({
         </TabsContent>
       </Tabs>
 
-      {/* Replan Dialog */}
+      {/* Dialogs */}
       <ReplanDialog
         open={showReplanDialog}
         onOpenChange={setShowReplanDialog}
         onReplan={handleReplan}
+      />
+      
+      <MilestoneDetailDialog
+        open={!!selectedMilestone}
+        onOpenChange={(open) => !open && setSelectedMilestone(null)}
+        milestone={selectedMilestone}
+        onUpdate={handleUpdateMilestone}
       />
     </div>
   );

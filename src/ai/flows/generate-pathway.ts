@@ -62,6 +62,9 @@ const GeneratePathwayInputSchema = z.object({
 
   // Brainstorming interests
   interests: z.array(z.string()).optional(),
+
+  // Recent feedback from milestones
+  recentFeedback: z.array(z.string()).optional().describe('Notes and results from previously completed milestones'),
 });
 export type GeneratePathwayInput = z.infer<typeof GeneratePathwayInputSchema>;
 
@@ -123,6 +126,13 @@ export async function generatePathway(
 {{/each}}
 {{/if}}
 
+{{#if recentFeedback}}
+**Recent User Progress & Feedback:**
+{{#each recentFeedback}}
+- {{this}}
+{{/each}}
+{{/if}}
+
 {{#if cvData}}
 **Current Profile:**
 {{#if cvData.skills}}Skills: {{#each cvData.skills}}{{this}}, {{/each}}{{/if}}
@@ -140,7 +150,11 @@ Generate a comprehensive, actionable pathway from **now** until the UCAS applica
 
 **Guidelines:**
 
-1. **Milestones** (month-by-month plan):
+1. **Adapt to Feedback:**
+   - **CRITICAL:** If "Recent User Progress & Feedback" indicates low scores or struggles (e.g., "Got 76%"), IMMEDIATELY schedule remedial actions/milestones for that topic/subject in the coming month.
+   - If feedback indicates success, accelerate that area or move to advanced topics.
+
+2. **Milestones** (month-by-month plan):
    - Start from current month and go until October {{targetApplicationYear}}
    - Each month should have 2-4 specific, achievable milestones
    - Mix of: academic work, exam prep, extracurriculars, skill development, application tasks
@@ -148,24 +162,24 @@ Generate a comprehensive, actionable pathway from **now** until the UCAS applica
    - Include topic improvement milestones that reference weak areas from Exammer
    - Essential milestones: must-do items; Important: strongly recommended; Optional: nice-to-have
 
-2. **Subject Grade Targets**:
+3. **Subject Grade Targets**:
    - For each required subject (and relevant A-levels), specify target grade
    - If entry requirements are "AAA", distribute realistically (e.g., one A* is safer)
    - List 2-4 key focus areas per subject
    - If weak topics identified, reference them in focus areas
 
-3. **Extracurricular Recommendations**:
+4. **Extracurricular Recommendations**:
    - Suggest 3-5 activities that enhance university application
    - Must be relevant to the course (e.g., coding projects for CS, volunteering for Medicine)
    - Realistic time commitments for a busy student
    - Prioritize: high = very important for this specific course
 
-4. **Application Timeline**:
+5. **Application Timeline**:
    - UCAS deadline: October 15 for Oxford/Cambridge/Medicine, January 31 for others
    - Personal statement: start 3-4 months before deadline
    - References: request 2 months before deadline
 
-5. **Make it Personal**:
+6. **Make it Personal**:
    - Reference their interests and achievements
    - Connect weak topics to improvement milestones
    - Show how activities build toward the goal
