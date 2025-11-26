@@ -34,6 +34,7 @@ interface Milestone {
   status: 'pending' | 'in_progress' | 'completed';
   completed_at: number | null;
   completion_notes?: string;
+  topics?: { subject_name: string; topic_name: string; exammer_link: string }[];
 }
 
 interface SubjectTarget {
@@ -378,6 +379,17 @@ export default function PathwayDashboard({
                           {milestone.completion_notes && (
                             <div className="mt-3 text-sm bg-muted/50 p-2 rounded-md border-l-2 border-primary">
                               <strong>Note:</strong> {milestone.completion_notes}
+                            </div>
+                          )}
+                          {milestone.topics && milestone.topics.length > 0 && (
+                            <div className="mt-3 flex flex-wrap gap-2">
+                              {milestone.topics.map((topic, i) => (
+                                <Link key={i} href={topic.exammer_link} passHref>
+                                  <Badge variant="secondary" className="hover:bg-primary hover:text-primary-foreground cursor-pointer transition-colors">
+                                    Practice {topic.topic_name}
+                                  </Badge>
+                                </Link>
+                              ))}
                             </div>
                           )}
                         </div>

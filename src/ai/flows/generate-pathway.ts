@@ -17,6 +17,7 @@ const MilestoneSchema = z.object({
   description: z.string().describe('Detailed description of what to achieve this month'),
   category: z.enum(['academic', 'extracurricular', 'application', 'skill-building']).describe('Type of milestone'),
   priority: z.enum(['essential', 'important', 'optional']).describe('How critical this milestone is'),
+  exammerTopics: z.array(z.string()).optional().describe('List of specific Exammer topic names to practice (if applicable)'),
 });
 
 const SubjectGradeTargetSchema = z.object({
@@ -185,13 +186,19 @@ Generate a comprehensive, actionable pathway from **now** until the UCAS applica
    - Show how activities build toward the goal
    - Be encouraging and realistic
 
+7. **Exammer Topics:**
+   - **CRITICAL:** For EVERY academic milestone, you MUST populate \`exammerTopics\` with 1-3 highly relevant topic names. Guess if necessary, prioritize common topics.
+   - Examples: "Integration", "Vectors", "Organic Chemistry", "Market Structures".
+   - These will be turned into clickable links for practice.
+
 **Example Milestone:**
 {
   "month": "March 2025",
   "title": "Master Calculus Fundamentals",
   "description": "Focus on improving differentiation and integration skills identified as weak areas. Complete 20 practice questions on Exammer, aiming for 80%+ scores. Review mark schemes to understand where marks are lost.",
   "category": "academic",
-  "priority": "essential"
+  "priority": "essential",
+  "exammerTopics": ["Differentiation", "Integration"]
 }
 
 Generate the complete pathway now.`,

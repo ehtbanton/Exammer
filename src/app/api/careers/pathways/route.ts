@@ -183,7 +183,7 @@ export async function POST(req: NextRequest) {
 
     // Store milestones
     for (const milestone of pathway.milestones) {
-      await db.run(
+      const result = await db.run(
         `INSERT INTO pathway_milestones (
           pathway_id,
           month,
@@ -202,6 +202,56 @@ export async function POST(req: NextRequest) {
           milestone.priority,
         ]
       );
+
+      const milestoneId = result.lastID;
+
+      // Store topic links if provided
+      if (milestone.exammerTopics && milestone.exammerTopics.length > 0) {
+        for (const topicName of milestone.exammerTopics) {
+          try {
+            // Find matching topic in DB (fuzzy match)
+            const topic = await db.get<{
+              id: number;
+              name: string;
+              paper_type_id: number;
+              subject_id: number;
+              subject_name: string;
+            }>(
+              `SELECT t.id, t.name, t.paper_type_id, pt.subject_id, s.name as subject_name
+               FROM topics t
+               JOIN paper_types pt ON t.paper_type_id = pt.id
+               JOIN subjects s ON pt.subject_id = s.id
+               WHERE t.name LIKE ?
+               LIMIT 1`,
+              [`%${topicName}%`]
+            );
+
+            if (topic) {
+              const link = `/workspace/subject/${topic.subject_id}/paper/${topic.paper_type_id}/topic/${topic.id}`;
+              
+              await db.run(
+                `INSERT INTO topic_improvement_links (
+                  milestone_id,
+                  subject_name,
+                  topic_id,
+                  topic_name,
+                  exammer_link,
+                  target_score
+                ) VALUES (?, ?, ?, ?, ?, 80)`,
+                [
+                  milestoneId,
+                  topic.subject_name,
+                  topic.id,
+                  topic.name,
+                  link
+                ]
+              );
+            }
+          } catch (topicError) {
+            console.error(`Error linking topic ${topicName}:`, topicError);
+          }
+        }
+      }
     }
 
     // Store subject grade targets
@@ -386,10 +436,29 @@ export async function GET(req: NextRequest) {
       [pathway.id]
     );
 
+    // Get topic links
+    const topicLinks = await db.all<{
+      milestone_id: number;
+      subject_name: string;
+      topic_name: string;
+      exammer_link: string;
+    }>(
+      `SELECT milestone_id, subject_name, topic_name, exammer_link
+       FROM topic_improvement_links
+       WHERE milestone_id IN (SELECT id FROM pathway_milestones WHERE pathway_id = ?)`,
+      [pathway.id]
+    );
+
+    // Attach links to milestones
+    const milestonesWithLinks = milestones.map(m => ({
+      ...m,
+      topics: topicLinks.filter(l => l.milestone_id === m.id)
+    }));
+
     return NextResponse.json({
       pathway: {
         ...pathway,
-        milestones,
+        milestones: milestonesWithLinks,
         subjectTargets,
       },
     });
