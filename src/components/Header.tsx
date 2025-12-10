@@ -173,9 +173,11 @@ export default function Header() {
                     </div>
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem disabled>
-                    <User className="mr-2 h-4 w-4" />
-                    <span>Profile</span>
+                  <DropdownMenuItem asChild>
+                    <Link href={`/profile/${session.user?.id}`}>
+                      <User className="mr-2 h-4 w-4" />
+                      <span>My Profile</span>
+                    </Link>
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={() => signOut({ callbackUrl: '/auth/signin' })} className="text-red-600">
