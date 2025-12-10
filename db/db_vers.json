@@ -1,5 +1,5 @@
 {
-  "currentVersion": 16,
+  "currentVersion": 17,
   "versions": {
     "0": {
       "description": "Initial schema - subjects owned by users",
@@ -385,6 +385,54 @@
       }
     },
     "11": {
+      "description": "Add conversation storage for RAG search - stores interview conversations with embeddings for semantic search",
+      "schema": {
+        "conversations": {
+          "columns": ["id", "user_id", "question_id", "started_at", "ended_at", "final_score", "summary", "summary_embedding"],
+          "note": "Stores interview sessions. summary is AI-generated, summary_embedding is JSON array of 768 floats for semantic search."
+        },
+        "conversation_messages": {
+          "columns": ["id", "conversation_id", "role", "content", "image_url", "created_at"],
+          "note": "Individual messages in a conversation. role is 'user' or 'assistant'. image_url stores whiteboard images."
+        }
+      },
+      "migration": {
+        "from": 10,
+        "steps": [
+          {
+            "action": "create_table",
+            "table": "conversations",
+            "sql": "CREATE TABLE IF NOT EXISTS conversations (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, question_id INTEGER NOT NULL, started_at INTEGER NOT NULL DEFAULT (unixepoch()), ended_at INTEGER, final_score INTEGER, summary TEXT, summary_embedding TEXT, FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE, FOREIGN KEY (question_id) REFERENCES questions(id) ON DELETE CASCADE)"
+          },
+          {
+            "action": "create_index",
+            "table": "conversations",
+            "sql": "CREATE INDEX IF NOT EXISTS idx_conversations_user_id ON conversations(user_id)"
+          },
+          {
+            "action": "create_index",
+            "table": "conversations",
+            "sql": "CREATE INDEX IF NOT EXISTS idx_conversations_question_id ON conversations(question_id)"
+          },
+          {
+            "action": "create_index",
+            "table": "conversations",
+            "sql": "CREATE INDEX IF NOT EXISTS idx_conversations_started_at ON conversations(started_at)"
+          },
+          {
+            "action": "create_table",
+            "table": "conversation_messages",
+            "sql": "CREATE TABLE IF NOT EXISTS conversation_messages (id INTEGER PRIMARY KEY AUTOINCREMENT, conversation_id INTEGER NOT NULL, role TEXT NOT NULL CHECK(role IN ('user', 'assistant')), content TEXT NOT NULL, image_url TEXT, created_at INTEGER NOT NULL DEFAULT (unixepoch()), FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE CASCADE)"
+          },
+          {
+            "action": "create_index",
+            "table": "conversation_messages",
+            "sql": "CREATE INDEX IF NOT EXISTS idx_conversation_messages_conversation_id ON conversation_messages(conversation_id)"
+          }
+        ]
+      }
+    },
+    "12": {
       "description": "Add careers pathway planning system - brainstorming, university goals, and personalized pathways",
       "schema": {
         "career_sessions": {
@@ -421,7 +469,7 @@
         }
       },
       "migration": {
-        "from": 10,
+        "from": 11,
         "steps": [
           {
             "action": "create_table",
@@ -521,7 +569,7 @@
         ]
       }
     },
-    "12": {
+    "13": {
       "description": "Fix careers pathway schema mismatches - align database schema with API code expectations",
       "schema": {
         "brainstorm_nodes": {
@@ -550,7 +598,7 @@
         }
       },
       "migration": {
-        "from": 11,
+        "from": 12,
         "steps": [
           {
             "action": "add_column",
@@ -611,7 +659,7 @@
         ]
       }
     },
-    "13": {
+    "14": {
       "description": "Add user_interests to career_sessions for better AI recommendations on both explore and direct paths",
       "schema": {
         "career_sessions": {
@@ -620,7 +668,7 @@
         }
       },
       "migration": {
-        "from": 12,
+        "from": 13,
         "steps": [
           {
             "action": "add_column",
@@ -630,7 +678,7 @@
         ]
       }
     },
-    "14": {
+    "15": {
       "description": "Add academic_profile to career_sessions for storing detailed subject and grade information",
       "schema": {
         "career_sessions": {
@@ -639,7 +687,7 @@
         }
       },
       "migration": {
-        "from": 13,
+        "from": 14,
         "steps": [
           {
             "action": "add_column",
@@ -654,7 +702,7 @@
         ]
       }
     },
-    "15": {
+    "16": {
       "description": "Fix brainstorm_nodes unique constraint - change from global node_id unique to composite (session_id, node_id) unique",
       "schema": {
         "brainstorm_nodes": {
@@ -663,7 +711,7 @@
         }
       },
       "migration": {
-        "from": 14,
+        "from": 15,
         "steps": [
           {
             "action": "recreate_table",
@@ -681,7 +729,7 @@
         ]
       }
     },
-    "16": {
+    "17": {
       "description": "Add completion_notes to pathway_milestones to store user results and grades",
       "schema": {
         "pathway_milestones": {
@@ -690,7 +738,7 @@
         }
       },
       "migration": {
-        "from": 15,
+        "from": 16,
         "steps": [
           {
             "action": "add_column",
