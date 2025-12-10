@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { Sparkles, Loader2, Check, ChevronRight } from 'lucide-react';
+import { Sparkles, Loader2, Check, ChevronRight, Star, Focus } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
 
 interface BrainstormNodeModalProps {
   isOpen: boolean;
@@ -25,6 +26,8 @@ interface BrainstormNodeModalProps {
   } | null;
   onExpand: () => Promise<void>;
   isExpanding: boolean;
+  onSelect?: () => void;
+  isOnSelectedPath?: boolean;
 }
 
 type ModalState = 'initial' | 'expanding' | 'success';
@@ -35,6 +38,8 @@ export default function BrainstormNodeModal({
   node,
   onExpand,
   isExpanding,
+  onSelect,
+  isOnSelectedPath = false,
 }: BrainstormNodeModalProps) {
   const [modalState, setModalState] = useState<ModalState>('initial');
 
@@ -64,6 +69,15 @@ export default function BrainstormNodeModal({
     }
   };
 
+  const handleSelectAndExpand = async () => {
+    // First select the node on the golden path
+    if (onSelect) {
+      onSelect();
+    }
+    // Then expand it
+    await handleExpand();
+  };
+
   if (!node) return null;
 
   return (
@@ -74,17 +88,38 @@ export default function BrainstormNodeModal({
           <>
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2 text-xl">
-                <Sparkles className="h-6 w-6 text-primary" />
+                {isOnSelectedPath ? (
+                  <div className="h-7 w-7 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center">
+                    <Star className="h-4 w-4 text-white fill-white" />
+                  </div>
+                ) : (
+                  <Sparkles className="h-6 w-6 text-primary" />
+                )}
                 {node.label}
               </DialogTitle>
               <DialogDescription>
                 {node.isRoot
-                  ? "This is your starting point. Click 'Explore this path' to discover related career paths and subjects."
-                  : "Explore related areas and discover more specific career paths."}
+                  ? "This is your starting point. Explore to discover related career paths and subjects."
+                  : isOnSelectedPath
+                  ? "This is on your golden path. Continue exploring from here!"
+                  : "Select this to add it to your path, or just explore without selecting."}
               </DialogDescription>
             </DialogHeader>
 
             <div className="py-4 space-y-4">
+              {/* Golden Path Badge */}
+              {isOnSelectedPath && (
+                <div className="flex items-center gap-2">
+                  <Badge className="bg-gradient-to-r from-amber-500 to-orange-500 text-white border-0">
+                    <Star className="h-3 w-3 mr-1 fill-white" />
+                    On Your Path
+                  </Badge>
+                  <span className="text-sm text-muted-foreground">
+                    This is part of your exploration journey
+                  </span>
+                </div>
+              )}
+
               {/* Breadcrumb Path */}
               {node.parentPath.length > 0 && (
                 <div className="bg-muted p-3 rounded-lg">
@@ -98,7 +133,12 @@ export default function BrainstormNodeModal({
                         )}
                       </div>
                     ))}
-                    <span className="font-semibold text-primary">{node.label}</span>
+                    <span className={cn(
+                      "font-semibold",
+                      isOnSelectedPath ? "text-amber-600" : "text-primary"
+                    )}>
+                      {node.label}
+                    </span>
                   </div>
                 </div>
               )}
@@ -117,30 +157,98 @@ export default function BrainstormNodeModal({
 
               {/* Info Section */}
               {!node.isExpanded && (
-                <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 p-4 rounded-lg">
-                  <p className="text-sm text-blue-900 dark:text-blue-100">
+                <div className={cn(
+                  "p-4 rounded-lg border",
+                  isOnSelectedPath
+                    ? "bg-amber-50 dark:bg-amber-950 border-amber-200 dark:border-amber-800"
+                    : "bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800"
+                )}>
+                  <p className={cn(
+                    "text-sm",
+                    isOnSelectedPath
+                      ? "text-amber-900 dark:text-amber-100"
+                      : "text-blue-900 dark:text-blue-100"
+                  )}>
                     <strong>What happens when you explore?</strong>
                   </p>
-                  <p className="text-sm text-blue-800 dark:text-blue-200 mt-1">
+                  <p className={cn(
+                    "text-sm mt-1",
+                    isOnSelectedPath
+                      ? "text-amber-800 dark:text-amber-200"
+                      : "text-blue-800 dark:text-blue-200"
+                  )}>
                     AI will suggest 5 related areas based on <strong>{node.label}</strong>.
                     These could include career paths, subjects, skills, or specializations.
                   </p>
                 </div>
               )}
+
+              {/* Selection hint for non-selected nodes */}
+              {!isOnSelectedPath && !node.isRoot && !node.isExpanded && (
+                <div className="bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-950 dark:to-orange-950 border border-amber-200 dark:border-amber-800 p-4 rounded-lg">
+                  <p className="text-sm text-amber-900 dark:text-amber-100">
+                    <strong><Star className="h-4 w-4 inline mr-1" />Tip: Select & Explore</strong>
+                  </p>
+                  <p className="text-sm text-amber-800 dark:text-amber-200 mt-1">
+                    Add this to your "golden path" to track your interests. This helps generate better recommendations later!
+                  </p>
+                </div>
+              )}
             </div>
 
-            <DialogFooter>
+            <DialogFooter className="flex-col sm:flex-row gap-2">
               <Button onClick={onClose} variant="outline">
                 Close
               </Button>
-              <Button
-                onClick={handleExpand}
-                disabled={node.isExpanded}
-                className="gap-2"
-              >
-                <Sparkles className="h-4 w-4" />
-                {node.isExpanded ? 'Already Explored' : 'Explore this path'}
-              </Button>
+
+              {/* Show different buttons based on state */}
+              {!node.isExpanded && (
+                <>
+                  {/* Just explore without selecting */}
+                  {!isOnSelectedPath && !node.isRoot && (
+                    <Button
+                      onClick={handleExpand}
+                      variant="secondary"
+                      className="gap-2"
+                    >
+                      <Sparkles className="h-4 w-4" />
+                      Just Explore
+                    </Button>
+                  )}
+
+                  {/* Select and explore - primary action for non-root, non-selected nodes */}
+                  {!isOnSelectedPath && !node.isRoot ? (
+                    <Button
+                      onClick={handleSelectAndExpand}
+                      className="gap-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600"
+                    >
+                      <Star className="h-4 w-4" />
+                      Select & Explore
+                    </Button>
+                  ) : (
+                    <Button
+                      onClick={handleExpand}
+                      className="gap-2"
+                    >
+                      <Sparkles className="h-4 w-4" />
+                      Explore this path
+                    </Button>
+                  )}
+                </>
+              )}
+
+              {node.isExpanded && !isOnSelectedPath && !node.isRoot && onSelect && (
+                <Button
+                  onClick={() => {
+                    onSelect();
+                    onClose();
+                  }}
+                  className="gap-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600"
+                >
+                  <Star className="h-4 w-4" />
+                  Add to My Path
+                </Button>
+              )}
             </DialogFooter>
           </>
         )}
@@ -189,6 +297,17 @@ export default function BrainstormNodeModal({
                 </p>
                 <p className="text-sm text-green-800 dark:text-green-200">
                   Five related areas have been added. Click on any of them to continue exploring!
+                </p>
+              </div>
+
+              {/* Remind about selection */}
+              <div className="bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 p-4 rounded-lg">
+                <p className="text-sm text-amber-900 dark:text-amber-100">
+                  <Star className="h-4 w-4 inline mr-1" />
+                  <strong>Next step:</strong>
+                </p>
+                <p className="text-sm text-amber-800 dark:text-amber-200 mt-1">
+                  Click on the ideas that interest you most to add them to your golden path!
                 </p>
               </div>
             </div>
