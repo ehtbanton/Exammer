@@ -52,7 +52,7 @@ export function EmployerSearch({ userId }: EmployerSearchProps) {
           userId,
           limit: 10,
           lambda: 0.7, // Balance relevance and diversity
-          threshold: 0.2, // Minimum relevance threshold
+          threshold: 0.35, // Minimum relevance threshold (35% match required)
         }),
       });
 
@@ -119,7 +119,7 @@ export function EmployerSearch({ userId }: EmployerSearchProps) {
           </Button>
         </div>
 
-        {searched && (
+        {searched && !loading && (
           <div className="space-y-4">
             <div className="text-sm text-muted-foreground">
               {results.length > 0

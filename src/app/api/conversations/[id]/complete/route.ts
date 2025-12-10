@@ -69,20 +69,10 @@ export async function POST(
       [conversationId]
     );
 
-    if (messages.length === 0) {
-      // No messages, just mark as ended
-      await db.run(
-        `UPDATE conversations SET ended_at = unixepoch(), final_score = ? WHERE id = ?`,
-        [finalScore || 0, conversationId]
-      );
-
-      return NextResponse.json({
-        id: conversationId,
-        endedAt: Math.floor(Date.now() / 1000),
-        finalScore: finalScore || 0,
-        summary: null,
-      });
-    }
+    // If no messages stored, create a minimal message list for summarization
+    const messagesForSummary = messages.length > 0
+      ? messages
+      : [{ role: 'assistant', content: `Interview on: ${question.question_text}` }];
 
     // Parse objectives
     let objectivesList: string[] = [];
@@ -105,7 +95,7 @@ export async function POST(
       const summaryResult = await summarizeConversation({
         questionText: question.question_text,
         questionTopic: question.topic_name,
-        messages: messages.map(m => ({
+        messages: messagesForSummary.map(m => ({
           role: m.role as 'user' | 'assistant',
           content: m.content,
         })),

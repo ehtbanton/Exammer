@@ -165,6 +165,7 @@ function InterviewPageContent() {
 
   // Conversation storage helpers
   const createConversation = async (qId: number): Promise<number | null> => {
+    console.log('Creating conversation for question ID:', qId);
     try {
       const response = await fetch('/api/conversations', {
         method: 'POST',
@@ -175,6 +176,9 @@ function InterviewPageContent() {
         const data = await response.json();
         console.log('Created conversation:', data.id);
         return data.id;
+      } else {
+        const errorText = await response.text();
+        console.error('Failed to create conversation, status:', response.status, 'response:', errorText);
       }
     } catch (error) {
       console.error('Failed to create conversation:', error);
@@ -184,24 +188,35 @@ function InterviewPageContent() {
 
   const saveMessage = async (convId: number, role: 'user' | 'assistant', content: string, imageUrl?: string) => {
     try {
-      await fetch(`/api/conversations/${convId}/messages`, {
+      const response = await fetch(`/api/conversations/${convId}/messages`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ role, content, imageUrl }),
       });
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Failed to save message, status:', response.status, errorText);
+      }
     } catch (error) {
       console.error('Failed to save message:', error);
     }
   };
 
   const completeConversation = async (convId: number, score: number, objectives: string[]) => {
+    console.log('Completing conversation:', convId, 'score:', score, 'objectives:', objectives.length);
     try {
-      await fetch(`/api/conversations/${convId}/complete`, {
+      const response = await fetch(`/api/conversations/${convId}/complete`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ finalScore: score, completedObjectives: objectives }),
       });
-      console.log('Conversation completed with summary + embedding');
+      if (response.ok) {
+        const data = await response.json();
+        console.log('Conversation completed successfully:', data);
+      } else {
+        const errorText = await response.text();
+        console.error('Failed to complete conversation, status:', response.status, 'response:', errorText);
+      }
     } catch (error) {
       console.error('Failed to complete conversation:', error);
     }
@@ -365,6 +380,16 @@ function InterviewPageContent() {
           setChatHistory(cachedData.chatHistory);
           setCompletedObjectives(cachedData.completedObjectives);
           console.log('Restored in-progress question with', cachedData.completedObjectives.length, 'completed objectives');
+
+          // Create a conversation for the restored session (for RAG search)
+          const convId = await createConversation(parseInt(examQuestion.id));
+          if (convId) {
+            setConversationId(convId);
+            // Save all existing messages to the conversation
+            for (const msg of cachedData.chatHistory) {
+              await saveMessage(convId, msg.role, msg.content, msg.imageUrl);
+            }
+          }
         } else {
           // Check if cache is full before generating new question
           if (!canAddToCache()) {
@@ -570,18 +595,21 @@ function InterviewPageContent() {
   };
 
   const handleSaveProgress = async () => {
+    // Complete the conversation for RAG search (always try, even with 0 objectives)
+    if (conversationId && generatedVariant) {
+      const totalObjectives = generatedVariant.solutionObjectives.length;
+      const scorePercent = totalObjectives > 0
+        ? Math.round((completedObjectives.length / totalObjectives) * 100)
+        : 0;
+      const completedObjectiveTexts = completedObjectives.map(idx => generatedVariant.solutionObjectives[idx]);
+      await completeConversation(conversationId, scorePercent, completedObjectiveTexts);
+    }
+
     if (subject && paperType && topic && completedObjectives.length > 0 && generatedVariant && examQuestion) {
       // Calculate score out of 10 based on objectives completed
       const totalObjectives = generatedVariant.solutionObjectives.length;
       const scoreOutOf10 = (completedObjectives.length / totalObjectives) * 10;
       updateExamQuestionScore(subject.id, paperType.name, topic.name, examQuestion.id, scoreOutOf10);
-
-      // Complete the conversation for RAG search
-      if (conversationId) {
-        const scorePercent = Math.round((completedObjectives.length / totalObjectives) * 100);
-        const completedObjectiveTexts = completedObjectives.map(idx => generatedVariant.solutionObjectives[idx]);
-        await completeConversation(conversationId, scorePercent, completedObjectiveTexts);
-      }
 
       toast({
         title: "Progress Saved",
