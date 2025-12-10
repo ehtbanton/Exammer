@@ -121,6 +121,7 @@ function InterviewPageContent() {
   const [showCacheLimitWarning, setShowCacheLimitWarning] = useState(false);
   const [oldestCachedQuestion, setOldestCachedQuestion] = useState<{id: string; timestamp: number} | null>(null);
   const [pendingQuestionGeneration, setPendingQuestionGeneration] = useState<(() => Promise<void>) | null>(null);
+  const [conversationId, setConversationId] = useState<number | null>(null);
 
   // Cache management functions
   const CACHE_KEY = 'question-progress-cache';
@@ -160,6 +161,50 @@ function InterviewPageContent() {
   const canAddToCache = () => {
     const cache = getQuestionCache();
     return Object.keys(cache).length < MAX_CACHED_QUESTIONS;
+  };
+
+  // Conversation storage helpers
+  const createConversation = async (qId: number): Promise<number | null> => {
+    try {
+      const response = await fetch('/api/conversations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ questionId: qId }),
+      });
+      if (response.ok) {
+        const data = await response.json();
+        console.log('Created conversation:', data.id);
+        return data.id;
+      }
+    } catch (error) {
+      console.error('Failed to create conversation:', error);
+    }
+    return null;
+  };
+
+  const saveMessage = async (convId: number, role: 'user' | 'assistant', content: string, imageUrl?: string) => {
+    try {
+      await fetch(`/api/conversations/${convId}/messages`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role, content, imageUrl }),
+      });
+    } catch (error) {
+      console.error('Failed to save message:', error);
+    }
+  };
+
+  const completeConversation = async (convId: number, score: number, objectives: string[]) => {
+    try {
+      await fetch(`/api/conversations/${convId}/complete`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ finalScore: score, completedObjectives: objectives }),
+      });
+      console.log('Conversation completed with summary + embedding');
+    } catch (error) {
+      console.error('Failed to complete conversation:', error);
+    }
   };
 
   // Load subject, paper type, topic, and full question on mount
@@ -277,6 +322,12 @@ function InterviewPageContent() {
       setGeneratedVariant(variantData);
       console.log('Question variant generated successfully with', variantData.solutionObjectives.length, 'objectives');
 
+      // Create a conversation record for RAG search
+      const convId = await createConversation(parseInt(examQuestion.id));
+      if (convId) {
+        setConversationId(convId);
+      }
+
       // Start the interview with the generated variant and objectives
       console.log('Calling aiPoweredInterview with generated variant and objectives...');
       const res = await aiPoweredInterview({
@@ -288,6 +339,14 @@ function InterviewPageContent() {
       console.log('Interview started, chat history:', res.chatHistory);
       setChatHistory(res.chatHistory);
       setCompletedObjectives(res.completedObjectives || []);
+
+      // Save the initial assistant message to the conversation
+      if (convId && res.chatHistory.length > 0) {
+        const firstMsg = res.chatHistory[0];
+        if (firstMsg.role === 'assistant') {
+          saveMessage(convId, 'assistant', firstMsg.content);
+        }
+      }
     };
 
     const startInterview = async () => {
@@ -436,6 +495,11 @@ function InterviewPageContent() {
     }];
     setChatHistory(newHistory);
 
+    // Save user message to conversation
+    if (conversationId) {
+      saveMessage(conversationId, 'user', currentInput || 'Whiteboard drawing', imageData);
+    }
+
     try {
       const res = await aiPoweredInterview({
         subsection: examQuestion.summary,
@@ -453,6 +517,14 @@ function InterviewPageContent() {
         const newSet = new Set([...prevCompleted, ...res.completedObjectives]);
         return Array.from(newSet).sort((a, b) => a - b);
       });
+
+      // Save assistant response to conversation
+      if (conversationId && res.chatHistory.length > 0) {
+        const lastMsg = res.chatHistory[res.chatHistory.length - 1];
+        if (lastMsg.role === 'assistant') {
+          saveMessage(conversationId, 'assistant', lastMsg.content);
+        }
+      }
     } catch (e) {
       toast({ variant: 'destructive', title: 'AI Error', description: 'Could not get AI response.' });
       console.error(e);
@@ -497,12 +569,20 @@ function InterviewPageContent() {
     setShowFinishDialog(true);
   };
 
-  const handleSaveProgress = () => {
+  const handleSaveProgress = async () => {
     if (subject && paperType && topic && completedObjectives.length > 0 && generatedVariant && examQuestion) {
       // Calculate score out of 10 based on objectives completed
       const totalObjectives = generatedVariant.solutionObjectives.length;
       const scoreOutOf10 = (completedObjectives.length / totalObjectives) * 10;
       updateExamQuestionScore(subject.id, paperType.name, topic.name, examQuestion.id, scoreOutOf10);
+
+      // Complete the conversation for RAG search
+      if (conversationId) {
+        const scorePercent = Math.round((completedObjectives.length / totalObjectives) * 100);
+        const completedObjectiveTexts = completedObjectives.map(idx => generatedVariant.solutionObjectives[idx]);
+        await completeConversation(conversationId, scorePercent, completedObjectiveTexts);
+      }
+
       toast({
         title: "Progress Saved",
         description: `Completed ${completedObjectives.length}/${totalObjectives} objectives.`,

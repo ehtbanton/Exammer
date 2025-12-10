@@ -1,5 +1,5 @@
 {
-  "currentVersion": 10,
+  "currentVersion": 11,
   "versions": {
     "0": {
       "description": "Initial schema - subjects owned by users",
@@ -380,6 +380,54 @@
             "action": "add_column",
             "table": "users",
             "sql": "ALTER TABLE users ADD COLUMN email_verification_sent_at INTEGER DEFAULT NULL"
+          }
+        ]
+      }
+    },
+    "11": {
+      "description": "Add conversation storage for RAG search - stores interview conversations with embeddings for semantic search",
+      "schema": {
+        "conversations": {
+          "columns": ["id", "user_id", "question_id", "started_at", "ended_at", "final_score", "summary", "summary_embedding"],
+          "note": "Stores interview sessions. summary is AI-generated, summary_embedding is JSON array of 768 floats for semantic search."
+        },
+        "conversation_messages": {
+          "columns": ["id", "conversation_id", "role", "content", "image_url", "created_at"],
+          "note": "Individual messages in a conversation. role is 'user' or 'assistant'. image_url stores whiteboard images."
+        }
+      },
+      "migration": {
+        "from": 10,
+        "steps": [
+          {
+            "action": "create_table",
+            "table": "conversations",
+            "sql": "CREATE TABLE IF NOT EXISTS conversations (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, question_id INTEGER NOT NULL, started_at INTEGER NOT NULL DEFAULT (unixepoch()), ended_at INTEGER, final_score INTEGER, summary TEXT, summary_embedding TEXT, FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE, FOREIGN KEY (question_id) REFERENCES questions(id) ON DELETE CASCADE)"
+          },
+          {
+            "action": "create_index",
+            "table": "conversations",
+            "sql": "CREATE INDEX IF NOT EXISTS idx_conversations_user_id ON conversations(user_id)"
+          },
+          {
+            "action": "create_index",
+            "table": "conversations",
+            "sql": "CREATE INDEX IF NOT EXISTS idx_conversations_question_id ON conversations(question_id)"
+          },
+          {
+            "action": "create_index",
+            "table": "conversations",
+            "sql": "CREATE INDEX IF NOT EXISTS idx_conversations_started_at ON conversations(started_at)"
+          },
+          {
+            "action": "create_table",
+            "table": "conversation_messages",
+            "sql": "CREATE TABLE IF NOT EXISTS conversation_messages (id INTEGER PRIMARY KEY AUTOINCREMENT, conversation_id INTEGER NOT NULL, role TEXT NOT NULL CHECK(role IN ('user', 'assistant')), content TEXT NOT NULL, image_url TEXT, created_at INTEGER NOT NULL DEFAULT (unixepoch()), FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE CASCADE)"
+          },
+          {
+            "action": "create_index",
+            "table": "conversation_messages",
+            "sql": "CREATE INDEX IF NOT EXISTS idx_conversation_messages_conversation_id ON conversation_messages(conversation_id)"
           }
         ]
       }

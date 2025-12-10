@@ -6,6 +6,7 @@ import { ProfileHeader } from "@/components/profile/ProfileHeader";
 import { SummaryCards } from "@/components/profile/SummaryCards";
 import { SubjectBreakdown } from "@/components/profile/SubjectBreakdown";
 import { ActivityHeatmap } from "@/components/profile/ActivityHeatmap";
+import { EmployerSearch } from "@/components/profile/EmployerSearch";
 import { Card, CardContent } from "@/components/ui/card";
 import { AlertCircle } from "lucide-react";
 
@@ -124,6 +125,8 @@ export default function ProfilePage({
       <ProfileHeader user={profile.user} profileUrl={profile.verification.profileUrl} />
 
       <SummaryCards summary={profile.summary} />
+
+      <EmployerSearch userId={profile.user.id} />
 
       <ActivityHeatmap activity={profile.activity} />
 
