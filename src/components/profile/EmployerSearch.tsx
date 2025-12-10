@@ -52,7 +52,7 @@ export function EmployerSearch({ userId }: EmployerSearchProps) {
           userId,
           limit: 10,
           lambda: 0.7, // Balance relevance and diversity
-          threshold: 0.35, // Minimum relevance threshold (35% match required)
+          threshold: 0.0, // No threshold - show all results
         }),
       });
 

@@ -38,7 +38,7 @@ export async function POST(
       return NextResponse.json({ error: 'Conversation not found' }, { status: 404 });
     }
 
-    if (conversation.user_id !== user.id) {
+    if (conversation.user_id !== parseInt(user.id as string)) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }
 
@@ -94,7 +94,7 @@ export async function GET(
       return NextResponse.json({ error: 'Conversation not found' }, { status: 404 });
     }
 
-    if (conversation.user_id !== user.id) {
+    if (conversation.user_id !== parseInt(user.id as string)) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }
 

@@ -37,7 +37,7 @@ export async function POST(
       return NextResponse.json({ error: 'Conversation not found' }, { status: 404 });
     }
 
-    if (conversation.user_id !== user.id) {
+    if (conversation.user_id !== parseInt(user.id as string)) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }
 
@@ -74,18 +74,8 @@ export async function POST(
       ? messages
       : [{ role: 'assistant', content: `Interview on: ${question.question_text}` }];
 
-    // Parse objectives
-    let objectivesList: string[] = [];
-    try {
-      const objectives = JSON.parse(question.solution_objectives || '[]');
-      if (completedObjectives && completedObjectives.length > 0) {
-        objectivesList = completedObjectives.map((idx: number) =>
-          objectives[idx] || `Objective ${idx + 1}`
-        );
-      }
-    } catch (e) {
-      // Ignore parse errors
-    }
+    // completedObjectives is already an array of objective text strings from the client
+    const objectivesList: string[] = completedObjectives || [];
 
     // Generate summary
     let summary = null;
