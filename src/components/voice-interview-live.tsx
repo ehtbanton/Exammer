@@ -1,9 +1,11 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Mic, Phone, PhoneOff, Volume2 } from 'lucide-react'
+import { Mic, Phone, PhoneOff, Volume2, Clock } from 'lucide-react'
+
+// 5 minute time limit in milliseconds
+const TIME_LIMIT_MS = 5 * 60 * 1000
 
 interface VoiceInterviewLiveProps {
   question: string
@@ -21,7 +23,8 @@ export function VoiceInterviewLive({ question, solutionObjectives, subsection, o
   const [status, setStatus] = useState('Click Start to begin')
   const [error, setError] = useState<string | null>(null)
   const [logs, setLogs] = useState<string[]>([])
-  
+  const [timeRemaining, setTimeRemaining] = useState(TIME_LIMIT_MS)
+
   const sessionRef = useRef<any>(null)
   const audioContextRef = useRef<AudioContext | null>(null)
   const playbackContextRef = useRef<AudioContext | null>(null)
@@ -31,12 +34,77 @@ export function VoiceInterviewLive({ question, solutionObjectives, subsection, o
   const isPlayingRef = useRef(false)
   const currentUserTextRef = useRef('')
   const currentAITextRef = useRef('')
+  const startTimeRef = useRef<number | null>(null)
+  const timerIntervalRef = useRef<NodeJS.Timeout | null>(null)
+  const timeLimitTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   const log = (msg: string) => {
     console.log(msg)
     setLogs(prev => [...prev, msg])
   }
 
+  // Format time remaining as MM:SS
+  const formatTime = (ms: number): string => {
+    const totalSeconds = Math.max(0, Math.ceil(ms / 1000))
+    const minutes = Math.floor(totalSeconds / 60)
+    const seconds = totalSeconds % 60
+    return `${minutes}:${seconds.toString().padStart(2, '0')}`
+  }
+
+  // Get time color based on remaining time
+  const getTimeColor = (): string => {
+    if (timeRemaining <= 30000) return 'text-destructive' // Last 30 seconds - red
+    if (timeRemaining <= 60000) return 'text-orange-500' // Last minute - orange
+    return 'text-muted-foreground' // Normal
+  }
+
+  const disconnect = useCallback(() => {
+    log('Disconnecting...')
+    setIsConnected(false)
+    if (sessionRef.current) {
+      sessionRef.current.close()
+      sessionRef.current = null
+    }
+    cleanup()
+  }, [])
+
+  const cleanup = useCallback(() => {
+    // Clear timers
+    if (timerIntervalRef.current) {
+      clearInterval(timerIntervalRef.current)
+      timerIntervalRef.current = null
+    }
+    if (timeLimitTimeoutRef.current) {
+      clearTimeout(timeLimitTimeoutRef.current)
+      timeLimitTimeoutRef.current = null
+    }
+    startTimeRef.current = null
+    setTimeRemaining(TIME_LIMIT_MS)
+
+    if (mediaStreamRef.current) {
+      mediaStreamRef.current.getTracks().forEach(t => t.stop())
+      mediaStreamRef.current = null
+    }
+    if (processorRef.current) {
+      processorRef.current.disconnect()
+      processorRef.current = null
+    }
+    if (audioContextRef.current) {
+      audioContextRef.current.close()
+      audioContextRef.current = null
+    }
+    if (playbackContextRef.current) {
+      playbackContextRef.current.close()
+      playbackContextRef.current = null
+    }
+    audioQueueRef.current = []
+    isPlayingRef.current = false
+    currentUserTextRef.current = ''
+    currentAITextRef.current = ''
+    setIsRecording(false)
+    setIsSpeaking(false)
+    setStatus('Disconnected')
+  }, [])
 
   const playAudio = (base64Data: string) => {
     audioQueueRef.current.push(base64Data)
@@ -103,24 +171,54 @@ export function VoiceInterviewLive({ question, solutionObjectives, subsection, o
     }
   }
 
+  const startTimer = useCallback(() => {
+    startTimeRef.current = Date.now()
+
+    // Update countdown every second
+    timerIntervalRef.current = setInterval(() => {
+      if (startTimeRef.current) {
+        const elapsed = Date.now() - startTimeRef.current
+        const remaining = Math.max(0, TIME_LIMIT_MS - elapsed)
+        setTimeRemaining(remaining)
+
+        // Warning at 1 minute remaining
+        if (remaining <= 60000 && remaining > 59000) {
+          log('Warning: 1 minute remaining')
+        }
+        // Warning at 30 seconds remaining
+        if (remaining <= 30000 && remaining > 29000) {
+          log('Warning: 30 seconds remaining')
+        }
+      }
+    }, 1000)
+
+    // Auto-disconnect after time limit
+    timeLimitTimeoutRef.current = setTimeout(() => {
+      log('Time limit reached (5 minutes)')
+      setStatus('Time limit reached')
+      onAddMessage('assistant', '⏰ The 5-minute voice session has ended. You can continue with text chat or start a new voice session.')
+      disconnect()
+    }, TIME_LIMIT_MS)
+  }, [disconnect, onAddMessage])
+
   const connect = async () => {
     try {
       setStatus('Connecting...')
       setError(null)
       log('Step 1: Importing SDK')
-      
+
       const { GoogleGenAI } = await import('@google/genai')
       log('Step 2: Fetching API key')
-      
+
       const res = await fetch('/api/gemini/live-token')
       if (!res.ok) {
         throw new Error('API key fetch failed: ' + res.status)
       }
       const { apiKey } = await res.json()
       log('Step 3: Connecting to Gemini Live')
-      
+
       const genai = new GoogleGenAI({ apiKey })
-      
+
       const session = await genai.live.connect({
         model: 'gemini-2.0-flash-exp',
         config: {
@@ -134,6 +232,7 @@ export function VoiceInterviewLive({ question, solutionObjectives, subsection, o
             log('Step 4: Connected!')
             setIsConnected(true)
             setStatus('Connected - requesting mic')
+            startTimer() // Start the 5-minute timer
             startMic()
           },
           onmessage: (msg: any) => {
@@ -144,7 +243,7 @@ export function VoiceInterviewLive({ question, solutionObjectives, subsection, o
             if (msg.serverContent) {
               log('ServerContent keys: ' + Object.keys(msg.serverContent).join(', '))
             }
-            
+
             // Check for audio in serverContent.modelTurn
             if (msg.serverContent?.modelTurn?.parts) {
               log('Got modelTurn with ' + msg.serverContent.modelTurn.parts.length + ' parts')
@@ -158,43 +257,43 @@ export function VoiceInterviewLive({ question, solutionObjectives, subsection, o
                 }
               }
             }
-            
-            
+
+
             // Check for top-level transcription fields (JavaScript SDK structure)
             if (msg.inputTranscription?.text) {
               log('[INPUT] User said (top-level): ' + msg.inputTranscription.text.substring(0, 50))
               currentUserTextRef.current += msg.inputTranscription.text
             }
-            
+
             if (msg.outputTranscription?.text) {
               log('[OUTPUT] AI said (top-level): ' + msg.outputTranscription.text.substring(0, 50))
               currentAITextRef.current += msg.outputTranscription.text
             }
-            
+
             // Check for nested transcription fields (Python SDK structure)
             if (msg.serverContent?.inputTranscription?.text) {
               log('[INPUT] User said (nested): ' + msg.serverContent.inputTranscription.text.substring(0, 50))
               currentUserTextRef.current += msg.serverContent.inputTranscription.text
             }
-            
+
             if (msg.serverContent?.outputTranscription?.text) {
               log('[OUTPUT] AI said (nested): ' + msg.serverContent.outputTranscription.text.substring(0, 50))
               currentAITextRef.current += msg.serverContent.outputTranscription.text
             }
-            
+
             // Check for turn complete
             if (msg.serverContent?.turnComplete) {
               log('Turn complete')
-              
+
               const userText = currentUserTextRef.current.trim()
               const aiText = currentAITextRef.current.trim()
-              
+
               // Add messages to chat immediately (for UI responsiveness)
               if (userText) {
                 log('Sending USER message: ' + userText.substring(0, 30))
                 onAddMessage('user', userText)
               }
-              
+
               if (aiText) {
                 log('Sending AI message: ' + aiText.substring(0, 50))
                 onAddMessage('assistant', aiText)
@@ -202,7 +301,7 @@ export function VoiceInterviewLive({ question, solutionObjectives, subsection, o
                 log('No AI text captured, using placeholder')
                 onAddMessage('assistant', '[Audio response - no text available]')
               }
-              
+
               // NEW: Trigger background evaluation for objective tracking
               if (userText) {
                 log('Evaluating answer for objectives...')
@@ -219,7 +318,7 @@ export function VoiceInterviewLive({ question, solutionObjectives, subsection, o
                     setIsEvaluating(false)
                   })
               }
-              
+
               // Clear buffers after processing
               currentUserTextRef.current = ''
               currentAITextRef.current = ''
@@ -236,7 +335,7 @@ export function VoiceInterviewLive({ question, solutionObjectives, subsection, o
           }
         }
       })
-      
+
       sessionRef.current = session
       log('Session created successfully')
     } catch (err: any) {
@@ -250,40 +349,40 @@ export function VoiceInterviewLive({ question, solutionObjectives, subsection, o
     try {
       log('Step 5: Requesting microphone')
       const stream = await navigator.mediaDevices.getUserMedia({
-        audio: { 
-          sampleRate: 16000, 
+        audio: {
+          sampleRate: 16000,
           channelCount: 1,
           echoCancellation: true,
           noiseSuppression: true
         }
       })
-      
+
       log('Step 6: Mic granted, setting up audio')
       mediaStreamRef.current = stream
       audioContextRef.current = new AudioContext({ sampleRate: 16000 })
-      
+
       const source = audioContextRef.current.createMediaStreamSource(stream)
       const processor = audioContextRef.current.createScriptProcessor(4096, 1, 1)
-      
+
       processor.onaudioprocess = (e) => {
         if (!sessionRef.current) return
-        
+
         const input = e.inputBuffer.getChannelData(0)
         const pcm = new Int16Array(input.length)
-        
+
         for (let i = 0; i < input.length; i++) {
           const s = Math.max(-1, Math.min(1, input[i]))
           pcm[i] = s < 0 ? s * 0x8000 : s * 0x7FFF
         }
-        
+
         const b64 = btoa(String.fromCharCode(...new Uint8Array(pcm.buffer)))
-        
+
         try {
           if (sessionRef.current && typeof sessionRef.current.sendRealtimeInput === 'function') {
             sessionRef.current.sendRealtimeInput({
-              audio: { 
-                mimeType: 'audio/pcm;rate=16000', 
-                data: b64 
+              audio: {
+                mimeType: 'audio/pcm;rate=16000',
+                data: b64
               }
             })
           }
@@ -291,11 +390,11 @@ export function VoiceInterviewLive({ question, solutionObjectives, subsection, o
           console.error('Send error:', err)
         }
       }
-      
+
       source.connect(processor)
       processor.connect(audioContextRef.current.destination)
       processorRef.current = processor
-      
+
       setIsRecording(true)
       setStatus('Recording - speak now!')
       log('Step 7: Recording started!')
@@ -305,45 +404,9 @@ export function VoiceInterviewLive({ question, solutionObjectives, subsection, o
     }
   }
 
-  const disconnect = () => {
-    log('Disconnecting...')
-    setIsConnected(false)
-    if (sessionRef.current) {
-      sessionRef.current.close()
-      sessionRef.current = null
-    }
-    cleanup()
-  }
-
-  const cleanup = () => {
-    if (mediaStreamRef.current) {
-      mediaStreamRef.current.getTracks().forEach(t => t.stop())
-      mediaStreamRef.current = null
-    }
-    if (processorRef.current) {
-      processorRef.current.disconnect()
-      processorRef.current = null
-    }
-    if (audioContextRef.current) {
-      audioContextRef.current.close()
-      audioContextRef.current = null
-    }
-    if (playbackContextRef.current) {
-      playbackContextRef.current.close()
-      playbackContextRef.current = null
-    }
-    audioQueueRef.current = []
-    isPlayingRef.current = false
-    currentUserTextRef.current = ''
-    currentAITextRef.current = ''
-    setIsRecording(false)
-    setIsSpeaking(false)
-    setStatus('Disconnected')
-  }
-
   useEffect(() => {
     return () => cleanup()
-  }, [])
+  }, [cleanup])
 
   return (
     <div className="flex items-center gap-3 p-3 border rounded-lg bg-muted/30">
@@ -370,6 +433,14 @@ export function VoiceInterviewLive({ question, solutionObjectives, subsection, o
         <span className="text-sm text-muted-foreground">{status}</span>
         {isEvaluating && <span className="text-xs text-muted-foreground ml-2">(Evaluating...)</span>}
       </div>
+
+      {/* Time remaining display */}
+      {isConnected && (
+        <div className={`flex items-center gap-1 text-sm font-mono ${getTimeColor()}`}>
+          <Clock className="h-4 w-4" />
+          <span>{formatTime(timeRemaining)}</span>
+        </div>
+      )}
 
       {error && (
         <span className="text-xs text-destructive">{error}</span>
