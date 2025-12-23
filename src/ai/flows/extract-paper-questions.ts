@@ -51,7 +51,7 @@ const PaperQuestionSchema = z.object({
   topicIndex: z.number().describe('The 0-based index of the topic this question belongs to (from the topics array). Choose based on content analysis, not header text.'),
   categorizationConfidence: z.number().min(0).max(100).describe('Your confidence score (0-100) that this question belongs to the chosen topic. Use 100 for obvious matches, 70-90 for good matches, 50-70 for uncertain matches, below 50 for very uncertain matches.'),
   categorizationReasoning: z.string().describe('A brief 1-2 sentence explanation of why you chose this topic for this question based on the question content and topic description.'),
-  diagramMermaid: z.string().optional().describe('If this question includes a diagram, graph, figure, or visual element, provide mermaid diagram syntax to represent it. Use appropriate mermaid diagram types (graph, flowchart, sequenceDiagram, etc.). Include all measurements, labels, and relationships from the original. Omit if question is text-only.'),
+  diagramDescription: z.string().optional().describe('If this question includes a diagram, graph, figure, or visual element, provide a detailed natural language description for AI image generation. Describe the visual element clearly: shapes, labels, measurements, relationships, and layout. Be specific about positions, colors if relevant, and all text/numbers shown. Omit if question is text-only.'),
 });
 
 const ExtractPaperQuestionsOutputSchema = z.object({
@@ -185,12 +185,13 @@ CRITICAL INSTRUCTIONS - READ CAREFULLY:
    - topicIndex: The 0-based index from the topics array (based on content analysis)
    - categorizationConfidence: 0-100 score for topic match confidence
    - categorizationReasoning: 1-2 sentences explaining why you chose this topic
-   - diagramMermaid (OPTIONAL): If the question includes a diagram, graph, chart, figure, or any visual element:
-     * Provide valid mermaid diagram syntax to represent the visual element
-     * Use appropriate mermaid types: graph/flowchart (for general diagrams), sequenceDiagram (for sequences), classDiagram (for relationships), etc.
-     * Include all measurements, labels, and relationships from the original diagram
-     * Include specific values, angles, dimensions shown in the diagram
-     * Example for a triangle: "graph TD\\n    A[\\"Point A\\"] ---|[\\"3 cm\\"]| B[\\"Point B\\"]\\n    B ---|[\\"4 cm\\"]| C[\\"Point C\\"]\\n    C ---|[\\"5 cm\\"]| A"
+   - diagramDescription (OPTIONAL): If the question includes a diagram, graph, chart, figure, or any visual element:
+     * Provide a detailed natural language description suitable for AI image generation
+     * Describe shapes, their positions, sizes, and relationships clearly
+     * Include ALL measurements, labels, and text shown in the original diagram
+     * Specify colors if relevant, and describe the layout (e.g., "centered", "left side", "connected by arrow")
+     * Example for a triangle: "A right-angled triangle with vertices labeled A, B, and C. Side AB is horizontal at the bottom, labeled '3 cm'. Side BC is vertical on the right, labeled '4 cm'. Side AC is the hypotenuse, labeled '5 cm'. The right angle is at vertex B, marked with a small square."
+     * Example for a circuit: "A simple electrical circuit showing a battery (labeled '12V') on the left, connected by wires to a resistor (labeled 'R = 5Ω') at the top, and an ammeter in series on the right side of the circuit."
      * If question is text-only with no visual elements, OMIT this field entirely
 
 5. YEAR AND MONTH EXTRACTION
@@ -214,7 +215,7 @@ OUTPUT STRUCTURE:
       "topicIndex": <0-based index from topics array>,
       "categorizationConfidence": <0-100>,
       "categorizationReasoning": "<1-2 sentence explanation>",
-      "diagramMermaid": "<optional: mermaid syntax if visual element present>"
+      "diagramDescription": "<optional: natural language description if visual element present>"
     }
   ]
 }

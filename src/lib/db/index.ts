@@ -290,7 +290,7 @@ export interface Question {
   markscheme_id?: number;
   paper_date?: string; // e.g., "2022-06"
   question_number?: string; // e.g., "1-3-5"
-  diagram_mermaid?: string; // Mermaid diagram syntax
+  diagram_mermaid?: string; // Natural language diagram description for AI image generation
   categorization_confidence?: number; // 0-100
   categorization_reasoning?: string; // Brief explanation of categorization
   created_at: number;

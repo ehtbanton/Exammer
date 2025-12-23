@@ -157,7 +157,7 @@ CREATE TABLE IF NOT EXISTS questions (
   markscheme_id INTEGER,
   paper_date TEXT,
   question_number TEXT,
-  diagram_mermaid TEXT,
+  diagram_mermaid TEXT, -- Stores natural language diagram descriptions for AI image generation (legacy column name)
   categorization_confidence INTEGER DEFAULT 100,
   categorization_reasoning TEXT,
   created_at INTEGER DEFAULT (unixepoch()),

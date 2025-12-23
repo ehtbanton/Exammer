@@ -55,7 +55,6 @@
     "html2canvas": "^1.4.1",
     "katex": "^0.16.25",
     "lucide-react": "^0.475.0",
-    "mermaid": "^11.12.1",
     "next": "15.5.7",
     "next-auth": "^4.24.13",
     "patch-package": "^8.0.0",
