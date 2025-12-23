@@ -1,10 +1,10 @@
 'use server';
 
 /**
- * @fileOverview Generates diagram images using Gemini 2.5 Flash.
+ * @fileOverview Generates diagram images using Gemini 3 Pro Image (nano banana pro).
  *
  * - generateDiagramImage - Function that generates an image from a text description
- * - Uses gemini-2.5-flash-preview-image-generation model with generateContent API
+ * - Uses gemini-3-pro-image-preview model with generateContent API
  * - Uses the existing Gemini API key manager for consistency
  */
 
@@ -21,7 +21,7 @@ export interface GenerateDiagramImageOutput {
 }
 
 /**
- * Generate a diagram image using Gemini 2.5 Flash.
+ * Generate a diagram image using Gemini 3 Pro Image (nano banana pro).
  * Uses the existing Gemini API key manager to ensure rate limiting and key rotation.
  */
 export async function generateDiagramImage(
@@ -36,15 +36,23 @@ export async function generateDiagramImage(
     const ai = new GoogleGenAI({ apiKey });
 
     try {
-      // Use generateContent API for Gemini image generation
+      // Use generateContent API with Gemini 3 Pro Image (nano banana pro)
       const response = await ai.models.generateContent({
-        model: 'gemini-2.0-flash-exp',
+        model: 'gemini-2.5-flash-image',
         contents: [{
           role: 'user',
-          parts: [{ text: `Generate an educational diagram image: ${input.description}. Make it clear, simple, and suitable for exam study materials. Use clean lines and labels.` }]
+          parts: [{
+            text: `Generate a clear educational diagram: ${input.description}
+
+Requirements:
+- Clean, simple lines suitable for exam study materials
+- Clear labels and measurements where specified
+- Professional appearance like a textbook diagram
+- White or light background for readability`
+          }]
         }],
         config: {
-          responseModalities: ['image', 'text'],
+          responseModalities: ['TEXT', 'IMAGE'],
         },
       });
 

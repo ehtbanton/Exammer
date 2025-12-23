@@ -27,17 +27,72 @@ import { VoiceInterviewLive } from '@/components/voice-interview-live';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useSession } from 'next-auth/react';
 import { LatexRenderer } from '@/components/latex-renderer';
+import { generateDiagramImage } from '@/ai/flows/generate-diagram-image';
 
-// Diagram component - displays description as formatted text
-// (Image generation disabled due to regional restrictions)
-function DiagramDescription({ description }: { description: string }) {
-  return (
-    <div className="p-4 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg">
-      <div className="flex items-center gap-2 mb-2">
-        <span className="text-lg">📐</span>
-        <p className="text-sm font-semibold text-blue-800 dark:text-blue-200">Diagram Description</p>
+// AI Diagram component - generates image from description using Gemini
+function AIDiagram({ description }: { description: string }) {
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const generateImage = async () => {
+      try {
+        setIsLoading(true);
+        setError(null);
+
+        const result = await generateDiagramImage({
+          description: description,
+          aspectRatio: '4:3',
+        });
+
+        setImageUrl(result.imageDataUri);
+      } catch (err: any) {
+        console.error('Diagram generation error:', err);
+        setError(err?.message || 'Failed to generate diagram');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    generateImage();
+  }, [description]);
+
+  if (isLoading) {
+    return (
+      <div className="flex justify-center items-center p-8 bg-muted/30 rounded-lg border">
+        <div className="flex items-center gap-3">
+          <LoadingSpinner className="w-5 h-5" />
+          <p className="text-sm text-muted-foreground">Generating diagram...</p>
+        </div>
       </div>
-      <p className="text-sm text-blue-700 dark:text-blue-300 whitespace-pre-wrap">{description}</p>
+    );
+  }
+
+  if (error) {
+    // Fallback to showing description if image generation fails
+    return (
+      <div className="p-4 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg">
+        <div className="flex items-center gap-2 mb-2">
+          <span className="text-lg">📐</span>
+          <p className="text-sm font-semibold text-blue-800 dark:text-blue-200">Diagram Description</p>
+        </div>
+        <p className="text-sm text-blue-700 dark:text-blue-300 whitespace-pre-wrap">{description}</p>
+      </div>
+    );
+  }
+
+  if (!imageUrl) {
+    return null;
+  }
+
+  return (
+    <div className="flex justify-center items-center p-4 bg-muted/30 rounded-lg border">
+      <img
+        src={imageUrl}
+        alt="Generated diagram"
+        className="max-w-full h-auto rounded"
+      />
     </div>
   );
 }
@@ -614,10 +669,10 @@ function InterviewPageContent() {
                           <LatexRenderer className="text-base leading-relaxed whitespace-pre-wrap break-words font-normal">
                             {formatQuestionText(generatedVariant.questionText)}
                           </LatexRenderer>
-                          {/* Diagram description display */}
+                          {/* AI-generated diagram display */}
                           {generatedVariant.diagramDescription && (
                             <div className="mt-6">
-                              <DiagramDescription description={generatedVariant.diagramDescription} />
+                              <AIDiagram description={generatedVariant.diagramDescription} />
                             </div>
                           )}
                         </div>
