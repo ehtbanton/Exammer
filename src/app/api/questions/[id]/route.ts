@@ -106,7 +106,7 @@ export async function GET(
       question_text: question.question_text,
       summary: question.summary,
       solution_objectives: solutionObjectives,
-      diagram_mermaid: question.diagram_mermaid,
+      diagram_description: question.diagram_mermaid, // DB column is diagram_mermaid, now stores descriptions
       markscheme_id: question.markscheme_id,
       paper_date: question.paper_date,
       question_number: question.question_number,

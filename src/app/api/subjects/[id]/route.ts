@@ -142,7 +142,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
           attempts: row.attempts,
           paperDate: row.paper_date,
           questionNumber: row.question_number,
-          diagram_mermaid: row.diagram_mermaid,
+          diagramDescription: row.diagram_mermaid, // DB column is diagram_mermaid, now stores descriptions
         });
       }
     });

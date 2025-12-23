@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import type { User } from '@/lib/db';
-import { createVerificationToken, canRequestVerificationEmail } from '@/lib/verification-tokens';
+import { createVerificationToken } from '@/lib/verification-tokens';
 import { sendVerificationEmail } from '@/lib/email';
 
 export async function POST(req: NextRequest) {
@@ -33,18 +33,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({
         message: 'This email is already verified. You can sign in.'
       });
-    }
-
-    // Check rate limiting
-    const rateLimitCheck = await canRequestVerificationEmail(email);
-
-    if (!rateLimitCheck.allowed) {
-      return NextResponse.json(
-        {
-          error: `Please wait ${rateLimitCheck.remainingSeconds} seconds before requesting another verification email.`
-        },
-        { status: 429 }
-      );
     }
 
     // Create verification token

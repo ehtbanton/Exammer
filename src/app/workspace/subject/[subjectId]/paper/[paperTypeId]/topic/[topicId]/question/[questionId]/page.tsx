@@ -27,60 +27,73 @@ import { VoiceInterviewLive } from '@/components/voice-interview-live';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useSession } from 'next-auth/react';
 import { LatexRenderer } from '@/components/latex-renderer';
-import mermaid from 'mermaid';
+import { generateDiagramImage } from '@/ai/flows/generate-diagram-image';
 
-// Initialize mermaid
-if (typeof window !== 'undefined') {
-  mermaid.initialize({
-    startOnLoad: true,
-    theme: 'default',
-    securityLevel: 'loose',
-  });
-}
-
-// Mermaid diagram component
-function MermaidDiagram({ chart }: { chart: string }) {
-  const mermaidRef = useRef<HTMLDivElement>(null);
+// AI Diagram component - generates image from description using Gemini
+function AIDiagram({ description }: { description: string }) {
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const renderDiagram = async () => {
-      if (!mermaidRef.current) return;
-
+    const generateImage = async () => {
       try {
+        setIsLoading(true);
         setError(null);
-        // Generate a unique ID for this diagram
-        const id = `mermaid-${Math.random().toString(36).substr(2, 9)}`;
 
-        // Clear previous content
-        mermaidRef.current.innerHTML = '';
+        const result = await generateDiagramImage({
+          description: description,
+          aspectRatio: '4:3',
+        });
 
-        // Render the diagram
-        const { svg } = await mermaid.render(id, chart);
-        mermaidRef.current.innerHTML = svg;
+        setImageUrl(result.imageDataUri);
       } catch (err: any) {
-        console.error('Mermaid rendering error:', err);
-        setError(err?.message || 'Failed to render diagram');
+        console.error('Diagram generation error:', err);
+        setError(err?.message || 'Failed to generate diagram');
+      } finally {
+        setIsLoading(false);
       }
     };
 
-    renderDiagram();
-  }, [chart]);
+    generateImage();
+  }, [description]);
 
-  if (error) {
+  if (isLoading) {
     return (
-      <div className="p-4 bg-destructive/10 border border-destructive/20 rounded-lg">
-        <p className="text-sm font-semibold text-destructive mb-2">⚠️ Diagram rendering failed</p>
-        <p className="text-xs text-muted-foreground">{error}</p>
+      <div className="flex justify-center items-center p-8 bg-muted/30 rounded-lg border">
+        <div className="flex items-center gap-3">
+          <LoadingSpinner className="w-5 h-5" />
+          <p className="text-sm text-muted-foreground">Generating diagram...</p>
+        </div>
       </div>
     );
   }
 
+  if (error) {
+    // Fallback to showing description if image generation fails
+    return (
+      <div className="p-4 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg">
+        <div className="flex items-center gap-2 mb-2">
+          <span className="text-lg">📐</span>
+          <p className="text-sm font-semibold text-blue-800 dark:text-blue-200">Diagram Description</p>
+        </div>
+        <p className="text-sm text-blue-700 dark:text-blue-300 whitespace-pre-wrap">{description}</p>
+      </div>
+    );
+  }
+
+  if (!imageUrl) {
+    return null;
+  }
+
   return (
-    <div
-      ref={mermaidRef}
-      className="flex justify-center items-center p-4 bg-muted/30 rounded-lg border"
-    />
+    <div className="flex justify-center items-center p-4 bg-muted/30 rounded-lg border">
+      <img
+        src={imageUrl}
+        alt="Generated diagram"
+        className="max-w-full h-auto rounded"
+      />
+    </div>
   );
 }
 
@@ -111,7 +124,7 @@ function InterviewPageContent() {
   const [chatHistory, setChatHistory] = useState<ChatHistory>([]);
   const [userInput, setUserInput] = useState('');
   const [isLoading, setIsLoading] = useState(true);
-  const [generatedVariant, setGeneratedVariant] = useState<{questionText: string; solutionObjectives: string[]; diagramMermaid?: string} | null>(null);
+  const [generatedVariant, setGeneratedVariant] = useState<{questionText: string; solutionObjectives: string[]; diagramDescription?: string} | null>(null);
   const [inputMode, setInputMode] = useState<'text' | 'whiteboard' | 'voice'>('text');
   const [accessLevel, setAccessLevel] = useState<number | null>(null);
   const [completedObjectives, setCompletedObjectives] = useState<number[]>([]);
@@ -332,7 +345,7 @@ function InterviewPageContent() {
         topicName: '', // Not used in variant generation
         topicDescription: '', // Not used in variant generation
         originalObjectives: examQuestion.solution_objectives,
-        originalDiagramMermaid: examQuestion.diagram_mermaid,
+        originalDiagramDescription: examQuestion.diagram_description,
       });
       setGeneratedVariant(variantData);
       console.log('Question variant generated successfully with', variantData.solutionObjectives.length, 'objectives');
@@ -764,10 +777,10 @@ function InterviewPageContent() {
                           <LatexRenderer className="text-base leading-relaxed whitespace-pre-wrap break-words font-normal">
                             {formatQuestionText(generatedVariant.questionText)}
                           </LatexRenderer>
-                          {/* Mermaid diagram display */}
-                          {generatedVariant.diagramMermaid && (
+                          {/* AI-generated diagram display */}
+                          {generatedVariant.diagramDescription && (
                             <div className="mt-6">
-                              <MermaidDiagram chart={generatedVariant.diagramMermaid} />
+                              <AIDiagram description={generatedVariant.diagramDescription} />
                             </div>
                           )}
                         </div>

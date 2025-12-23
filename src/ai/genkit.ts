@@ -49,10 +49,8 @@ export async function executeWithManagedKeyAndTracking<TInput, TOutput>(
   const result = await geminiApiKeyManager.withKey(async (apiKey) => {
     const aiInstance = createGenkitInstance(apiKey);
 
-    // Token tracking function (no-op now that rate limiting is removed)
-    const trackTokens = (_tokens: number) => {
-      // No-op: rate limiting removed
-    };
+    // Token tracking function (no-op)
+    const trackTokens = (_tokens: number) => {};
 
     return flowFn(aiInstance, input, trackTokens);
   });

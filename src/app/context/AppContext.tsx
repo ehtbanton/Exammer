@@ -50,7 +50,7 @@ interface FullQuestion {
   question_text: string;
   summary: string;
   solution_objectives?: string[];
-  diagram_mermaid?: string;
+  diagram_description?: string;
   markscheme_id?: number;
   paper_date?: string;
   question_number?: string;
@@ -89,7 +89,7 @@ interface AppContextType {
   getSubjectById: (subjectId: string) => Subject | undefined;
   addPastPaperToSubject: (subjectId: string, paperFile: File) => Promise<void>;
   updateExamQuestionScore: (subjectId: string, paperTypeName: string, topicName: string, questionId: string, score: number) => void;
-  generateQuestionVariant: (subjectId: string, paperTypeId: string, topicId: string, questionId: string) => Promise<{ questionText: string; solutionObjectives: string[]; diagramMermaid?: string }>;
+  generateQuestionVariant: (subjectId: string, paperTypeId: string, topicId: string, questionId: string) => Promise<{ questionText: string; solutionObjectives: string[]; diagramDescription?: string }>;
   isLoading: (key: string) => boolean;
   setLoading: (key: string, value: boolean) => void;
 }
@@ -864,7 +864,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       topicName: topic.name,
       topicDescription: topic.description,
       originalObjectives: question.solutionObjectives,
-      originalDiagramMermaid: question.diagramMermaid,
+      originalDiagramDescription: question.diagramDescription,
     });
 
     console.log(`[Process C] Question variant generated successfully with ${result.solutionObjectives.length} ${hasObjectives ? 'adapted' : 'manufactured'} objectives`);
@@ -872,7 +872,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return {
       questionText: result.questionText,
       solutionObjectives: result.solutionObjectives,
-      diagramMermaid: result.diagramMermaid,
+      diagramDescription: result.diagramDescription,
     };
   }, [subjects]);
 
@@ -1133,7 +1133,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         question_text: data.question_text,
         summary: data.summary,
         solution_objectives: data.solution_objectives,
-        diagram_mermaid: data.diagram_mermaid,
+        diagram_description: data.diagram_description,
         markscheme_id: data.markscheme_id,
         paper_date: data.paper_date,
         question_number: data.question_number,

@@ -257,7 +257,7 @@ export async function POST(req: NextRequest) {
       questionText: string;
       summary: string;
       solutionObjectives?: string[]; // Optional - may be null if no markscheme
-      diagramMermaid?: string; // Optional - mermaid diagram syntax for rendering
+      diagramDescription?: string; // Optional - diagram description for AI image generation
       paperDate: string; // e.g., "2022-06"
       questionNumber: string; // e.g., "1-3-5"
       categorizationConfidence: number; // 0-100
@@ -399,7 +399,7 @@ export async function POST(req: NextRequest) {
           questionText: question.questionText,
           summary: question.summary,
           solutionObjectives,
-          diagramMermaid: question.diagramMermaid,
+          diagramDescription: question.diagramDescription,
           paperDate,
           questionNumber: questionNumberStr,
           categorizationConfidence,
@@ -446,11 +446,11 @@ export async function POST(req: NextRequest) {
       try {
         const topicId = question.topicId;
         const solutionObjectivesJson = question.solutionObjectives ? JSON.stringify(question.solutionObjectives) : null;
-        const diagramMermaid = question.diagramMermaid || null;
+        const diagramDescription = question.diagramDescription || null;
 
         await db.run(
           'INSERT INTO questions (topic_id, question_text, summary, solution_objectives, paper_date, question_number, diagram_mermaid, categorization_confidence, categorization_reasoning) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-          [topicId, question.questionText, question.summary, solutionObjectivesJson, question.paperDate, question.questionNumber, diagramMermaid, question.categorizationConfidence, question.categorizationReasoning]
+          [topicId, question.questionText, question.summary, solutionObjectivesJson, question.paperDate, question.questionNumber, diagramDescription, question.categorizationConfidence, question.categorizationReasoning]
         );
 
         totalQuestionsSaved++;

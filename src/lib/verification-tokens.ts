@@ -2,7 +2,6 @@ import crypto from 'crypto';
 import { db } from './db';
 
 const TOKEN_EXPIRY_HOURS = 24;
-const RATE_LIMIT_SECONDS = 60;
 
 /**
  * Generate a cryptographically secure verification token
@@ -13,21 +12,10 @@ export function generateVerificationToken(): string {
 
 /**
  * Create a new verification token for a user
- * Returns the token string if successful, or null if rate limited
+ * Returns the token string if successful
  */
 export async function createVerificationToken(email: string): Promise<string | null> {
   const now = Math.floor(Date.now() / 1000); // Unix timestamp in seconds
-
-  // Check rate limiting - get user's last verification email timestamp
-  const user = await db.get('SELECT email_verification_sent_at FROM users WHERE email = ?', [email]);
-
-  if (user?.email_verification_sent_at) {
-    const timeSinceLastEmail = now - user.email_verification_sent_at;
-    if (timeSinceLastEmail < RATE_LIMIT_SECONDS) {
-      console.log(`Rate limit: ${RATE_LIMIT_SECONDS - timeSinceLastEmail} seconds remaining`);
-      return null;
-    }
-  }
 
   // Generate token
   const token = generateVerificationToken();
@@ -87,29 +75,6 @@ export async function verifyEmailToken(token: string): Promise<{ success: boolea
   await db.run('DELETE FROM verification_tokens WHERE token = ?', [token]);
 
   return { success: true, email };
-}
-
-/**
- * Check if a user can request a new verification email (not rate limited)
- */
-export async function canRequestVerificationEmail(email: string): Promise<{ allowed: boolean; remainingSeconds?: number }> {
-  const now = Math.floor(Date.now() / 1000);
-
-  const user = await db.get('SELECT email_verification_sent_at FROM users WHERE email = ?', [email]);
-
-  if (!user?.email_verification_sent_at) {
-    return { allowed: true };
-  }
-
-  const timeSinceLastEmail = now - user.email_verification_sent_at;
-  if (timeSinceLastEmail < RATE_LIMIT_SECONDS) {
-    return {
-      allowed: false,
-      remainingSeconds: RATE_LIMIT_SECONDS - timeSinceLastEmail
-    };
-  }
-
-  return { allowed: true };
 }
 
 /**
