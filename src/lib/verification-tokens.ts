@@ -77,9 +77,9 @@ export async function verifyEmailToken(token: string): Promise<{ success: boolea
 
   const email = tokenRecord.identifier;
 
-  // Update user's email_verified status and upgrade access_level to 1 (student)
+  // Update user's email_verified status and upgrade access_level to 2 (full access)
   await db.run(
-    'UPDATE users SET email_verified = ?, access_level = 1 WHERE email = ?',
+    'UPDATE users SET email_verified = ?, access_level = 2 WHERE email = ?',
     [now, email]
   );
 
