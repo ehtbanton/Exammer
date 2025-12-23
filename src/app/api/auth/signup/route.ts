@@ -4,28 +4,10 @@ import { db } from '@/lib/db';
 import type { User } from '@/lib/db';
 import { createVerificationToken } from '@/lib/verification-tokens';
 import { sendVerificationEmail } from '@/lib/email';
-import { checkSignupRateLimit, getClientIP, createRateLimitHeaders } from '@/lib/rate-limiter';
 import { syncNewUser } from '@/lib/user-access-sync';
-
-const SIGNUP_RATE_LIMIT = 9; // matches the limit in rate-limiter.ts
 
 export async function POST(req: NextRequest) {
   try {
-    // Rate limiting: 3 signups per hour per IP
-    const ip = getClientIP(req);
-    const rateLimit = checkSignupRateLimit(ip);
-
-    if (!rateLimit.success) {
-      const retryAfter = Math.max(0, rateLimit.resetAt - Math.floor(Date.now() / 1000));
-      return NextResponse.json(
-        { error: 'Too many signup attempts. Please try again later.' },
-        {
-          status: 429,
-          headers: { 'Retry-After': retryAfter.toString() }
-        }
-      );
-    }
-
     const { email, password, name } = await req.json();
 
     // Validate input
@@ -89,17 +71,11 @@ export async function POST(req: NextRequest) {
       // Don't fail the signup if email fails - user can resend later
     }
 
-    // Include rate limit headers in successful response
-    const rateLimitHeaders = createRateLimitHeaders(rateLimit, SIGNUP_RATE_LIMIT);
-
     return NextResponse.json(
       {
         message: 'Account created successfully! Please check your email to verify your account.',
         userId: result.lastID,
         requiresVerification: true
-      },
-      {
-        headers: rateLimitHeaders
       }
     );
   } catch (error) {

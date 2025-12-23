@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { requireAuth, getUserWithAccessLevel } from '@/lib/auth-helpers';
+import { requireAuth } from '@/lib/auth-helpers';
 import { extractPaperQuestions } from '@/ai/flows/extract-paper-questions';
 import { extractMarkschemesSolutions } from '@/ai/flows/extract-markscheme-solutions';
 import { db } from '@/lib/db';
-import { checkBatchExtractionRateLimit } from '@/lib/rate-limiter';
 
 export const maxDuration = 300; // 5 minutes max for batch processing
 export const dynamic = 'force-dynamic';
@@ -28,26 +27,6 @@ interface ExtractQuestionsRequest {
 export async function POST(req: NextRequest) {
   try {
     const user = await requireAuth();
-
-    // Check if user is admin (level 3) - admins bypass rate limits
-    const fullUser = await getUserWithAccessLevel(user.id);
-    const isAdmin = fullUser?.access_level === 3;
-
-    // Rate limiting: 50 batches per day per user (unless admin)
-    if (!isAdmin) {
-      const rateLimit = checkBatchExtractionRateLimit(user.id);
-
-      if (!rateLimit.success) {
-        const retryAfter = Math.max(0, rateLimit.resetAt - Math.floor(Date.now() / 1000));
-        return NextResponse.json(
-          { error: 'Too many batch extraction requests. Please try again later.' },
-          {
-            status: 429,
-            headers: { 'Retry-After': retryAfter.toString() }
-          }
-        );
-      }
-    }
 
     const { subjectId, examPapersDataUris, markschemesDataUris = [], paperTypes } = await req.json() as ExtractQuestionsRequest;
 

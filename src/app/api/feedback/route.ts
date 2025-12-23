@@ -8,9 +8,6 @@ import type {
   FeedbackWithDetails,
 } from '@/lib/types';
 import { z } from 'zod';
-import { checkFeedbackRateLimit, getClientIP, createRateLimitHeaders, logAdminBypass } from '@/lib/rate-limiter';
-
-const FEEDBACK_RATE_LIMIT = 15; // matches the limit in rate-limiter.ts
 
 export const dynamic = 'force-dynamic';
 
@@ -30,37 +27,6 @@ export async function POST(req: NextRequest): Promise<NextResponse<CreateFeedbac
     // Get current user (optional - feedback can be submitted by anonymous users)
     const user = await getCurrentUser();
     const userId = user?.id || null;
-
-    // Check if user is admin (level 3) - admins bypass rate limits
-    let isAdmin = false;
-    let rateLimit = { success: true, remaining: FEEDBACK_RATE_LIMIT, resetAt: 0 };
-
-    if (userId) {
-      const fullUser = await getUserWithAccessLevel(userId);
-      isAdmin = fullUser?.access_level === 3;
-    }
-
-    // Rate limiting: 15 submissions per hour per IP (unless admin)
-    if (!isAdmin) {
-      const ip = getClientIP(req);
-      rateLimit = checkFeedbackRateLimit(ip);
-
-      if (!rateLimit.success) {
-        const retryAfter = Math.max(0, rateLimit.resetAt - Math.floor(Date.now() / 1000));
-        return NextResponse.json(
-          {
-            success: false,
-            error: 'Too many feedback submissions. Please try again later.'
-          },
-          {
-            status: 429,
-            headers: { 'Retry-After': retryAfter.toString() }
-          }
-        );
-      }
-    } else if (userId) {
-      logAdminBypass(userId, 'FEEDBACK_RATE_LIMIT');
-    }
 
     // Parse and validate request body
     const body = await req.json();
@@ -128,16 +94,10 @@ export async function POST(req: NextRequest): Promise<NextResponse<CreateFeedbac
       resolvedAt: feedback.resolved_at,
     };
 
-    // Include rate limit headers in successful response
-    const rateLimitHeaders = createRateLimitHeaders(rateLimit, FEEDBACK_RATE_LIMIT);
-
     return NextResponse.json(
       {
         success: true,
         feedback: transformedFeedback,
-      },
-      {
-        headers: rateLimitHeaders
       }
     );
   } catch (error) {

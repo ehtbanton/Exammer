@@ -10,7 +10,7 @@
  */
 
 import { z } from 'genkit';
-import { executeWithManagedKey, ESTIMATED_TOKENS } from '@/ai/genkit';
+import { executeWithManagedKey } from '@/ai/genkit';
 
 // Input schema
 const SummarizeConversationInputSchema = z.object({
@@ -39,8 +39,7 @@ export type SummarizeConversationOutput = z.infer<typeof SummarizeConversationOu
  * Generate a concise, searchable summary of an interview conversation.
  */
 export async function summarizeConversation(
-  input: SummarizeConversationInput,
-  userId?: string
+  input: SummarizeConversationInput
 ): Promise<SummarizeConversationOutput> {
   // Build conversation transcript
   const transcript = input.messages
@@ -87,9 +86,9 @@ Generate a summary that captures what the student demonstrated and the key conce
     });
 
     return response.output;
-  }, input, userId, ESTIMATED_TOKENS.SIMPLE_QUERY);
+  }, input);
 
-  return result;
+  return result as SummarizeConversationOutput;
 }
 
 /**

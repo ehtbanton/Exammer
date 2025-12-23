@@ -91,7 +91,7 @@ export async function POST(
         })),
         finalScore,
         completedObjectives: objectivesList,
-      }, user.id.toString());
+      });
 
       summary = JSON.stringify(summaryResult);
 

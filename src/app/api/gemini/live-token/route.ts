@@ -1,34 +1,11 @@
 import { NextResponse } from 'next/server'
 import { geminiApiKeyManager } from '@root/gemini-api-key-manager'
-import { requireAuth, getUserWithAccessLevel } from '@/lib/auth-helpers'
-import { checkGeminiTokenRateLimit, logAdminBypass } from '@/lib/rate-limiter'
+import { requireAuth } from '@/lib/auth-helpers'
 
 export async function GET() {
   try {
     // SECURITY: Require authentication to access API keys
-    const user = await requireAuth();
-
-    // Check if user is admin (level 3) - admins bypass rate limits
-    const fullUser = await getUserWithAccessLevel(user.id);
-    const isAdmin = fullUser?.access_level === 3;
-
-    // Rate limiting: 30 requests per hour per user (unless admin)
-    if (!isAdmin) {
-      const rateLimit = checkGeminiTokenRateLimit(user.id);
-
-      if (!rateLimit.success) {
-        const retryAfter = Math.max(0, rateLimit.resetAt - Math.floor(Date.now() / 1000));
-        return NextResponse.json(
-          { error: 'Too many requests. Please try again later.' },
-          {
-            status: 429,
-            headers: { 'Retry-After': retryAfter.toString() }
-          }
-        )
-      }
-    } else {
-      logAdminBypass(user.id, 'GEMINI_TOKEN_RATE_LIMIT');
-    }
+    await requireAuth();
 
     // Get keys directly without acquire/release since this is for client-side WebSocket usage
     // The key manager's acquire/release pattern is for server-side API calls
