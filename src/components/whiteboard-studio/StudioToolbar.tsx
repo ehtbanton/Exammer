@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { motion } from 'framer-motion';
-import { X, Send, Trash2, Undo, Redo, ZoomIn, ZoomOut, Maximize2 } from 'lucide-react';
+import { X, Send, Trash2, Undo, Redo, ZoomIn, ZoomOut, Maximize2, Tag } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toolbarVariants } from './animations';
 import { cn } from '@/lib/utils';
@@ -16,6 +16,7 @@ interface StudioToolbarProps {
   onZoomIn: () => void;
   onZoomOut: () => void;
   onResetZoom: () => void;
+  onLabelImage: () => void;
   isSubmitting?: boolean;
   canUndo?: boolean;
   canRedo?: boolean;
@@ -30,6 +31,7 @@ export function StudioToolbar({
   onZoomIn,
   onZoomOut,
   onResetZoom,
+  onLabelImage,
   isSubmitting = false,
   canUndo = true,
   canRedo = false,
@@ -113,6 +115,20 @@ export function StudioToolbar({
         title="Zoom In"
       >
         <ZoomIn className="h-4 w-4" />
+      </Button>
+
+      <div className="w-px h-6 bg-gray-200 dark:bg-gray-700 mx-1" />
+
+      {/* Text Tool */}
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={onLabelImage}
+        className="text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100"
+        title="Add text label"
+      >
+        <Tag className="h-4 w-4 mr-1" />
+        Text
       </Button>
 
       <div className="w-px h-6 bg-gray-200 dark:bg-gray-700 mx-1" />

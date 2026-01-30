@@ -37,7 +37,7 @@ export async function executeDevCommand(input: DevCommandInput): Promise<DevComm
     // Generate a complete answer to the question using Gemini
     return executeWithManagedKey(async (ai) => {
       const response = await ai.generate({
-        model: 'googleai/gemini-2.5-flash-lite',
+        model: 'googleai/gemini-3-flash-preview',
         prompt: `You are a student answering an exam question. Provide a complete, detailed answer to the following question.
 
 Topic context: ${subsection}
@@ -83,7 +83,7 @@ Provide a comprehensive answer that would earn full marks. Be thorough and inclu
         for (const objIndex of unachievedIndices) {
           const targetObjective = solutionObjectives[objIndex];
           const response = await ai.generate({
-            model: 'googleai/gemini-2.5-flash-lite',
+            model: 'googleai/gemini-3-flash-preview',
             prompt: `You are a student answering an exam question. You need to provide a specific part of your answer that addresses the following objective.
 
 Topic context: ${subsection}
@@ -135,7 +135,7 @@ Provide a concise answer that specifically addresses this objective. Focus only 
     // Generate an answer specifically for this objective
     return executeWithManagedKey(async (ai) => {
       const response = await ai.generate({
-        model: 'googleai/gemini-2.5-flash-lite',
+        model: 'googleai/gemini-3-flash-preview',
         prompt: `You are a student answering an exam question. You need to provide a specific part of your answer that addresses the following objective.
 
 Topic context: ${subsection}

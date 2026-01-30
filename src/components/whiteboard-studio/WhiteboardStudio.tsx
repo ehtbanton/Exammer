@@ -63,14 +63,75 @@ export function WhiteboardStudio({
     // Set initial tool to draw
     editor.setCurrentTool('draw');
 
-    // Update undo/redo state on history change
-    const updateHistoryState = () => {
+    // Update undo/redo state
+    const updateState = () => {
       setCanUndo(editor.getCanUndo());
       setCanRedo(editor.getCanRedo());
     };
 
-    editor.store.listen(updateHistoryState);
-    updateHistoryState();
+    editor.store.listen(updateState);
+    updateState();
+  }, []);
+
+  // Helper function to compress image blob if too large
+  const compressImageBlob = useCallback(async (blob: Blob, targetSizeKB: number): Promise<Blob> => {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+
+        // Calculate scaled dimensions if needed (max 1024px)
+        let { width, height } = img;
+        const maxDim = 1024;
+        if (width > maxDim || height > maxDim) {
+          const ratio = Math.min(maxDim / width, maxDim / height);
+          width = Math.round(width * ratio);
+          height = Math.round(height * ratio);
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          reject(new Error('Could not get canvas context'));
+          return;
+        }
+
+        // White background
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillRect(0, 0, width, height);
+        ctx.drawImage(img, 0, 0, width, height);
+
+        // Try progressively lower quality until under target size
+        const tryCompress = (quality: number) => {
+          canvas.toBlob(
+            (compressedBlob) => {
+              if (!compressedBlob) {
+                reject(new Error('Compression failed'));
+                return;
+              }
+
+              const sizeKB = compressedBlob.size / 1024;
+              if (sizeKB <= targetSizeKB || quality <= 0.4) {
+                console.log(`Compressed to ${sizeKB.toFixed(0)}KB at quality ${quality}`);
+                resolve(compressedBlob);
+              } else {
+                tryCompress(quality - 0.1);
+              }
+            },
+            'image/jpeg',
+            quality
+          );
+        };
+
+        tryCompress(0.8);
+        URL.revokeObjectURL(img.src);
+      };
+
+      img.onerror = () => reject(new Error('Failed to load image for compression'));
+      img.src = URL.createObjectURL(blob);
+    });
   }, []);
 
   // Export canvas to image
@@ -86,16 +147,26 @@ export function WhiteboardStudio({
         return null; // No shapes to export
       }
 
-      // Use editor.toImage() to get the blob (tldraw v4 API)
+      // Optimized export settings for smaller file size
       const result = await editor.toImage([...shapeIds], {
-        format: 'png',
-        quality: 1,
-        scale: 2,
+        format: 'jpeg',      // Lossy format = much smaller
+        quality: 0.85,       // Good quality/size balance
+        scale: 1,            // 1x scale is sufficient for AI analysis
         background: true,
-        padding: 20,
+        padding: 10,
       });
 
       if (!result?.blob) return null;
+
+      let finalBlob = result.blob;
+      const initialSizeKB = finalBlob.size / 1024;
+      console.log(`Initial export size: ${initialSizeKB.toFixed(0)}KB`);
+
+      // If still too large (>500KB), compress further
+      if (initialSizeKB > 500) {
+        console.log(`Image too large, compressing...`);
+        finalBlob = await compressImageBlob(finalBlob, 500);
+      }
 
       // Convert blob to base64
       return new Promise((resolve) => {
@@ -103,13 +174,13 @@ export function WhiteboardStudio({
         reader.onloadend = () => {
           resolve(reader.result as string);
         };
-        reader.readAsDataURL(result.blob);
+        reader.readAsDataURL(finalBlob);
       });
     } catch (error) {
       console.error('Error exporting canvas:', error);
       return null;
     }
-  }, []);
+  }, [compressImageBlob]);
 
   // Handle submit
   const handleSubmit = useCallback(async () => {
@@ -175,16 +246,53 @@ export function WhiteboardStudio({
     editorRef.current?.resetZoom();
   }, []);
 
+  // Handle label image - switches to text tool so user can add a label
+  const handleLabelImage = useCallback(() => {
+    const editor = editorRef.current;
+    if (!editor) return;
+
+    // Switch to text tool so user can click to add text
+    editor.setCurrentTool('text');
+
+    toast({
+      title: "Text tool selected",
+      description: "Click anywhere to add a label, then select both and group with Ctrl+G",
+    });
+  }, [toast]);
+
   // Handle chat message from panel
   const handleChatMessage = useCallback((content: string) => {
     onSendMessage(content);
   }, [onSendMessage]);
 
-  // Prevent body scroll when studio is open
+  // Prevent body scroll and boost tldraw menu z-index
   useEffect(() => {
     document.body.style.overflow = 'hidden';
+
+    // Add style to make tldraw menus appear above floating panels
+    const style = document.createElement('style');
+    style.id = 'whiteboard-studio-styles';
+    style.textContent = `
+      /* Boost all tldraw UI elements above floating panels */
+      .tl-container [data-radix-popper-content-wrapper],
+      .tl-container [data-radix-menu-content],
+      [data-radix-popper-content-wrapper],
+      [data-radix-menu-content],
+      .tlui-popover,
+      .tlui-menu,
+      .tlui-dialog,
+      .tlui-dropdown,
+      .tlui-menu__content,
+      .tlui-popover__content {
+        z-index: 9999 !important;
+      }
+    `;
+    document.head.appendChild(style);
+
     return () => {
       document.body.style.overflow = '';
+      const existingStyle = document.getElementById('whiteboard-studio-styles');
+      if (existingStyle) existingStyle.remove();
     };
   }, []);
 
@@ -203,7 +311,6 @@ export function WhiteboardStudio({
         {/* Canvas Container */}
         <motion.div
           className="absolute inset-0"
-          style={{ zIndex: 1 }}
           variants={canvasVariants}
           initial="hidden"
           animate="visible"
@@ -241,6 +348,7 @@ export function WhiteboardStudio({
           onZoomIn={handleZoomIn}
           onZoomOut={handleZoomOut}
           onResetZoom={handleResetZoom}
+          onLabelImage={handleLabelImage}
           isSubmitting={isSubmitting}
           canUndo={canUndo}
           canRedo={canRedo}

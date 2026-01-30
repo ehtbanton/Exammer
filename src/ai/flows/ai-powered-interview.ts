@@ -149,7 +149,7 @@ Output:
         : 'None yet';
 
       const response = await ai.generate({
-        model: 'googleai/gemini-2.0-flash-exp',
+        model: 'googleai/gemini-3-flash-preview',
         prompt: [
           {text: `You are Xam, a friendly AI teaching assistant acting as an exam marker. You are checking a student's work against the official markscheme for a real exam question, just like a teacher would do when marking exams.
 
@@ -249,7 +249,7 @@ Use your knowledge of the subject matter to assess the answer fairly.`},
       solutionObjectives,
       previouslyCompletedObjectives,
     }, {
-      model: 'googleai/gemini-2.5-flash-lite',
+      model: 'googleai/gemini-3-flash-preview',
     });
 
     if (!output) {
@@ -305,7 +305,7 @@ Output only the question in the 'question' field.`,
       subsection,
       pastPapers,
     }, {
-      model: 'googleai/gemini-2.5-flash-lite',
+      model: 'googleai/gemini-3-flash-preview',
     });
 
     if (!output) {

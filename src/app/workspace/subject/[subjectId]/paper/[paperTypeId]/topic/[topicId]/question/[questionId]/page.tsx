@@ -573,8 +573,12 @@ function InterviewPageContent() {
       }
     } catch (e) {
       toast({ variant: 'destructive', title: 'AI Error', description: 'Could not get AI response.' });
-      console.error(e);
-      setChatHistory(chatHistory); // Revert history on error
+      console.error('AI Interview Error:', e);
+      // Keep the user message but add an error response instead of reverting
+      setChatHistory(prev => [...prev, {
+        role: 'assistant',
+        content: 'Sorry, I encountered an error analyzing your work. Please try again.',
+      }]);
     } finally {
       setIsLoading(false);
     }
