@@ -246,8 +246,33 @@ export interface Subject {
   id: number;
   name: string;
   syllabus_content?: string;
+  field_classification?: string; // JSON: {field, subfield, level, keywords[]}
   created_at: number;
   updated_at: number;
+}
+
+export interface EnrichmentSuggestion {
+  id: number;
+  subject_id: number;
+  type: 'gap' | 'breakthrough';
+  source_subject_id?: number;
+  source_topic_name?: string;
+  source_topic_description?: string;
+  breakthrough_title?: string;
+  breakthrough_summary?: string;
+  breakthrough_source?: string;
+  breakthrough_relevance?: string;
+  field: string;
+  confidence_score: number;
+  created_at: number;
+  expires_at?: number;
+}
+
+export interface EnrichmentDismissal {
+  id: number;
+  user_id: number;
+  suggestion_id: number;
+  dismissed_at: number;
 }
 
 export interface UserWorkspace {

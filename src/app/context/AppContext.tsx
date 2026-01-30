@@ -333,6 +333,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
             title: "Syllabus Processed",
             description: `"${result.subjectName}" with ${createdPaperTypes.length} paper types identified.`
           });
+
+          // Trigger curriculum enrichment in the background (non-blocking)
+          fetch('/api/enrichment/refresh', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ subjectId }),
+          }).then(res => {
+            if (res.ok) {
+              console.log(`[Enrichment] Enrichment pipeline completed for subject ${subjectId}`);
+            } else {
+              console.warn(`[Enrichment] Enrichment pipeline failed for subject ${subjectId}`);
+            }
+          }).catch(err => {
+            console.warn('[Enrichment] Enrichment pipeline error:', err);
+          });
         }
       });
 
