@@ -8,6 +8,7 @@ import { ChevronDown, ChevronUp, RefreshCw, Sparkles, BookOpen, Zap } from 'luci
 import LoadingSpinner from '@/components/LoadingSpinner';
 import { GapSuggestionCard } from './GapSuggestionCard';
 import { BreakthroughCard } from './BreakthroughCard';
+import { BreakthroughDetailDialog } from './BreakthroughDetailDialog';
 
 interface GapSuggestion {
   id: number;
@@ -48,6 +49,8 @@ export function EnrichmentPanel({ subjectId }: EnrichmentPanelProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [selectedBreakthrough, setSelectedBreakthrough] = useState<BreakthroughSuggestion | null>(null);
+  const [isDetailOpen, setIsDetailOpen] = useState(false);
 
   const fetchEnrichment = useCallback(async () => {
     try {
@@ -111,6 +114,11 @@ export function EnrichmentPanel({ subjectId }: EnrichmentPanelProps) {
     }
   };
 
+  const handleBreakthroughClick = (breakthrough: BreakthroughSuggestion) => {
+    setSelectedBreakthrough(breakthrough);
+    setIsDetailOpen(true);
+  };
+
   if (isLoading) {
     return null; // Don't show anything while loading
   }
@@ -122,97 +130,107 @@ export function EnrichmentPanel({ subjectId }: EnrichmentPanelProps) {
   const hasContent = data && (data.gaps.length > 0 || data.breakthroughs.length > 0);
 
   return (
-    <Collapsible open={isOpen} onOpenChange={setIsOpen} className="mt-8">
-      <Card>
-        <CollapsibleTrigger asChild>
-          <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors">
-            <div className="flex items-center justify-between">
-              <CardTitle className="flex items-center gap-2 text-lg">
-                <Sparkles className="h-5 w-5 text-purple-500" />
-                Curriculum Enrichment
-              </CardTitle>
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleRefresh();
-                  }}
-                  disabled={isRefreshing}
-                >
-                  {isRefreshing ? <LoadingSpinner /> : <RefreshCw className="h-4 w-4" />}
-                </Button>
-                {isOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+    <>
+      <Collapsible open={isOpen} onOpenChange={setIsOpen} className="mt-8">
+        <Card>
+          <CollapsibleTrigger asChild>
+            <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors">
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <Sparkles className="h-5 w-5 text-purple-500" />
+                  Curriculum Enrichment
+                </CardTitle>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleRefresh();
+                    }}
+                    disabled={isRefreshing}
+                  >
+                    {isRefreshing ? <LoadingSpinner /> : <RefreshCw className="h-4 w-4" />}
+                  </Button>
+                  {isOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                </div>
               </div>
-            </div>
-          </CardHeader>
-        </CollapsibleTrigger>
+            </CardHeader>
+          </CollapsibleTrigger>
 
-        <CollapsibleContent>
-          <CardContent className="pt-0">
-            {!hasContent ? (
-              <div className="text-center py-6">
-                <p className="text-muted-foreground mb-3">
-                  No enrichment suggestions yet. Click refresh to analyze your curriculum.
-                </p>
-                <Button
-                  variant="outline"
-                  onClick={handleRefresh}
-                  disabled={isRefreshing}
-                >
-                  {isRefreshing ? <LoadingSpinner /> : <RefreshCw className="mr-2 h-4 w-4" />}
-                  Analyze Curriculum
-                </Button>
-              </div>
-            ) : (
-              <div className="space-y-6">
-                {data.gaps.length > 0 && (
-                  <div>
-                    <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3 flex items-center gap-2">
-                      <BookOpen className="h-4 w-4" />
-                      Topics from Similar Courses
-                    </h3>
-                    <p className="text-xs text-muted-foreground mb-3">
-                      These topics are covered by similar courses on the platform but may be missing from yours.
-                    </p>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      {data.gaps.map(gap => (
-                        <GapSuggestionCard
-                          key={gap.id}
-                          gap={gap}
-                          onDismiss={() => handleDismiss(gap.id)}
-                        />
-                      ))}
+          <CollapsibleContent>
+            <CardContent className="pt-0">
+              {!hasContent ? (
+                <div className="text-center py-6">
+                  <p className="text-muted-foreground mb-3">
+                    No enrichment suggestions yet. Click refresh to analyze your curriculum.
+                  </p>
+                  <Button
+                    variant="outline"
+                    onClick={handleRefresh}
+                    disabled={isRefreshing}
+                  >
+                    {isRefreshing ? <LoadingSpinner /> : <RefreshCw className="mr-2 h-4 w-4" />}
+                    Analyze Curriculum
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  {data.gaps.length > 0 && (
+                    <div>
+                      <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3 flex items-center gap-2">
+                        <BookOpen className="h-4 w-4" />
+                        Topics from Similar Courses
+                      </h3>
+                      <p className="text-xs text-muted-foreground mb-3">
+                        These topics are covered by similar courses on the platform but may be missing from yours.
+                      </p>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        {data.gaps.map(gap => (
+                          <GapSuggestionCard
+                            key={gap.id}
+                            gap={gap}
+                            onDismiss={() => handleDismiss(gap.id)}
+                          />
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                )}
+                  )}
 
-                {data.breakthroughs.length > 0 && (
-                  <div>
-                    <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3 flex items-center gap-2">
-                      <Zap className="h-4 w-4" />
-                      Recent Developments in {data.breakthroughs[0]?.field}
-                    </h3>
-                    <p className="text-xs text-muted-foreground mb-3">
-                      Recent breakthroughs and industry developments you should know about.
-                    </p>
-                    <div className="grid grid-cols-1 gap-3">
-                      {data.breakthroughs.map(bt => (
-                        <BreakthroughCard
-                          key={bt.id}
-                          breakthrough={bt}
-                          onDismiss={() => handleDismiss(bt.id)}
-                        />
-                      ))}
+                  {data.breakthroughs.length > 0 && (
+                    <div>
+                      <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3 flex items-center gap-2">
+                        <Zap className="h-4 w-4" />
+                        Recent Developments in {data.breakthroughs[0]?.field}
+                      </h3>
+                      <p className="text-xs text-muted-foreground mb-3">
+                        Recent breakthroughs and industry developments you should know about. Click to see how they connect to your studies.
+                      </p>
+                      <div className="grid grid-cols-1 gap-3">
+                        {data.breakthroughs.map(bt => (
+                          <BreakthroughCard
+                            key={bt.id}
+                            breakthrough={bt}
+                            onDismiss={() => handleDismiss(bt.id)}
+                            onClick={() => handleBreakthroughClick(bt)}
+                          />
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                )}
-              </div>
-            )}
-          </CardContent>
-        </CollapsibleContent>
-      </Card>
-    </Collapsible>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </CollapsibleContent>
+        </Card>
+      </Collapsible>
+
+      <BreakthroughDetailDialog
+        open={isDetailOpen}
+        onOpenChange={setIsDetailOpen}
+        breakthrough={selectedBreakthrough}
+        subjectId={subjectId}
+      />
+    </>
   );
 }
