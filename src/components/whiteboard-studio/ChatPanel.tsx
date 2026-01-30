@@ -76,11 +76,16 @@ export function ChatPanel({
         icon={<Bot className="h-4 w-4" />}
         defaultPosition={panelPosition}
         defaultCollapsed={defaultCollapsed}
-        minWidth={340}
-        maxWidth={420}
+        minWidth={320}
+        maxWidth={600}
+        minHeight={250}
+        maxHeight={700}
+        defaultWidth={380}
+        defaultHeight={420}
+        resizable={true}
         zIndex={115}
       >
-        <div className="flex flex-col h-[350px]">
+        <div className="flex flex-col h-full">
           {/* Messages Area */}
           <ScrollArea className="flex-1 pr-4" ref={scrollRef}>
             <div className="space-y-3">

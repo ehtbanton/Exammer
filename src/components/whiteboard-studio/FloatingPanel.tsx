@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import { motion, AnimatePresence, useDragControls } from 'framer-motion';
 import { ChevronDown, ChevronUp, GripHorizontal } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -15,6 +15,11 @@ interface FloatingPanelProps {
   defaultCollapsed?: boolean;
   minWidth?: number;
   maxWidth?: number;
+  minHeight?: number;
+  maxHeight?: number;
+  defaultWidth?: number;
+  defaultHeight?: number;
+  resizable?: boolean;
   className?: string;
   zIndex?: number;
   onPositionChange?: (position: { x: number; y: number }) => void;
@@ -28,15 +33,57 @@ export function FloatingPanel({
   collapsible = true,
   defaultCollapsed = false,
   minWidth = 280,
-  maxWidth = 400,
+  maxWidth = 600,
+  minHeight = 200,
+  maxHeight = 600,
+  defaultWidth,
+  defaultHeight,
+  resizable = true,
   className,
   zIndex = 100,
   onPositionChange,
 }: FloatingPanelProps) {
   const [isCollapsed, setIsCollapsed] = useState(defaultCollapsed);
   const [isDragging, setIsDragging] = useState(false);
+  const [isResizing, setIsResizing] = useState(false);
+  const [size, setSize] = useState({
+    width: defaultWidth || minWidth,
+    height: defaultHeight || 300,
+  });
   const constraintsRef = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
   const dragControls = useDragControls();
+
+  // Handle resize
+  const handleResizeStart = useCallback((e: React.PointerEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsResizing(true);
+
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const startWidth = size.width;
+    const startHeight = size.height;
+
+    const handleMove = (moveEvent: PointerEvent) => {
+      const deltaX = moveEvent.clientX - startX;
+      const deltaY = moveEvent.clientY - startY;
+
+      setSize({
+        width: Math.min(maxWidth, Math.max(minWidth, startWidth + deltaX)),
+        height: Math.min(maxHeight, Math.max(minHeight, startHeight + deltaY)),
+      });
+    };
+
+    const handleUp = () => {
+      setIsResizing(false);
+      document.removeEventListener('pointermove', handleMove);
+      document.removeEventListener('pointerup', handleUp);
+    };
+
+    document.addEventListener('pointermove', handleMove);
+    document.addEventListener('pointerup', handleUp);
+  }, [size, minWidth, maxWidth, minHeight, maxHeight]);
 
   return (
     <>
@@ -65,8 +112,11 @@ export function FloatingPanel({
           "transition-shadow",
           className
         )}
+        ref={panelRef}
         style={{
           zIndex,
+          width: size.width,
+          height: isCollapsed ? 'auto' : size.height,
           minWidth,
           maxWidth,
           pointerEvents: 'auto',
@@ -117,14 +167,43 @@ export function FloatingPanel({
               initial="collapsed"
               animate="expanded"
               exit="collapsed"
-              className="overflow-hidden"
+              className="overflow-hidden flex-1 flex flex-col"
+              style={{ height: 'calc(100% - 52px)' }}
             >
-              <div className="p-4">
+              <div className="p-4 flex-1 overflow-auto">
                 {children}
               </div>
             </motion.div>
           )}
         </AnimatePresence>
+
+        {/* Resize Handle */}
+        {resizable && !isCollapsed && (
+          <div
+            onPointerDown={handleResizeStart}
+            className={cn(
+              "absolute bottom-0 right-0 w-4 h-4 cursor-se-resize",
+              "flex items-center justify-center",
+              "hover:bg-gray-200/50 dark:hover:bg-gray-700/50 rounded-tl",
+              isResizing && "bg-blue-200/50 dark:bg-blue-700/50"
+            )}
+            style={{ touchAction: 'none' }}
+          >
+            <svg
+              width="10"
+              height="10"
+              viewBox="0 0 10 10"
+              className="text-gray-400"
+            >
+              <path
+                d="M9 1L1 9M9 5L5 9M9 9L9 9"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+              />
+            </svg>
+          </div>
+        )}
       </motion.div>
     </>
   );

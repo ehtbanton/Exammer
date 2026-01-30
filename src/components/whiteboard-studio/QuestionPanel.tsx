@@ -41,13 +41,18 @@ export function QuestionPanel({
         icon={<FileQuestion className="h-4 w-4" />}
         defaultPosition={defaultPosition}
         defaultCollapsed={defaultCollapsed}
-        minWidth={320}
-        maxWidth={450}
+        minWidth={300}
+        maxWidth={550}
+        minHeight={250}
+        maxHeight={600}
+        defaultWidth={380}
+        defaultHeight={400}
+        resizable={true}
         zIndex={105}
       >
-        <div className="space-y-4">
+        <div className="flex flex-col h-full space-y-3">
           {/* Progress Section */}
-          <div className="space-y-2">
+          <div className="space-y-2 shrink-0">
             <div className="flex items-center justify-between text-sm">
               <span className="text-gray-600 dark:text-gray-400">
                 Progress
@@ -60,7 +65,7 @@ export function QuestionPanel({
           </div>
 
           {/* Question Text */}
-          <ScrollArea className="h-[200px] pr-4">
+          <ScrollArea className="flex-1 pr-4">
             <div className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">
               <LatexRenderer>{questionText}</LatexRenderer>
             </div>
