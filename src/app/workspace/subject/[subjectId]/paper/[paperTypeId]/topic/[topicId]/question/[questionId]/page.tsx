@@ -24,6 +24,10 @@ import { useToast } from '@/hooks/use-toast';
 import PageSpinner from '@/components/PageSpinner';
 import { Whiteboard } from '@/components/whiteboard';
 import { VoiceInterviewLive } from '@/components/voice-interview-live';
+import { WhiteboardStudio } from '@/components/whiteboard-studio';
+import 'tldraw/tldraw.css';
+import { AnimatePresence } from 'framer-motion';
+import { Maximize2 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useSession } from 'next-auth/react';
 import { LatexRenderer } from '@/components/latex-renderer';
@@ -135,6 +139,7 @@ function InterviewPageContent() {
   const [oldestCachedQuestion, setOldestCachedQuestion] = useState<{id: string; timestamp: number} | null>(null);
   const [pendingQuestionGeneration, setPendingQuestionGeneration] = useState<(() => Promise<void>) | null>(null);
   const [conversationId, setConversationId] = useState<number | null>(null);
+  const [isWhiteboardStudio, setIsWhiteboardStudio] = useState(false);
 
   // Cache management functions
   const CACHE_KEY = 'question-progress-cache';
@@ -914,10 +919,19 @@ function InterviewPageContent() {
                     </div>
                   </TabsContent>
                   <TabsContent value="whiteboard" className="mt-0">
-                    <Whiteboard
-                      onSubmit={handleSendMessage}
-                      disabled={isLoading || isCompleted}
-                    />
+                    <div className="space-y-3">
+                      <Button
+                        onClick={() => setIsWhiteboardStudio(true)}
+                        disabled={isLoading || isCompleted}
+                        className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white"
+                      >
+                        <Maximize2 className="h-4 w-4 mr-2" />
+                        Open Whiteboard Studio
+                      </Button>
+                      <p className="text-xs text-muted-foreground text-center">
+                        Full-screen canvas with drawing tools
+                      </p>
+                    </div>
                   </TabsContent>
                   <TabsContent value="voice" className="mt-0">
                     <VoiceInterviewLive
@@ -934,6 +948,22 @@ function InterviewPageContent() {
           </Card>
         </div>
       </div>
+
+      {/* Whiteboard Studio Overlay */}
+      <AnimatePresence>
+        {isWhiteboardStudio && generatedVariant && (
+          <WhiteboardStudio
+            questionId={questionId}
+            questionText={generatedVariant.questionText}
+            objectives={generatedVariant.solutionObjectives}
+            chatHistory={chatHistory}
+            completedObjectives={completedObjectives}
+            onSendMessage={handleSendMessage}
+            onExit={() => setIsWhiteboardStudio(false)}
+            isLoading={isLoading}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }
