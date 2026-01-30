@@ -8,6 +8,7 @@ import { QuestionPanel } from './QuestionPanel';
 import { ChatPanel } from './ChatPanel';
 import { StudioToolbar } from './StudioToolbar';
 import { overlayVariants, canvasVariants } from './animations';
+import { useToast } from '@/hooks/use-toast';
 
 // Dynamically import tldraw to avoid SSR issues
 const Tldraw = dynamic(
@@ -53,6 +54,7 @@ export function WhiteboardStudio({
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const { toast } = useToast();
 
   // Handle editor mount
   const handleMount = useCallback((editor: Editor) => {
@@ -114,16 +116,33 @@ export function WhiteboardStudio({
     setIsSubmitting(true);
     try {
       const imageData = await exportCanvas();
-      if (imageData) {
-        await onSendMessage('', imageData);
-        // Clear canvas after successful submit
-        editorRef.current?.selectAll();
-        editorRef.current?.deleteShapes(editorRef.current.getSelectedShapeIds());
+      if (!imageData) {
+        toast({
+          title: "Nothing to submit",
+          description: "Draw something on the canvas first",
+          variant: "destructive",
+        });
+        return;
       }
+
+      await onSendMessage('', imageData);
+      toast({
+        title: "Answer submitted",
+        description: "XAM is analyzing your work...",
+      });
+      // Clear canvas after successful submit
+      editorRef.current?.selectAll();
+      editorRef.current?.deleteShapes(editorRef.current.getSelectedShapeIds());
+    } catch (error) {
+      toast({
+        title: "Submission failed",
+        description: "Please try again",
+        variant: "destructive",
+      });
     } finally {
       setIsSubmitting(false);
     }
-  }, [exportCanvas, onSendMessage]);
+  }, [exportCanvas, onSendMessage, toast]);
 
   // Handle clear
   const handleClear = useCallback(() => {
@@ -184,6 +203,7 @@ export function WhiteboardStudio({
         {/* Canvas Container */}
         <motion.div
           className="absolute inset-0"
+          style={{ zIndex: 1 }}
           variants={canvasVariants}
           initial="hidden"
           animate="visible"
@@ -201,7 +221,7 @@ export function WhiteboardStudio({
           questionText={questionText}
           objectives={objectives}
           completedObjectives={completedObjectives}
-          defaultPosition={{ x: 20, y: 20 }}
+          defaultPosition={{ x: 20, y: 70 }}
         />
 
         {/* Chat Panel (top-right) */}

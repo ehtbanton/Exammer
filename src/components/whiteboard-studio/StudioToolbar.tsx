@@ -41,7 +41,7 @@ export function StudioToolbar({
       animate="visible"
       exit="exit"
       className={cn(
-        "fixed bottom-6 left-1/2 -translate-x-1/2 z-[120]",
+        "fixed bottom-20 left-1/2 -translate-x-1/2 z-[120]",
         "flex items-center gap-1 p-2",
         "bg-white/95 dark:bg-gray-900/95",
         "backdrop-blur-xl",

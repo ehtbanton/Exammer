@@ -478,12 +478,15 @@ function InterviewPageContent() {
     }
   };
 
-  const handleSendMessage = async (imageData?: string) => {
-    if ((!userInput.trim() && !imageData) || !subject || !examQuestion || isLoading || !generatedVariant) return;
+  const handleSendMessage = async (content?: string, imageData?: string) => {
+    // Use provided content or fall back to userInput state
+    const messageContent = content ?? userInput;
+
+    if ((!messageContent.trim() && !imageData) || !subject || !examQuestion || isLoading || !generatedVariant) return;
 
     setIsLoading(true);
-    const currentInput = userInput;
-    setUserInput('');
+    const currentInput = messageContent;
+    if (!content) setUserInput(''); // Only clear userInput if we used it
 
     // Check if this is a cheat command (level 2+ users only)
     if (accessLevel !== null && accessLevel >= 2 && !imageData && isDevCommand(currentInput)) {

@@ -22,7 +22,7 @@ export function QuestionPanel({
   questionText,
   objectives,
   completedObjectives,
-  defaultPosition = { x: 20, y: 20 },
+  defaultPosition = { x: 20, y: 70 },
   defaultCollapsed = false,
 }: QuestionPanelProps) {
   const completedCount = completedObjectives.length;
@@ -43,7 +43,7 @@ export function QuestionPanel({
         defaultCollapsed={defaultCollapsed}
         minWidth={320}
         maxWidth={450}
-        zIndex={110}
+        zIndex={105}
       >
         <div className="space-y-4">
           {/* Progress Section */}

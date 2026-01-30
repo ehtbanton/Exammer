@@ -37,14 +37,11 @@ export function ChatPanel({
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Calculate default position based on window size
-  const getDefaultPosition = () => {
+  // Position next to the question panel (which is at x: 20, width ~320-450)
+  const [panelPosition] = useState(() => {
     if (defaultPosition) return defaultPosition;
-    if (typeof window !== 'undefined') {
-      return { x: window.innerWidth - 380, y: 20 };
-    }
-    return { x: 800, y: 20 };
-  };
+    return { x: 500, y: 70 }; // Next to Question panel with gap
+  });
 
   // Auto-scroll to bottom on new messages
   useEffect(() => {
@@ -77,11 +74,11 @@ export function ChatPanel({
       <FloatingPanel
         title="XAM - AI Tutor"
         icon={<Bot className="h-4 w-4" />}
-        defaultPosition={getDefaultPosition()}
+        defaultPosition={panelPosition}
         defaultCollapsed={defaultCollapsed}
         minWidth={340}
         maxWidth={420}
-        zIndex={110}
+        zIndex={115}
       >
         <div className="flex flex-col h-[350px]">
           {/* Messages Area */}

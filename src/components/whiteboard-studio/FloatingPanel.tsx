@@ -1,11 +1,10 @@
 "use client";
 
 import React, { useState, useRef } from 'react';
-import Draggable, { DraggableData, DraggableEvent } from 'react-draggable';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, useDragControls } from 'framer-motion';
 import { ChevronDown, ChevronUp, GripHorizontal } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { collapseVariants, dragVariants } from './animations';
+import { collapseVariants } from './animations';
 
 interface FloatingPanelProps {
   title: string;
@@ -36,53 +35,52 @@ export function FloatingPanel({
 }: FloatingPanelProps) {
   const [isCollapsed, setIsCollapsed] = useState(defaultCollapsed);
   const [isDragging, setIsDragging] = useState(false);
-  const nodeRef = useRef<HTMLDivElement>(null);
-
-  const handleDragStart = () => {
-    setIsDragging(true);
-  };
-
-  const handleDragStop = (_e: DraggableEvent, data: DraggableData) => {
-    setIsDragging(false);
-    onPositionChange?.({ x: data.x, y: data.y });
-  };
+  const constraintsRef = useRef<HTMLDivElement>(null);
+  const dragControls = useDragControls();
 
   return (
-    <Draggable
-      nodeRef={nodeRef}
-      defaultPosition={defaultPosition}
-      handle=".drag-handle"
-      bounds="parent"
-      onStart={handleDragStart}
-      onStop={handleDragStop}
-    >
+    <>
+      {/* Invisible constraints container */}
+      <div ref={constraintsRef} className="fixed inset-0 pointer-events-none" style={{ zIndex: zIndex - 1 }} />
+
       <motion.div
-        ref={nodeRef}
+        drag
+        dragControls={dragControls}
+        dragListener={false}
+        dragMomentum={false}
+        dragElastic={0}
+        dragConstraints={constraintsRef}
+        onDragStart={() => setIsDragging(true)}
+        onDragEnd={(_, info) => {
+          setIsDragging(false);
+          onPositionChange?.({ x: info.point.x, y: info.point.y });
+        }}
+        initial={{ x: defaultPosition.x, y: defaultPosition.y }}
         className={cn(
-          "absolute rounded-2xl overflow-hidden",
+          "fixed top-0 left-0 rounded-2xl overflow-hidden",
           "bg-white/90 dark:bg-gray-900/90",
           "backdrop-blur-xl",
           "border border-white/30 dark:border-gray-700/50",
-          "shadow-lg",
+          isDragging ? "shadow-2xl scale-[1.02]" : "shadow-lg",
+          "transition-shadow",
           className
         )}
         style={{
           zIndex,
           minWidth,
           maxWidth,
+          pointerEvents: 'auto',
         }}
-        initial="idle"
-        animate={isDragging ? "dragging" : "idle"}
-        variants={dragVariants}
       >
         {/* Header / Drag Handle */}
         <div
+          onPointerDown={(e) => dragControls.start(e)}
           className={cn(
             "drag-handle flex items-center justify-between px-4 py-3",
             "bg-gradient-to-r from-gray-50/80 to-gray-100/80 dark:from-gray-800/80 dark:to-gray-850/80",
             "border-b border-gray-200/50 dark:border-gray-700/50",
             "cursor-grab active:cursor-grabbing",
-            "select-none"
+            "select-none touch-none"
           )}
         >
           <div className="flex items-center gap-2">
@@ -128,6 +126,6 @@ export function FloatingPanel({
           )}
         </AnimatePresence>
       </motion.div>
-    </Draggable>
+    </>
   );
 }
