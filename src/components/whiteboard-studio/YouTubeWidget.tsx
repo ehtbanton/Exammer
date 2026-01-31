@@ -56,18 +56,18 @@ export function YouTubeWidget({ defaultPosition = { x: 800, y: 70 }, onClose }: 
         title="YouTube"
         icon={<Youtube className="h-4 w-4 text-red-500" />}
         defaultPosition={defaultPosition}
-        minWidth={320}
-        maxWidth={640}
-        minHeight={200}
-        maxHeight={500}
+        minWidth={200}
+        maxWidth={1200}
+        minHeight={150}
+        maxHeight={800}
         defaultWidth={400}
-        defaultHeight={320}
+        defaultHeight={300}
         resizable={true}
         closable={true}
         onClose={onClose}
         zIndex={110}
       >
-        <div className="flex flex-col h-full space-y-3">
+        <div className="flex flex-col h-full space-y-2">
           {/* URL Input */}
           <div className="flex gap-2 shrink-0">
             <Input
@@ -83,16 +83,15 @@ export function YouTubeWidget({ defaultPosition = { x: 800, y: 70 }, onClose }: 
           </div>
 
           {error && (
-            <p className="text-xs text-red-500">{error}</p>
+            <p className="text-xs text-red-500 shrink-0">{error}</p>
           )}
 
-          {/* Video Player */}
-          <div className="flex-1 bg-black rounded-lg overflow-hidden">
+          {/* Video Player - 16:9 aspect ratio */}
+          <div className="w-full bg-black rounded-lg overflow-hidden" style={{ aspectRatio: '16/9' }}>
             {videoId ? (
               <iframe
                 src={`https://www.youtube-nocookie.com/embed/${videoId}?enablejsapi=1&origin=${typeof window !== 'undefined' ? window.location.origin : ''}&rel=0`}
-                className="w-full h-full"
-                frameBorder="0"
+                style={{ width: '100%', height: '100%', border: 'none' }}
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
                 allowFullScreen
                 referrerPolicy="strict-origin-when-cross-origin"
@@ -112,7 +111,7 @@ export function YouTubeWidget({ defaultPosition = { x: 800, y: 70 }, onClose }: 
             <Button
               variant="ghost"
               size="sm"
-              className="w-full"
+              className="w-full shrink-0"
               onClick={() => window.open(`https://youtube.com/watch?v=${videoId}`, '_blank')}
             >
               <ExternalLink className="h-3 w-3 mr-1" />
