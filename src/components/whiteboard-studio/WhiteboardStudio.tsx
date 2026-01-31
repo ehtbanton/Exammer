@@ -12,7 +12,7 @@ import { SnippingMenu } from './SnippingMenu';
 import { YouTubeWidget } from './YouTubeWidget';
 import { SpotifyWidget } from './SpotifyWidget';
 import { FlashcardPanel } from './FlashcardPanel';
-import { BrowserWidget } from './BrowserWidget';
+import { ResourceViewer, isEmbeddableSite } from './ResourceViewer';
 import { WidgetType } from './WidgetMenu';
 import { overlayVariants, canvasVariants } from './animations';
 import { useToast } from '@/hooks/use-toast';
@@ -70,7 +70,7 @@ export function WhiteboardStudio({
   const [showGrid, setShowGrid] = useState(false);
   const [showPages, setShowPages] = useState(false);
   const [youtubeInitialUrl, setYoutubeInitialUrl] = useState<string | undefined>();
-  const [browserInitialUrl, setBrowserInitialUrl] = useState<string | undefined>();
+  const [resourceUrl, setResourceUrl] = useState<string | null>(null);
   const { toast } = useToast();
 
   // Page dimensions (A4 at 96 DPI)
@@ -387,7 +387,6 @@ export function WhiteboardStudio({
     setActiveWidgets(prev => prev.filter(w => w !== type));
     // Clear initial URLs when closing widgets
     if (type === 'youtube') setYoutubeInitialUrl(undefined);
-    if (type === 'browser') setBrowserInitialUrl(undefined);
   }, []);
 
   // Open YouTube widget with a specific video URL
@@ -402,17 +401,30 @@ export function WhiteboardStudio({
     });
   }, [activeWidgets, toast]);
 
-  // Open Browser widget with a specific URL
-  const handleOpenBrowser = useCallback((url: string) => {
-    setBrowserInitialUrl(url);
-    if (!activeWidgets.includes('browser')) {
-      setActiveWidgets(prev => [...prev, 'browser']);
+  // Open Resource Viewer with a specific URL (for embeddable sites like Wikipedia)
+  const handleOpenResource = useCallback((url: string) => {
+    console.log('handleOpenResource called with:', url);
+    console.log('isEmbeddableSite result:', isEmbeddableSite(url));
+
+    if (isEmbeddableSite(url)) {
+      setResourceUrl(url);
+      toast({
+        title: "Opening resource",
+        description: "Loading content...",
+      });
+    } else {
+      // For non-embeddable sites, open in new tab
+      window.open(url, '_blank');
+      toast({
+        title: "Opening in new tab",
+        description: "This site cannot be embedded.",
+      });
     }
-    toast({
-      title: "Opening in Browser widget",
-      description: "Page loading...",
-    });
-  }, [activeWidgets, toast]);
+  }, [toast]);
+
+  const handleCloseResource = useCallback(() => {
+    setResourceUrl(null);
+  }, []);
 
   // Handle grid and pages toggles
   const handleToggleGrid = useCallback(() => {
@@ -543,7 +555,7 @@ export function WhiteboardStudio({
           onSendMessage={handleChatMessage}
           isLoading={isLoading}
           onOpenYouTube={handleOpenYouTube}
-          onOpenBrowser={handleOpenBrowser}
+          onOpenResource={handleOpenResource}
         />
 
         {/* Bottom Toolbar */}
@@ -609,12 +621,12 @@ export function WhiteboardStudio({
               onClose={() => handleRemoveWidget('spotify')}
             />
           )}
-          {activeWidgets.includes('browser') && (
-            <BrowserWidget
-              key="browser"
+          {resourceUrl && (
+            <ResourceViewer
+              key="resource"
               defaultPosition={{ x: 100, y: 100 }}
-              initialUrl={browserInitialUrl}
-              onClose={() => handleRemoveWidget('browser')}
+              url={resourceUrl}
+              onClose={handleCloseResource}
             />
           )}
           {activeWidgets.includes('flashcards') && (

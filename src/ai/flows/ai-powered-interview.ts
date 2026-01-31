@@ -122,27 +122,33 @@ Here's the previous chat history:
 {{/if}}
 
 {{#if isFindRequest}}
-  SPECIAL REQUEST: The student is asking for learning resources.
+  SPECIAL REQUEST: The student is asking for learning resources about "{{subsection}}".
 
   {{#if youtubeResults.length}}
-  I found these YouTube videos for you! Present them in a friendly way:
-
+  YouTube videos I found:
   {{#each youtubeResults}}
-  - "{{this.title}}" by {{this.author}} - {{this.url}}
+  - {{this.url}}
   {{/each}}
+  {{/if}}
 
-  Format your response like:
-  "I found some great videos to help you understand this topic! Click the buttons below to watch:
+  Your response MUST end with URLs on separate lines. Example format:
 
-  **Video 1** - [brief description of why this video is helpful based on the title]
-  **Video 2** - [brief description]
-  **Video 3** - [brief description]
+  "Here are some resources for {{subsection}}:
 
-  [Then put each URL on its own line at the end - they'll become clickable buttons]"
+  **Videos:** I found some helpful tutorials - click the buttons below!
+  **Wikipedia:** Good overview of the concepts
+  **Khan Academy:** Interactive practice problems
 
-  IMPORTANT: Include the actual URLs at the end of your message so buttons appear. Don't show raw URLs in the main text.
-  {{else}}
-  I couldn't find specific videos right now. Suggest the student search YouTube for topics related to: {{subsection}}
+  https://www.youtube.com/watch?v=example1
+  https://www.youtube.com/watch?v=example2
+  https://en.wikipedia.org/wiki/Proof_by_contradiction
+  https://www.khanacademy.org/search?page_search_query=proof+contradiction"
+
+  CRITICAL: You MUST include these exact URLs at the very end (replace topic as needed):
+  - https://en.wikipedia.org/wiki/{{subsection}} (replace spaces with underscores)
+  - https://www.khanacademy.org/search?page_search_query={{subsection}} (replace spaces with +)
+  {{#if youtubeResults.length}}
+  - Plus the YouTube URLs listed above
   {{/if}}
 
 {{else if isNextStepRequest}}
@@ -261,12 +267,17 @@ Guide the student step-by-step through just this one objective. Be like a helpfu
 
 ${isFindRequest ? `SPECIAL REQUEST: The student is asking for learning resources.
 
-${youtubeResults.length > 0 ? `I found these YouTube videos for you:
-${youtubeResults.map((v, i) => `${i + 1}. "${v.title}" by ${v.author} - ${v.url}`).join('\n')}
+${youtubeResults.length > 0 ? `YouTube videos found:
+${youtubeResults.map((v, i) => `${i + 1}. "${v.title}" by ${v.author} - ${v.url}`).join('\n')}` : ''}
 
-Present these videos in a friendly way. Describe each video briefly based on its title.
-Put each URL on its own line at the END of your message (they'll become clickable buttons).
-Don't show the raw URLs in the main text - just describe the videos.` : `I couldn't find specific videos right now. Suggest the student search YouTube for: ${subsection}`}
+ALSO construct URLs for these educational sites based on the topic "${subsection}":
+- Wikipedia: https://en.wikipedia.org/wiki/[topic_with_underscores]
+- Khan Academy: https://www.khanacademy.org/search?page_search_query=[topic+words]
+- BBC Bitesize: https://www.bbc.co.uk/bitesize/search?q=[topic+words]
+
+Provide a variety of resources (videos AND articles). Describe each briefly.
+Put ALL URLs at the END of your message, each on its own line - they become clickable buttons.
+Don't show raw URLs in the main text. Replace spaces with + or _ as appropriate for URLs.
 
 ` : ''}
 

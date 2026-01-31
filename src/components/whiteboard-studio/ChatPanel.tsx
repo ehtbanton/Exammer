@@ -24,13 +24,15 @@ interface ChatPanelProps {
   defaultPosition?: { x: number; y: number };
   defaultCollapsed?: boolean;
   onOpenYouTube?: (url: string) => void;
-  onOpenBrowser?: (url: string) => void;
+  onOpenResource?: (url: string) => void;
 }
 
 // Detect URLs in text
 function extractUrls(text: string): { youtubeVideoUrls: string[]; youtubeSearchUrls: string[]; articleUrls: string[] } {
   const urlRegex = /https?:\/\/[^\s<>\[\]"']+/g;
   const urls = text.match(urlRegex) || [];
+
+  console.log('extractUrls - found URLs:', urls);
 
   const youtubeVideoUrls: string[] = [];
   const youtubeSearchUrls: string[] = [];
@@ -51,6 +53,7 @@ function extractUrls(text: string): { youtubeVideoUrls: string[]; youtubeSearchU
     }
   }
 
+  console.log('extractUrls - categorized:', { youtubeVideoUrls, youtubeSearchUrls, articleUrls });
   return { youtubeVideoUrls, youtubeSearchUrls, articleUrls };
 }
 
@@ -70,7 +73,7 @@ export function ChatPanel({
   defaultPosition,
   defaultCollapsed = false,
   onOpenYouTube,
-  onOpenBrowser,
+  onOpenResource,
 }: ChatPanelProps) {
   const [inputValue, setInputValue] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -219,7 +222,7 @@ export function ChatPanel({
                                 variant="outline"
                                 size="sm"
                                 className="h-7 text-xs gap-1 bg-white dark:bg-gray-900"
-                                onClick={() => onOpenBrowser?.(artUrl)}
+                                onClick={() => onOpenResource?.(artUrl)}
                               >
                                 <Globe className="h-3 w-3 text-blue-500" />
                                 Link {articleUrls.length > 1 ? i + 1 : ''}
