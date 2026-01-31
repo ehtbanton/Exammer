@@ -2,9 +2,10 @@
 
 import React from 'react';
 import { motion } from 'framer-motion';
-import { X, Send, Trash2, Undo, Redo, ZoomIn, ZoomOut, Maximize2, Tag } from 'lucide-react';
+import { X, Send, Trash2, Undo, Redo, ZoomIn, ZoomOut, Maximize2, Tag, Scissors } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toolbarVariants } from './animations';
+import { WidgetMenu, WidgetType } from './WidgetMenu';
 import { cn } from '@/lib/utils';
 
 interface StudioToolbarProps {
@@ -17,7 +18,11 @@ interface StudioToolbarProps {
   onZoomOut: () => void;
   onResetZoom: () => void;
   onLabelImage: () => void;
+  onSnip: () => void;
+  onAddWidget: (type: WidgetType) => void;
+  activeWidgets: WidgetType[];
   isSubmitting?: boolean;
+  isSnipping?: boolean;
   canUndo?: boolean;
   canRedo?: boolean;
 }
@@ -32,7 +37,11 @@ export function StudioToolbar({
   onZoomOut,
   onResetZoom,
   onLabelImage,
+  onSnip,
+  onAddWidget,
+  activeWidgets,
   isSubmitting = false,
+  isSnipping = false,
   canUndo = true,
   canRedo = false,
 }: StudioToolbarProps) {
@@ -130,6 +139,25 @@ export function StudioToolbar({
         <Tag className="h-4 w-4 mr-1" />
         Text
       </Button>
+
+      {/* Snipping Tool */}
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={onSnip}
+        className={cn(
+          isSnipping
+            ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
+            : "text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100"
+        )}
+        title="Snip selection"
+      >
+        <Scissors className="h-4 w-4 mr-1" />
+        Snip
+      </Button>
+
+      {/* Widget Menu */}
+      <WidgetMenu onAddWidget={onAddWidget} activeWidgets={activeWidgets} />
 
       <div className="w-px h-6 bg-gray-200 dark:bg-gray-700 mx-1" />
 

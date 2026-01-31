@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useCallback } from 'react';
 import { motion, AnimatePresence, useDragControls } from 'framer-motion';
-import { ChevronDown, ChevronUp, GripHorizontal } from 'lucide-react';
+import { ChevronDown, ChevronUp, GripHorizontal, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { collapseVariants } from './animations';
 
@@ -20,9 +20,11 @@ interface FloatingPanelProps {
   defaultWidth?: number;
   defaultHeight?: number;
   resizable?: boolean;
+  closable?: boolean;
   className?: string;
   zIndex?: number;
   onPositionChange?: (position: { x: number; y: number }) => void;
+  onClose?: () => void;
 }
 
 export function FloatingPanel({
@@ -39,9 +41,11 @@ export function FloatingPanel({
   defaultWidth,
   defaultHeight,
   resizable = true,
+  closable = false,
   className,
   zIndex = 100,
   onPositionChange,
+  onClose,
 }: FloatingPanelProps) {
   const [isCollapsed, setIsCollapsed] = useState(defaultCollapsed);
   const [isDragging, setIsDragging] = useState(false);
@@ -141,22 +145,36 @@ export function FloatingPanel({
             </h3>
           </div>
 
-          {collapsible && (
-            <button
-              onClick={() => setIsCollapsed(!isCollapsed)}
-              className={cn(
-                "p-1 rounded-md transition-colors",
-                "hover:bg-gray-200/50 dark:hover:bg-gray-700/50",
-                "text-gray-500 dark:text-gray-400"
-              )}
-            >
-              {isCollapsed ? (
-                <ChevronDown className="h-4 w-4" />
-              ) : (
-                <ChevronUp className="h-4 w-4" />
-              )}
-            </button>
-          )}
+          <div className="flex items-center gap-1">
+            {collapsible && (
+              <button
+                onClick={() => setIsCollapsed(!isCollapsed)}
+                className={cn(
+                  "p-1 rounded-md transition-colors",
+                  "hover:bg-gray-200/50 dark:hover:bg-gray-700/50",
+                  "text-gray-500 dark:text-gray-400"
+                )}
+              >
+                {isCollapsed ? (
+                  <ChevronDown className="h-4 w-4" />
+                ) : (
+                  <ChevronUp className="h-4 w-4" />
+                )}
+              </button>
+            )}
+            {closable && onClose && (
+              <button
+                onClick={onClose}
+                className={cn(
+                  "p-1 rounded-md transition-colors",
+                  "hover:bg-red-100 dark:hover:bg-red-900/30",
+                  "text-gray-500 hover:text-red-600 dark:text-gray-400 dark:hover:text-red-400"
+                )}
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Content */}
@@ -170,7 +188,7 @@ export function FloatingPanel({
               className="overflow-hidden flex-1 flex flex-col"
               style={{ height: 'calc(100% - 52px)' }}
             >
-              <div className="p-4 flex-1 overflow-auto">
+              <div className="p-4 flex-1 overflow-y-auto overflow-x-hidden">
                 {children}
               </div>
             </motion.div>

@@ -7,6 +7,12 @@ import type { Editor } from 'tldraw';
 import { QuestionPanel } from './QuestionPanel';
 import { ChatPanel } from './ChatPanel';
 import { StudioToolbar } from './StudioToolbar';
+import { SnippingTool } from './SnippingTool';
+import { SnippingMenu } from './SnippingMenu';
+import { YouTubeWidget } from './YouTubeWidget';
+import { SpotifyWidget } from './SpotifyWidget';
+import { FlashcardPanel } from './FlashcardPanel';
+import { WidgetType } from './WidgetMenu';
 import { overlayVariants, canvasVariants } from './animations';
 import { useToast } from '@/hooks/use-toast';
 
@@ -54,6 +60,12 @@ export function WhiteboardStudio({
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSnipping, setIsSnipping] = useState(false);
+  const [snipResult, setSnipResult] = useState<{
+    imageData: string;
+    position: { x: number; y: number };
+  } | null>(null);
+  const [activeWidgets, setActiveWidgets] = useState<WidgetType[]>([]);
   const { toast } = useToast();
 
   // Handle editor mount
@@ -265,6 +277,107 @@ export function WhiteboardStudio({
     onSendMessage(content);
   }, [onSendMessage]);
 
+  // Handle snipping tool
+  const handleSnipStart = useCallback(() => {
+    setIsSnipping(true);
+  }, []);
+
+  const handleSnipCancel = useCallback(() => {
+    setIsSnipping(false);
+  }, []);
+
+  const handleSnipComplete = useCallback(async (bounds: { x: number; y: number; width: number; height: number }) => {
+    setIsSnipping(false);
+    const editor = editorRef.current;
+    if (!editor) return;
+
+    try {
+      // Get all shapes that intersect with the selection bounds
+      const allShapes = editor.getCurrentPageShapes();
+      const selectedShapeIds = allShapes
+        .filter(shape => {
+          const shapeBounds = editor.getShapePageBounds(shape.id);
+          if (!shapeBounds) return false;
+          // Check if shape intersects with selection
+          return (
+            shapeBounds.x < bounds.x + bounds.width &&
+            shapeBounds.x + shapeBounds.width > bounds.x &&
+            shapeBounds.y < bounds.y + bounds.height &&
+            shapeBounds.y + shapeBounds.height > bounds.y
+          );
+        })
+        .map(shape => shape.id);
+
+      if (selectedShapeIds.length === 0) {
+        toast({
+          title: "No content selected",
+          description: "Draw something first, then snip it",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Export the selected area
+      const result = await editor.toImage(selectedShapeIds, {
+        format: 'png',
+        quality: 1,
+        scale: 2,
+        background: true,
+        padding: 10,
+      });
+
+      if (!result?.blob) {
+        toast({
+          title: "Failed to capture",
+          description: "Could not capture selection",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Convert to base64
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setSnipResult({
+          imageData: reader.result as string,
+          position: { x: bounds.x + bounds.width + 20, y: bounds.y },
+        });
+      };
+      reader.readAsDataURL(result.blob);
+    } catch (error) {
+      console.error('Snip error:', error);
+      toast({
+        title: "Snip failed",
+        description: "Could not capture selection",
+        variant: "destructive",
+      });
+    }
+  }, [toast]);
+
+  const handleSnipMenuClose = useCallback(() => {
+    setSnipResult(null);
+  }, []);
+
+  const handleAskXamWithSnip = useCallback(async (message: string, imageData: string) => {
+    setSnipResult(null);
+    toast({
+      title: "Sending to XAM",
+      description: "XAM is analyzing your selection...",
+    });
+    await onSendMessage(message, imageData);
+  }, [onSendMessage, toast]);
+
+  // Handle widget add/remove
+  const handleAddWidget = useCallback((type: WidgetType) => {
+    if (!activeWidgets.includes(type)) {
+      setActiveWidgets(prev => [...prev, type]);
+    }
+  }, [activeWidgets]);
+
+  const handleRemoveWidget = useCallback((type: WidgetType) => {
+    setActiveWidgets(prev => prev.filter(w => w !== type));
+  }, []);
+
   // Prevent body scroll and boost tldraw menu z-index
   useEffect(() => {
     document.body.style.overflow = 'hidden';
@@ -349,10 +462,59 @@ export function WhiteboardStudio({
           onZoomOut={handleZoomOut}
           onResetZoom={handleResetZoom}
           onLabelImage={handleLabelImage}
+          onSnip={handleSnipStart}
+          onAddWidget={handleAddWidget}
+          activeWidgets={activeWidgets}
           isSubmitting={isSubmitting}
+          isSnipping={isSnipping}
           canUndo={canUndo}
           canRedo={canRedo}
         />
+
+        {/* Snipping Tool Overlay */}
+        <AnimatePresence>
+          {isSnipping && (
+            <SnippingTool
+              isActive={isSnipping}
+              onSelectionComplete={handleSnipComplete}
+              onCancel={handleSnipCancel}
+            />
+          )}
+        </AnimatePresence>
+
+        {/* Snipping Menu */}
+        <SnippingMenu
+          isOpen={!!snipResult}
+          imageData={snipResult?.imageData || null}
+          position={snipResult?.position || { x: 0, y: 0 }}
+          onClose={handleSnipMenuClose}
+          onAskXam={handleAskXamWithSnip}
+        />
+
+        {/* Media Widgets */}
+        <AnimatePresence>
+          {activeWidgets.includes('youtube') && (
+            <YouTubeWidget
+              key="youtube"
+              defaultPosition={{ x: 800, y: 70 }}
+              onClose={() => handleRemoveWidget('youtube')}
+            />
+          )}
+          {activeWidgets.includes('spotify') && (
+            <SpotifyWidget
+              key="spotify"
+              defaultPosition={{ x: 800, y: 400 }}
+              onClose={() => handleRemoveWidget('spotify')}
+            />
+          )}
+          {activeWidgets.includes('flashcards') && (
+            <FlashcardPanel
+              key="flashcards"
+              defaultPosition={{ x: 420, y: 70 }}
+              onClose={() => handleRemoveWidget('flashcards')}
+            />
+          )}
+        </AnimatePresence>
       </motion.div>
     </AnimatePresence>
   );
