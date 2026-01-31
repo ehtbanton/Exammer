@@ -35,6 +35,7 @@ export function QuestionPanel({
       animate="visible"
       exit="exit"
     >
+      <style>{`.hide-scrollbar::-webkit-scrollbar { display: none; }`}</style>
       <FloatingPanel
         title="Question"
         icon={<FileQuestion className="h-4 w-4" />}
@@ -64,7 +65,10 @@ export function QuestionPanel({
           </div>
 
           {/* Scrollable Content */}
-          <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden pr-2 space-y-3">
+          <div
+            className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden pr-2 space-y-3 hide-scrollbar"
+            style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+          >
             {/* Question Text */}
             <div className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">
               <LatexRenderer>{questionText}</LatexRenderer>

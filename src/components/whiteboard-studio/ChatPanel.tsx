@@ -94,6 +94,7 @@ export function ChatPanel({
       animate="visible"
       exit="exit"
     >
+      <style>{`.hide-scrollbar::-webkit-scrollbar { display: none; }`}</style>
       <FloatingPanel
         title="XAM - AI Tutor"
         icon={<Bot className="h-4 w-4" />}
@@ -110,7 +111,10 @@ export function ChatPanel({
       >
         <div className="flex flex-col h-full min-h-0 overflow-hidden">
           {/* Messages Area */}
-          <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden pr-2">
+          <div
+            className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden pr-2 hide-scrollbar"
+            style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+          >
             <div className="space-y-3">
               {messages.length === 0 ? (
                 <div className="text-center py-8 text-gray-400">
