@@ -13,14 +13,49 @@ interface BrowserWidgetProps {
   onClose: () => void;
 }
 
+// Sites that block iframe embedding - show friendly message
+const BLOCKED_SITES: { pattern: RegExp; message: string }[] = [
+  { pattern: /youtube\.com|youtu\.be/, message: 'YouTube blocks embedding. Use the YouTube widget with direct video links instead.' },
+  { pattern: /google\.com|google\.[a-z]+$/, message: 'Google blocks embedding. Use your regular browser for Google searches.' },
+  { pattern: /facebook\.com|fb\.com/, message: 'Facebook blocks embedding for security reasons.' },
+  { pattern: /twitter\.com|x\.com/, message: 'X/Twitter blocks embedding for security reasons.' },
+  { pattern: /instagram\.com/, message: 'Instagram blocks embedding for security reasons.' },
+];
+
+function getBlockedMessage(url: string): string | null {
+  try {
+    const hostname = new URL(url).hostname.toLowerCase();
+    for (const site of BLOCKED_SITES) {
+      if (site.pattern.test(hostname)) {
+        return site.message;
+      }
+    }
+  } catch {
+    return null;
+  }
+  return null;
+}
+
 export function BrowserWidget({
   defaultPosition = { x: 100, y: 100 },
   initialUrl,
   onClose
 }: BrowserWidgetProps) {
   const [url, setUrl] = useState(initialUrl || '');
-  const [loadedUrl, setLoadedUrl] = useState<string | null>(initialUrl || null);
-  const [error, setError] = useState('');
+  const [loadedUrl, setLoadedUrl] = useState<string | null>(() => {
+    // Don't auto-load blocked sites
+    if (initialUrl && getBlockedMessage(initialUrl)) {
+      return null;
+    }
+    return initialUrl || null;
+  });
+  const [error, setError] = useState(() => {
+    // Show error for blocked initial URLs
+    if (initialUrl) {
+      return getBlockedMessage(initialUrl) || '';
+    }
+    return '';
+  });
 
   const handleLoadUrl = () => {
     let urlToLoad = url.trim();
@@ -36,6 +71,16 @@ export function BrowserWidget({
 
     try {
       new URL(urlToLoad); // Validate URL
+
+      // Check if site is blocked
+      const blockedMessage = getBlockedMessage(urlToLoad);
+      if (blockedMessage) {
+        setError(blockedMessage);
+        setLoadedUrl(null);
+        setUrl(urlToLoad);
+        return;
+      }
+
       setLoadedUrl(urlToLoad);
       setUrl(urlToLoad);
       setError('');
@@ -115,20 +160,24 @@ export function BrowserWidget({
           {/* Browser Frame */}
           <div className="flex-1 min-h-0 bg-white rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700">
             {loadedUrl ? (
-              <iframe
-                src={loadedUrl}
-                className="w-full h-full"
-                style={{ border: 'none' }}
-                sandbox="allow-scripts allow-same-origin allow-popups allow-forms"
-                referrerPolicy="no-referrer"
-                title="Browser content"
-              />
+              <>
+                <iframe
+                  src={loadedUrl}
+                  className="w-full h-full"
+                  style={{ border: 'none' }}
+                  sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-top-navigation"
+                  referrerPolicy="no-referrer"
+                  title="Browser content"
+                  onError={() => setError('This site cannot be embedded. Click "Open in New Tab" below.')}
+                />
+              </>
             ) : (
               <div className="w-full h-full flex items-center justify-center text-gray-500 bg-gray-50 dark:bg-gray-800">
                 <div className="text-center">
                   <Globe className="h-12 w-12 mx-auto mb-2 opacity-50" />
                   <p className="text-sm">Enter a URL above to browse</p>
-                  <p className="text-xs text-gray-400 mt-1">Some sites may not load due to security restrictions</p>
+                  <p className="text-xs text-gray-400 mt-1">Some sites (YouTube, Google, etc.) block embedding</p>
+                  <p className="text-xs text-gray-400">and will need to open in a new tab</p>
                 </div>
               </div>
             )}

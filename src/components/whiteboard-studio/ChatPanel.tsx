@@ -28,25 +28,39 @@ interface ChatPanelProps {
 }
 
 // Detect URLs in text
-function extractUrls(text: string): { youtubeUrls: string[]; articleUrls: string[] } {
+function extractUrls(text: string): { youtubeVideoUrls: string[]; youtubeSearchUrls: string[]; articleUrls: string[] } {
   const urlRegex = /https?:\/\/[^\s<>\[\]"']+/g;
   const urls = text.match(urlRegex) || [];
 
-  const youtubeUrls: string[] = [];
+  const youtubeVideoUrls: string[] = [];
+  const youtubeSearchUrls: string[] = [];
   const articleUrls: string[] = [];
 
   for (const url of urls) {
     // Clean up any trailing punctuation
     const cleanUrl = url.replace(/[.,;:!?)]+$/, '');
 
-    if (cleanUrl.includes('youtube.com') || cleanUrl.includes('youtu.be')) {
-      youtubeUrls.push(cleanUrl);
+    if (cleanUrl.includes('youtube.com/results') || cleanUrl.includes('youtube.com/search')) {
+      // YouTube search URLs - open in new tab
+      youtubeSearchUrls.push(cleanUrl);
+    } else if (cleanUrl.includes('youtube.com/watch') || cleanUrl.includes('youtu.be/')) {
+      // YouTube video URLs - open in YouTube widget
+      youtubeVideoUrls.push(cleanUrl);
     } else {
       articleUrls.push(cleanUrl);
     }
   }
 
-  return { youtubeUrls, articleUrls };
+  return { youtubeVideoUrls, youtubeSearchUrls, articleUrls };
+}
+
+// Strip URLs from message text for cleaner display
+function stripUrls(text: string): string {
+  // Remove URLs and any trailing whitespace/newlines
+  return text
+    .replace(/https?:\/\/[^\s<>\[\]"']+/g, '')
+    .replace(/\n\s*\n\s*\n/g, '\n\n') // Collapse multiple newlines
+    .trim();
 }
 
 export function ChatPanel({
@@ -124,9 +138,9 @@ export function ChatPanel({
               ) : (
                 messages.map((message, index) => {
                   // Extract URLs from assistant messages
-                  const { youtubeUrls, articleUrls } = message.role === 'assistant'
+                  const { youtubeVideoUrls, youtubeSearchUrls, articleUrls } = message.role === 'assistant'
                     ? extractUrls(message.content)
-                    : { youtubeUrls: [], articleUrls: [] };
+                    : { youtubeVideoUrls: [], youtubeSearchUrls: [], articleUrls: [] };
 
                   return (
                     <div
@@ -169,13 +183,13 @@ export function ChatPanel({
                               className="max-w-full rounded-lg mb-2"
                             />
                           )}
-                          <LatexRenderer>{message.content}</LatexRenderer>
+                          <LatexRenderer>{message.role === 'assistant' ? stripUrls(message.content) : message.content}</LatexRenderer>
                         </div>
 
                         {/* URL Action Buttons */}
-                        {(youtubeUrls.length > 0 || articleUrls.length > 0) && (
+                        {(youtubeVideoUrls.length > 0 || youtubeSearchUrls.length > 0 || articleUrls.length > 0) && (
                           <div className="flex flex-wrap gap-1">
-                            {youtubeUrls.map((ytUrl, i) => (
+                            {youtubeVideoUrls.map((ytUrl, i) => (
                               <Button
                                 key={`yt-${i}`}
                                 variant="outline"
@@ -184,7 +198,19 @@ export function ChatPanel({
                                 onClick={() => onOpenYouTube?.(ytUrl)}
                               >
                                 <Youtube className="h-3 w-3 text-red-500" />
-                                Open in Widget
+                                Video {youtubeVideoUrls.length > 1 ? i + 1 : ''}
+                              </Button>
+                            ))}
+                            {youtubeSearchUrls.map((searchUrl, i) => (
+                              <Button
+                                key={`yts-${i}`}
+                                variant="outline"
+                                size="sm"
+                                className="h-7 text-xs gap-1 bg-white dark:bg-gray-900"
+                                onClick={() => window.open(searchUrl, '_blank')}
+                              >
+                                <Youtube className="h-3 w-3 text-red-500" />
+                                Search {youtubeSearchUrls.length > 1 ? i + 1 : ''}
                               </Button>
                             ))}
                             {articleUrls.map((artUrl, i) => (
@@ -196,7 +222,7 @@ export function ChatPanel({
                                 onClick={() => onOpenBrowser?.(artUrl)}
                               >
                                 <Globe className="h-3 w-3 text-blue-500" />
-                                Open in Browser
+                                Link {articleUrls.length > 1 ? i + 1 : ''}
                               </Button>
                             ))}
                           </div>
