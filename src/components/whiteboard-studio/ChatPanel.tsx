@@ -2,10 +2,9 @@
 
 import React, { useRef, useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Bot, User, Send, MessageSquare, Loader2 } from 'lucide-react';
+import { Bot, User, Send, MessageSquare, Loader2, Youtube, Globe } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { LatexRenderer } from '@/components/latex-renderer';
 import { FloatingPanel } from './FloatingPanel';
@@ -24,6 +23,30 @@ interface ChatPanelProps {
   isLoading?: boolean;
   defaultPosition?: { x: number; y: number };
   defaultCollapsed?: boolean;
+  onOpenYouTube?: (url: string) => void;
+  onOpenBrowser?: (url: string) => void;
+}
+
+// Detect URLs in text
+function extractUrls(text: string): { youtubeUrls: string[]; articleUrls: string[] } {
+  const urlRegex = /https?:\/\/[^\s<>\[\]"']+/g;
+  const urls = text.match(urlRegex) || [];
+
+  const youtubeUrls: string[] = [];
+  const articleUrls: string[] = [];
+
+  for (const url of urls) {
+    // Clean up any trailing punctuation
+    const cleanUrl = url.replace(/[.,;:!?)]+$/, '');
+
+    if (cleanUrl.includes('youtube.com') || cleanUrl.includes('youtu.be')) {
+      youtubeUrls.push(cleanUrl);
+    } else {
+      articleUrls.push(cleanUrl);
+    }
+  }
+
+  return { youtubeUrls, articleUrls };
 }
 
 export function ChatPanel({
@@ -32,9 +55,11 @@ export function ChatPanel({
   isLoading = false,
   defaultPosition,
   defaultCollapsed = false,
+  onOpenYouTube,
+  onOpenBrowser,
 }: ChatPanelProps) {
   const [inputValue, setInputValue] = useState('');
-  const scrollRef = useRef<HTMLDivElement>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Position next to the question panel (which is at x: 20, width ~320-450)
@@ -45,10 +70,8 @@ export function ChatPanel({
 
   // Auto-scroll to bottom on new messages
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-    }
-  }, [messages]);
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages, isLoading]);
 
   const handleSend = () => {
     if (inputValue.trim() && !isLoading) {
@@ -85,9 +108,9 @@ export function ChatPanel({
         resizable={true}
         zIndex={115}
       >
-        <div className="flex flex-col h-full">
+        <div className="flex flex-col h-full min-h-0 overflow-hidden">
           {/* Messages Area */}
-          <ScrollArea className="flex-1 pr-4" ref={scrollRef}>
+          <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden pr-2">
             <div className="space-y-3">
               {messages.length === 0 ? (
                 <div className="text-center py-8 text-gray-400">
@@ -95,50 +118,89 @@ export function ChatPanel({
                   <p className="text-sm">Start a conversation with XAM</p>
                 </div>
               ) : (
-                messages.map((message, index) => (
-                  <div
-                    key={index}
-                    className={cn(
-                      "flex gap-2",
-                      message.role === 'user' ? "flex-row-reverse" : "flex-row"
-                    )}
-                  >
-                    <Avatar className="h-7 w-7 shrink-0">
-                      <AvatarFallback
-                        className={cn(
-                          "text-xs",
-                          message.role === 'user'
-                            ? "bg-primary text-primary-foreground"
-                            : "bg-purple-100 dark:bg-purple-900 text-purple-700 dark:text-purple-300"
-                        )}
-                      >
-                        {message.role === 'user' ? (
-                          <User className="h-3.5 w-3.5" />
-                        ) : (
-                          <Bot className="h-3.5 w-3.5" />
-                        )}
-                      </AvatarFallback>
-                    </Avatar>
+                messages.map((message, index) => {
+                  // Extract URLs from assistant messages
+                  const { youtubeUrls, articleUrls } = message.role === 'assistant'
+                    ? extractUrls(message.content)
+                    : { youtubeUrls: [], articleUrls: [] };
 
+                  return (
                     <div
+                      key={index}
                       className={cn(
-                        "max-w-[80%] rounded-xl px-3 py-2 text-sm",
-                        message.role === 'user'
-                          ? "bg-primary text-primary-foreground"
-                          : "bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200"
+                        "flex gap-2",
+                        message.role === 'user' ? "flex-row-reverse" : "flex-row"
                       )}
                     >
-                      {message.imageUrl && (
-                        <img
-                          src={message.imageUrl}
-                          alt="Whiteboard"
-                          className="max-w-full rounded-lg mb-2"
-                        />
-                      )}
-                      <LatexRenderer>{message.content}</LatexRenderer>
+                      <Avatar className="h-7 w-7 shrink-0">
+                        <AvatarFallback
+                          className={cn(
+                            "text-xs",
+                            message.role === 'user'
+                              ? "bg-primary text-primary-foreground"
+                              : "bg-purple-100 dark:bg-purple-900 text-purple-700 dark:text-purple-300"
+                          )}
+                        >
+                          {message.role === 'user' ? (
+                            <User className="h-3.5 w-3.5" />
+                          ) : (
+                            <Bot className="h-3.5 w-3.5" />
+                          )}
+                        </AvatarFallback>
+                      </Avatar>
+
+                      <div className="max-w-[80%] space-y-2">
+                        <div
+                          className={cn(
+                            "rounded-xl px-3 py-2 text-sm",
+                            message.role === 'user'
+                              ? "bg-primary text-primary-foreground"
+                              : "bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200"
+                          )}
+                        >
+                          {message.imageUrl && (
+                            <img
+                              src={message.imageUrl}
+                              alt="Whiteboard"
+                              className="max-w-full rounded-lg mb-2"
+                            />
+                          )}
+                          <LatexRenderer>{message.content}</LatexRenderer>
+                        </div>
+
+                        {/* URL Action Buttons */}
+                        {(youtubeUrls.length > 0 || articleUrls.length > 0) && (
+                          <div className="flex flex-wrap gap-1">
+                            {youtubeUrls.map((ytUrl, i) => (
+                              <Button
+                                key={`yt-${i}`}
+                                variant="outline"
+                                size="sm"
+                                className="h-7 text-xs gap-1 bg-white dark:bg-gray-900"
+                                onClick={() => onOpenYouTube?.(ytUrl)}
+                              >
+                                <Youtube className="h-3 w-3 text-red-500" />
+                                Open in Widget
+                              </Button>
+                            ))}
+                            {articleUrls.map((artUrl, i) => (
+                              <Button
+                                key={`art-${i}`}
+                                variant="outline"
+                                size="sm"
+                                className="h-7 text-xs gap-1 bg-white dark:bg-gray-900"
+                                onClick={() => onOpenBrowser?.(artUrl)}
+                              >
+                                <Globe className="h-3 w-3 text-blue-500" />
+                                Open in Browser
+                              </Button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                ))
+                  );
+                })
               )}
 
               {isLoading && (
@@ -153,8 +215,10 @@ export function ChatPanel({
                   </div>
                 </div>
               )}
+              {/* Auto-scroll anchor */}
+              <div ref={messagesEndRef} />
             </div>
-          </ScrollArea>
+          </div>
 
           {/* Input Area */}
           <div className="flex gap-2 mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">

@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { motion } from 'framer-motion';
-import { X, Send, Trash2, Undo, Redo, ZoomIn, ZoomOut, Maximize2, Tag, Scissors } from 'lucide-react';
+import { X, Send, Trash2, Undo, Redo, ZoomIn, ZoomOut, Maximize2, Tag, Scissors, Grid3X3, FileText, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toolbarVariants } from './animations';
 import { WidgetMenu, WidgetType } from './WidgetMenu';
@@ -19,8 +19,14 @@ interface StudioToolbarProps {
   onResetZoom: () => void;
   onLabelImage: () => void;
   onSnip: () => void;
+  onNextStep: () => void;
+  hasIncompleteObjectives: boolean;
   onAddWidget: (type: WidgetType) => void;
   activeWidgets: WidgetType[];
+  onToggleGrid: () => void;
+  showGrid: boolean;
+  onTogglePages: () => void;
+  showPages: boolean;
   isSubmitting?: boolean;
   isSnipping?: boolean;
   canUndo?: boolean;
@@ -38,8 +44,14 @@ export function StudioToolbar({
   onResetZoom,
   onLabelImage,
   onSnip,
+  onNextStep,
+  hasIncompleteObjectives,
   onAddWidget,
   activeWidgets,
+  onToggleGrid,
+  showGrid,
+  onTogglePages,
+  showPages,
   isSubmitting = false,
   isSnipping = false,
   canUndo = true,
@@ -156,8 +168,49 @@ export function StudioToolbar({
         Snip
       </Button>
 
+      {/* Next Step Tool */}
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={onNextStep}
+        disabled={!hasIncompleteObjectives || isSubmitting}
+        className="text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100"
+        title="Get help with the next step"
+      >
+        <ArrowRight className="h-4 w-4 mr-1" />
+        Next
+      </Button>
+
       {/* Widget Menu */}
       <WidgetMenu onAddWidget={onAddWidget} activeWidgets={activeWidgets} />
+
+      <div className="w-px h-6 bg-gray-200 dark:bg-gray-700 mx-1" />
+
+      {/* Canvas Options */}
+      <Button
+        variant="ghost"
+        size="icon"
+        onClick={onToggleGrid}
+        className={cn(
+          "h-9 w-9",
+          showGrid && "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
+        )}
+        title="Toggle Grid"
+      >
+        <Grid3X3 className="h-4 w-4" />
+      </Button>
+      <Button
+        variant="ghost"
+        size="icon"
+        onClick={onTogglePages}
+        className={cn(
+          "h-9 w-9",
+          showPages && "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
+        )}
+        title="Toggle Page Boundaries"
+      >
+        <FileText className="h-4 w-4" />
+      </Button>
 
       <div className="w-px h-6 bg-gray-200 dark:bg-gray-700 mx-1" />
 

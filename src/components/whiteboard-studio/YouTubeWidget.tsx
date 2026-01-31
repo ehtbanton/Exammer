@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 
 interface YouTubeWidgetProps {
   defaultPosition?: { x: number; y: number };
+  initialUrl?: string;
   onClose: () => void;
 }
 
@@ -25,9 +26,15 @@ function extractYouTubeId(url: string): string | null {
   return null;
 }
 
-export function YouTubeWidget({ defaultPosition = { x: 800, y: 70 }, onClose }: YouTubeWidgetProps) {
-  const [url, setUrl] = useState('');
-  const [videoId, setVideoId] = useState<string | null>(null);
+export function YouTubeWidget({ defaultPosition = { x: 800, y: 70 }, initialUrl, onClose }: YouTubeWidgetProps) {
+  const [url, setUrl] = useState(initialUrl || '');
+  const [videoId, setVideoId] = useState<string | null>(() => {
+    // Auto-extract video ID from initial URL if provided
+    if (initialUrl) {
+      return extractYouTubeId(initialUrl);
+    }
+    return null;
+  });
   const [error, setError] = useState('');
 
   const handleLoadVideo = () => {
@@ -66,6 +73,8 @@ export function YouTubeWidget({ defaultPosition = { x: 800, y: 70 }, onClose }: 
         closable={true}
         onClose={onClose}
         zIndex={110}
+        squareMinimize={true}
+        minimizedIcon={<Youtube className="h-5 w-5 text-red-500" />}
       >
         <div className="flex flex-col h-full space-y-2">
           {/* URL Input */}

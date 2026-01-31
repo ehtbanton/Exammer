@@ -57,16 +57,18 @@ export function SpotifyWidget({ defaultPosition = { x: 800, y: 400 }, onClose }:
         title="Spotify"
         icon={<Music className="h-4 w-4 text-green-500" />}
         defaultPosition={defaultPosition}
-        minWidth={300}
-        maxWidth={400}
-        minHeight={180}
-        maxHeight={400}
+        minWidth={200}
+        maxWidth={800}
+        minHeight={150}
+        maxHeight={600}
         defaultWidth={320}
-        defaultHeight={260}
+        defaultHeight={280}
         resizable={true}
         closable={true}
         onClose={onClose}
         zIndex={108}
+        squareMinimize={true}
+        minimizedIcon={<Music className="h-5 w-5 text-green-500" />}
       >
         <div className="flex flex-col h-full space-y-3">
           {/* URL Input */}
@@ -88,7 +90,7 @@ export function SpotifyWidget({ defaultPosition = { x: 800, y: 400 }, onClose }:
           )}
 
           {/* Spotify Player */}
-          <div className="flex-1 bg-gray-900 rounded-lg overflow-hidden">
+          <div className="flex-1 min-h-0 bg-gray-900 rounded-lg overflow-hidden">
             {embed ? (
               <iframe
                 src={`https://open.spotify.com/embed/${embed.type}/${embed.id}?theme=0`}

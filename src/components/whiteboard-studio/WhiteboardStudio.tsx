@@ -12,6 +12,7 @@ import { SnippingMenu } from './SnippingMenu';
 import { YouTubeWidget } from './YouTubeWidget';
 import { SpotifyWidget } from './SpotifyWidget';
 import { FlashcardPanel } from './FlashcardPanel';
+import { BrowserWidget } from './BrowserWidget';
 import { WidgetType } from './WidgetMenu';
 import { overlayVariants, canvasVariants } from './animations';
 import { useToast } from '@/hooks/use-toast';
@@ -66,7 +67,15 @@ export function WhiteboardStudio({
     position: { x: number; y: number };
   } | null>(null);
   const [activeWidgets, setActiveWidgets] = useState<WidgetType[]>([]);
+  const [showGrid, setShowGrid] = useState(false);
+  const [showPages, setShowPages] = useState(false);
+  const [youtubeInitialUrl, setYoutubeInitialUrl] = useState<string | undefined>();
+  const [browserInitialUrl, setBrowserInitialUrl] = useState<string | undefined>();
   const { toast } = useToast();
+
+  // Page dimensions (A4 at 96 DPI)
+  const PAGE_WIDTH = 794;
+  const PAGE_HEIGHT = 1123;
 
   // Handle editor mount
   const handleMount = useCallback((editor: Editor) => {
@@ -376,7 +385,57 @@ export function WhiteboardStudio({
 
   const handleRemoveWidget = useCallback((type: WidgetType) => {
     setActiveWidgets(prev => prev.filter(w => w !== type));
+    // Clear initial URLs when closing widgets
+    if (type === 'youtube') setYoutubeInitialUrl(undefined);
+    if (type === 'browser') setBrowserInitialUrl(undefined);
   }, []);
+
+  // Open YouTube widget with a specific video URL
+  const handleOpenYouTube = useCallback((url: string) => {
+    setYoutubeInitialUrl(url);
+    if (!activeWidgets.includes('youtube')) {
+      setActiveWidgets(prev => [...prev, 'youtube']);
+    }
+    toast({
+      title: "Opening in YouTube widget",
+      description: "Video loading...",
+    });
+  }, [activeWidgets, toast]);
+
+  // Open Browser widget with a specific URL
+  const handleOpenBrowser = useCallback((url: string) => {
+    setBrowserInitialUrl(url);
+    if (!activeWidgets.includes('browser')) {
+      setActiveWidgets(prev => [...prev, 'browser']);
+    }
+    toast({
+      title: "Opening in Browser widget",
+      description: "Page loading...",
+    });
+  }, [activeWidgets, toast]);
+
+  // Handle grid and pages toggles
+  const handleToggleGrid = useCallback(() => {
+    setShowGrid(prev => !prev);
+  }, []);
+
+  const handleTogglePages = useCallback(() => {
+    setShowPages(prev => !prev);
+  }, []);
+
+  // Handle Next Step - ask XAM for focused guidance on next objective
+  const handleNextStep = useCallback(() => {
+    const incompleteIndex = objectives.findIndex(
+      (_, idx) => !completedObjectives.includes(idx)
+    );
+    if (incompleteIndex !== -1) {
+      onSendMessage('[NEXT_STEP] Help me with the next step of this question.');
+      toast({
+        title: "Asking XAM for guidance",
+        description: "Getting help with the next step...",
+      });
+    }
+  }, [objectives, completedObjectives, onSendMessage, toast]);
 
   // Prevent body scroll and boost tldraw menu z-index
   useEffect(() => {
@@ -436,6 +495,40 @@ export function WhiteboardStudio({
           />
         </motion.div>
 
+        {/* Grid Overlay */}
+        {showGrid && (
+          <div
+            className="absolute inset-0 pointer-events-none z-[5]"
+            style={{
+              backgroundImage: `
+                linear-gradient(to right, rgba(0,0,0,0.06) 1px, transparent 1px),
+                linear-gradient(to bottom, rgba(0,0,0,0.06) 1px, transparent 1px)
+              `,
+              backgroundSize: '25px 25px',
+            }}
+          />
+        )}
+
+        {/* Page Boundary Overlay */}
+        {showPages && (
+          <div
+            className="absolute pointer-events-none z-[6]"
+            style={{
+              top: '50%',
+              left: '50%',
+              transform: 'translate(-50%, -50%)',
+              width: PAGE_WIDTH,
+              height: PAGE_HEIGHT,
+              border: '2px dashed rgba(100, 100, 100, 0.3)',
+              borderRadius: '4px',
+            }}
+          >
+            <div className="absolute -top-6 left-0 text-xs text-gray-400 bg-white/80 dark:bg-gray-900/80 px-2 py-0.5 rounded">
+              A4 Page
+            </div>
+          </div>
+        )}
+
         {/* Question Panel (top-left) */}
         <QuestionPanel
           questionText={questionText}
@@ -449,6 +542,8 @@ export function WhiteboardStudio({
           messages={chatHistory}
           onSendMessage={handleChatMessage}
           isLoading={isLoading}
+          onOpenYouTube={handleOpenYouTube}
+          onOpenBrowser={handleOpenBrowser}
         />
 
         {/* Bottom Toolbar */}
@@ -463,8 +558,14 @@ export function WhiteboardStudio({
           onResetZoom={handleResetZoom}
           onLabelImage={handleLabelImage}
           onSnip={handleSnipStart}
+          onNextStep={handleNextStep}
+          hasIncompleteObjectives={completedObjectives.length < objectives.length}
           onAddWidget={handleAddWidget}
           activeWidgets={activeWidgets}
+          onToggleGrid={handleToggleGrid}
+          showGrid={showGrid}
+          onTogglePages={handleTogglePages}
+          showPages={showPages}
           isSubmitting={isSubmitting}
           isSnipping={isSnipping}
           canUndo={canUndo}
@@ -497,6 +598,7 @@ export function WhiteboardStudio({
             <YouTubeWidget
               key="youtube"
               defaultPosition={{ x: 800, y: 70 }}
+              initialUrl={youtubeInitialUrl}
               onClose={() => handleRemoveWidget('youtube')}
             />
           )}
@@ -505,6 +607,14 @@ export function WhiteboardStudio({
               key="spotify"
               defaultPosition={{ x: 800, y: 400 }}
               onClose={() => handleRemoveWidget('spotify')}
+            />
+          )}
+          {activeWidgets.includes('browser') && (
+            <BrowserWidget
+              key="browser"
+              defaultPosition={{ x: 100, y: 100 }}
+              initialUrl={browserInitialUrl}
+              onClose={() => handleRemoveWidget('browser')}
             />
           )}
           {activeWidgets.includes('flashcards') && (

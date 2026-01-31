@@ -23,6 +23,9 @@ const AIPoweredInterviewInputSchema = z.object({
   question: z.string().describe('The exam question being asked to the student.'),
   solutionObjectives: z.array(z.string()).describe('List of specific marking objectives/criteria that the student must achieve to gain full marks.'),
   previouslyCompletedObjectives: z.array(z.number()).optional().describe('Array of objective indices (0-based) that the user has already completed. These cannot be undone.'),
+  isNextStepRequest: z.boolean().optional().describe('Whether the user requested focused step-by-step guidance.'),
+  nextIncompleteIndex: z.number().optional().describe('Index of the next incomplete objective for focused guidance.'),
+  isFindRequest: z.boolean().optional().describe('Whether the user is asking for learning resources like YouTube videos or articles.'),
 });
 export type AIPoweredInterviewInput = z.infer<typeof AIPoweredInterviewInputSchema>;
 
@@ -92,7 +95,32 @@ Here's the previous chat history:
   The user has also provided a whiteboard drawing (image will be included in the request).
 {{/if}}
 
-{{#if userAnswer}}
+{{#if isFindRequest}}
+  SPECIAL REQUEST: The student is asking for learning resources (YouTube videos, articles, tutorials).
+
+  Your task is to SEARCH FOR AND PROVIDE RELEVANT LEARNING RESOURCES:
+  1. Use Google Search to find relevant YouTube videos and articles about the topic
+  2. Provide 2-3 YouTube video recommendations with FULL URLs (https://youtube.com/watch?v=...)
+  3. Provide 1-2 article recommendations with FULL URLs
+  4. Briefly explain why each resource is helpful for understanding the topic
+  5. Keep your response focused on the resources
+
+  IMPORTANT: Always include the complete URLs so the student can click on them.
+
+{{else if isNextStepRequest}}
+  SPECIAL REQUEST: The student has clicked "Next" to get focused step-by-step guidance.
+
+  Your task is to provide FOCUSED GUIDANCE on just the next incomplete objective:
+  1. Identify the first objective that is NOT in the completed list (index {{nextIncompleteIndex}})
+  2. Break this ONE objective down into small, actionable substeps
+  3. Provide a clear, encouraging hint about how to approach this specific step
+  4. Do NOT reveal the exact wording of the objective
+  5. Do NOT mention other objectives - focus ONLY on this one step
+  6. Keep the message concise and motivating
+
+  Guide the student step-by-step through just this one objective. Be like a helpful tutor sitting next to them.
+
+{{else if userAnswer}}
 
   Your task is to CHECK THE STUDENT'S WORK AGAINST THE MARKSCHEME:
 
@@ -139,6 +167,24 @@ Output:
       previouslyCompletedObjectives = [],
     } = flowInput;
 
+    // Detect if this is a [NEXT_STEP] request for focused guidance
+    const isNextStepRequest = userAnswer?.startsWith('[NEXT_STEP]');
+    // Detect if this is a [FIND_RESOURCES] request for web search
+    const isFindRequest = userAnswer?.toLowerCase().includes('find') &&
+      (userAnswer?.toLowerCase().includes('video') ||
+       userAnswer?.toLowerCase().includes('resource') ||
+       userAnswer?.toLowerCase().includes('article') ||
+       userAnswer?.toLowerCase().includes('youtube') ||
+       userAnswer?.toLowerCase().includes('tutorial'));
+    const cleanUserAnswer = isNextStepRequest
+      ? userAnswer.replace('[NEXT_STEP]', '').trim()
+      : userAnswer;
+
+    // Find the next incomplete objective index
+    const nextIncompleteIndex = solutionObjectives.findIndex(
+      (_, idx) => !previouslyCompletedObjectives.includes(idx)
+    );
+
     // For Genkit with images, we need to use the generate function directly
     // because definePrompt doesn't handle multimodal input properly
     if (userImage) {
@@ -148,10 +194,35 @@ Output:
         ? previouslyCompletedObjectives.map(idx => `[${idx}]`).join(', ')
         : 'None yet';
 
+      // Build the next step guidance section if needed
+      const nextStepGuidance = isNextStepRequest ? `
+SPECIAL REQUEST: The student has clicked "Next" to get focused step-by-step guidance.
+
+Your task is to provide FOCUSED GUIDANCE on just the next incomplete objective (index ${nextIncompleteIndex}):
+1. Break this ONE objective down into small, actionable substeps
+2. Provide a clear, encouraging hint about how to approach this specific step
+3. Do NOT reveal the exact wording of the objective
+4. Do NOT mention other objectives - focus ONLY on this one step
+5. Keep the message concise and motivating
+
+Guide the student step-by-step through just this one objective. Be like a helpful tutor sitting next to them.
+` : '';
+
+      // Build config with optional grounding for resource searches
+      const generateConfig: Record<string, unknown> = {};
+      if (isFindRequest) {
+        generateConfig.googleSearchRetrieval = true;
+      }
+
       const response = await ai.generate({
         model: 'googleai/gemini-3-flash-preview',
+        config: generateConfig,
         prompt: [
           {text: `You are Xam, a friendly AI teaching assistant acting as an exam marker. You are checking a student's work against the official markscheme for a real exam question, just like a teacher would do when marking exams.
+
+${isFindRequest ? `SPECIAL REQUEST: The student is asking for learning resources. Use Google Search to find relevant YouTube videos or articles. Include the full URLs in your response so the student can access them.
+
+` : ''}
 
 Topic context: ${subsection}
 
@@ -169,9 +240,9 @@ Previously Completed Objectives (IMMUTABLE - cannot be removed):
 Here's the previous chat history:
 ${previousChatHistory.map(msg => `${msg.role}: ${msg.content}${msg.imageUrl ? ' [Image provided]' : ''}`).join('\n')}
 
-The user has provided a whiteboard drawing (see image) ${userAnswer ? `and the following text answer: ${userAnswer}` : ''}.
-
-Your task is to CHECK THE STUDENT'S WORK AGAINST THE MARKSCHEME:
+The user has provided a whiteboard drawing (see image) ${cleanUserAnswer ? `and the following text answer: ${cleanUserAnswer}` : ''}.
+${nextStepGuidance}
+${!isNextStepRequest ? 'Your task is to CHECK THE STUDENT\'S WORK AGAINST THE MARKSCHEME:' : ''}
 
 1. Review each marking objective carefully
 2. Check if the student has demonstrated that specific objective in their answer (text or image)
@@ -238,18 +309,28 @@ Use your knowledge of the subject matter to assess the answer fairly.`},
     }
 
     // Text-only path - use the original prompt
+    // Build config with optional grounding for resource searches
+    const textGenerateConfig: Record<string, unknown> = {};
+    if (isFindRequest) {
+      textGenerateConfig.googleSearchRetrieval = true;
+    }
+
     const {
       output,
     } = await prompt({
       subsection,
-      userAnswer,
+      userAnswer: cleanUserAnswer,
       userImage,
       previousChatHistory,
       question,
       solutionObjectives,
       previouslyCompletedObjectives,
+      isNextStepRequest,
+      nextIncompleteIndex,
+      isFindRequest,
     }, {
       model: 'googleai/gemini-3-flash-preview',
+      config: textGenerateConfig,
     });
 
     if (!output) {

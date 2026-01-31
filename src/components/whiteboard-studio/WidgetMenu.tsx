@@ -16,6 +16,7 @@ interface WidgetMenuProps {
 const widgets = [
   { type: 'youtube' as WidgetType, icon: Youtube, label: 'YouTube', color: 'text-red-500' },
   { type: 'spotify' as WidgetType, icon: Music, label: 'Spotify', color: 'text-green-500' },
+  { type: 'browser' as WidgetType, icon: Globe, label: 'Browser', color: 'text-blue-500' },
   { type: 'flashcards' as WidgetType, icon: Layers, label: 'Flashcards', color: 'text-purple-500' },
 ];
 

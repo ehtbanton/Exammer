@@ -195,16 +195,18 @@ export function FlashcardPanel({ defaultPosition = { x: 800, y: 70 }, onClose }:
         title="Flashcards"
         icon={<Layers className="h-4 w-4 text-purple-500" />}
         defaultPosition={defaultPosition}
-        minWidth={300}
-        maxWidth={500}
-        minHeight={300}
-        maxHeight={500}
+        minWidth={200}
+        maxWidth={800}
+        minHeight={150}
+        maxHeight={700}
         defaultWidth={360}
         defaultHeight={380}
         resizable={true}
         closable={true}
         onClose={onClose}
         zIndex={112}
+        squareMinimize={true}
+        minimizedIcon={<Layers className="h-5 w-5 text-purple-500" />}
       >
         <div className="flex flex-col h-full overflow-hidden">
           {/* Hidden file input for import */}
