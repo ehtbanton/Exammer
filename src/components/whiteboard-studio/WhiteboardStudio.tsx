@@ -515,10 +515,13 @@ export function WhiteboardStudio({
                 disabled={isSubmitting}
                 className={cn(
                   "flex items-center gap-2 px-6 py-2.5",
-                  "bg-blue-600 hover:bg-blue-700 text-white",
-                  "rounded-xl shadow-md font-medium text-sm",
-                  "transition-colors",
-                  isSubmitting && "opacity-70 cursor-not-allowed"
+                  "bg-[#1a1a1a] hover:bg-[#333] text-white",
+                  "rounded-xl font-medium text-[13px]",
+                  "shadow-[0_2px_8px_rgba(0,0,0,0.15),0_1px_3px_rgba(0,0,0,0.08)]",
+                  "hover:shadow-[0_4px_14px_rgba(0,0,0,0.2),0_2px_4px_rgba(0,0,0,0.08)]",
+                  "hover:-translate-y-px",
+                  "transition-all duration-200",
+                  isSubmitting && "opacity-60 cursor-not-allowed hover:translate-y-0"
                 )}
               >
                 <Send className="h-4 w-4" />

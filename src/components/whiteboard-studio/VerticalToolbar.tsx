@@ -37,12 +37,12 @@ const DRAWING_TOOLS: { id: DrawingTool; icon: React.ElementType; label: string }
 ];
 
 const COLORS = [
-  { value: 'black', bg: 'bg-gray-900', ring: 'ring-gray-900' },
-  { value: 'blue', bg: 'bg-blue-600', ring: 'ring-blue-600' },
-  { value: 'red', bg: 'bg-red-500', ring: 'ring-red-500' },
-  { value: 'green', bg: 'bg-green-600', ring: 'ring-green-600' },
-  { value: 'orange', bg: 'bg-orange-500', ring: 'ring-orange-500' },
-  { value: 'grey', bg: 'bg-gray-400', ring: 'ring-gray-400' },
+  { value: 'black', bg: 'bg-[#1a1a1a]', shadow: 'shadow-[0_0_0_2px_#f5f5f5,0_0_0_3.5px_#1a1a1a]' },
+  { value: 'blue', bg: 'bg-[#3478f6]', shadow: 'shadow-[0_0_0_2px_#f5f5f5,0_0_0_3.5px_#3478f6]' },
+  { value: 'red', bg: 'bg-[#ff3b30]', shadow: 'shadow-[0_0_0_2px_#f5f5f5,0_0_0_3.5px_#ff3b30]' },
+  { value: 'green', bg: 'bg-[#34c759]', shadow: 'shadow-[0_0_0_2px_#f5f5f5,0_0_0_3.5px_#34c759]' },
+  { value: 'orange', bg: 'bg-[#ff9500]', shadow: 'shadow-[0_0_0_2px_#f5f5f5,0_0_0_3.5px_#ff9500]' },
+  { value: 'grey', bg: 'bg-[#8e8e93]', shadow: 'shadow-[0_0_0_2px_#f5f5f5,0_0_0_3.5px_#8e8e93]' },
 ];
 
 function ToolButton({
@@ -63,10 +63,10 @@ function ToolButton({
       onClick={onClick}
       title={title}
       className={cn(
-        "w-9 h-9 rounded-lg flex items-center justify-center transition-colors",
-        active && variant === 'default' && "bg-gray-100 text-blue-600",
-        !active && variant === 'default' && "text-gray-600 hover:bg-gray-100",
-        variant === 'danger' && "text-gray-500 hover:bg-red-50 hover:text-red-600",
+        "w-9 h-9 rounded-xl flex items-center justify-center transition-all duration-200",
+        active && variant === 'default' && "bg-white/90 text-[#1a1a1a] shadow-[0_0.5px_1px_rgba(0,0,0,0.1),0_1px_3px_rgba(0,0,0,0.06)]",
+        !active && variant === 'default' && "text-[#8e8e93] hover:text-[#555] hover:bg-white/60",
+        variant === 'danger' && "text-[#8e8e93] hover:bg-[#fff5f5] hover:text-[#ff3b30]",
       )}
     >
       {children}
@@ -97,7 +97,7 @@ export function VerticalToolbar({
       initial="hidden"
       animate="visible"
       exit="exit"
-      className="w-[52px] h-full bg-white border-l border-gray-200 flex flex-col items-center py-3 gap-1.5 shrink-0"
+      className="w-[56px] h-full bg-[#f5f5f5]/80 backdrop-blur-xl flex flex-col items-center py-4 gap-1 shrink-0"
     >
       {/* Drawing Tools */}
       {DRAWING_TOOLS.map(({ id, icon: Icon, label }) => (
@@ -107,7 +107,7 @@ export function VerticalToolbar({
           onClick={() => onToolChange(id)}
           title={label}
         >
-          <Icon className="h-4 w-4" />
+          <Icon className="h-[18px] w-[18px]" />
         </ToolButton>
       ))}
 
@@ -117,30 +117,34 @@ export function VerticalToolbar({
         onClick={onSnip}
         title="Snip selection"
       >
-        <Scissors className="h-4 w-4" />
+        <Scissors className="h-[18px] w-[18px]" />
       </ToolButton>
 
       {/* Divider */}
-      <div className="w-6 h-px bg-gray-200 my-1" />
+      <div className="w-7 my-2">
+        <div className="h-px bg-gradient-to-r from-transparent via-[#e0e0e0] to-transparent" />
+      </div>
 
       {/* Color Palette */}
-      <div className="flex flex-col items-center gap-1.5">
-        {COLORS.map(({ value, bg, ring }) => (
+      <div className="flex flex-col items-center gap-2">
+        {COLORS.map(({ value, bg, shadow }) => (
           <button
             key={value}
             onClick={() => onColorChange(value)}
             title={value}
             className={cn(
-              "w-5 h-5 rounded-full transition-all",
+              "w-[18px] h-[18px] rounded-full transition-all duration-200",
               bg,
-              activeColor === value && `ring-2 ${ring} ring-offset-2`,
+              activeColor === value ? shadow : "hover:scale-110",
             )}
           />
         ))}
       </div>
 
       {/* Divider */}
-      <div className="w-6 h-px bg-gray-200 my-1" />
+      <div className="w-7 my-2">
+        <div className="h-px bg-gradient-to-r from-transparent via-[#e0e0e0] to-transparent" />
+      </div>
 
       {/* Canvas Controls */}
       <ToolButton
@@ -148,21 +152,21 @@ export function VerticalToolbar({
         onClick={onToggleGrid}
         title="Toggle grid"
       >
-        <Grid3X3 className="h-4 w-4" />
+        <Grid3X3 className="h-[18px] w-[18px]" />
       </ToolButton>
       <ToolButton
         active={showPages}
         onClick={onTogglePages}
         title="Toggle page boundaries"
       >
-        <FileText className="h-4 w-4" />
+        <FileText className="h-[18px] w-[18px]" />
       </ToolButton>
       <ToolButton
         onClick={onClear}
         title="Clear canvas"
         variant="danger"
       >
-        <Trash2 className="h-4 w-4" />
+        <Trash2 className="h-[18px] w-[18px]" />
       </ToolButton>
 
       {/* Spacer */}
@@ -174,14 +178,14 @@ export function VerticalToolbar({
         title="Undo"
         active={false}
       >
-        <Undo className={cn("h-4 w-4", !canUndo && "opacity-30")} />
+        <Undo className={cn("h-[18px] w-[18px]", !canUndo && "opacity-25")} />
       </ToolButton>
       <ToolButton
         onClick={onRedo}
         title="Redo"
         active={false}
       >
-        <Redo className={cn("h-4 w-4", !canRedo && "opacity-30")} />
+        <Redo className={cn("h-[18px] w-[18px]", !canRedo && "opacity-25")} />
       </ToolButton>
     </motion.div>
   );

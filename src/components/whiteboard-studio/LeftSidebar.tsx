@@ -26,40 +26,32 @@ interface ChatMessage {
 }
 
 interface LeftSidebarProps {
-  // Question
   questionText: string;
   objectives: string[];
   completedObjectives: number[];
-  // Chat
   messages: ChatMessage[];
   onSendMessage: (content: string) => void;
   isLoading: boolean;
   onOpenYouTube?: (url: string) => void;
   onOpenResource?: (url: string) => void;
-  // Action cards
   onNextStep: () => void;
   onFind: () => void;
   onExplain: () => void;
   onCheck: () => void;
   hasIncompleteObjectives: boolean;
-  // Widgets
   onAddWidget: (type: WidgetType) => void;
   activeWidgets: WidgetType[];
-  // Sidebar
   isCollapsed: boolean;
   onToggleCollapse: () => void;
   onExit: () => void;
 }
 
-// Detect URLs in text
 function extractUrls(text: string): { youtubeVideoUrls: string[]; youtubeSearchUrls: string[]; articleUrls: string[] } {
   const urlRegex = /https?:\/\/[^\s<>\[\]"']+/g;
   const urls = text.match(urlRegex) || [];
-
   const youtubeVideoUrls: string[] = [];
   const youtubeSearchUrls: string[] = [];
   const articleUrls: string[] = [];
-
   for (const url of urls) {
     const cleanUrl = url.replace(/[.,;:!?)]+$/, '');
     if (cleanUrl.includes('youtube.com/results') || cleanUrl.includes('youtube.com/search')) {
@@ -70,7 +62,6 @@ function extractUrls(text: string): { youtubeVideoUrls: string[]; youtubeSearchU
       articleUrls.push(cleanUrl);
     }
   }
-
   return { youtubeVideoUrls, youtubeSearchUrls, articleUrls };
 }
 
@@ -110,7 +101,6 @@ export function LeftSidebar({
   const totalCount = objectives.length;
   const progressPercent = totalCount > 0 ? (completedCount / totalCount) * 100 : 0;
 
-  // Auto-scroll to bottom on new messages
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isLoading]);
@@ -129,42 +119,42 @@ export function LeftSidebar({
     }
   };
 
-  // Collapsed state - thin icon strip
+  // Collapsed state
   if (isCollapsed) {
     return (
       <motion.div
-        initial={{ width: 52 }}
-        animate={{ width: 52 }}
-        className="h-full bg-white border-r border-gray-200 flex flex-col items-center py-4 gap-3 shrink-0"
+        initial={{ width: 56 }}
+        animate={{ width: 56 }}
+        className="h-full bg-[#f5f5f5]/80 backdrop-blur-xl flex flex-col items-center py-4 gap-2 shrink-0"
       >
         <button
           onClick={onToggleCollapse}
-          className="w-9 h-9 rounded-lg flex items-center justify-center hover:bg-gray-100 transition-colors text-gray-600"
+          className="w-10 h-10 rounded-xl flex items-center justify-center hover:bg-white/60 active:scale-95 transition-all duration-200 text-[#8e8e93]"
           title="Expand sidebar"
         >
-          <ChevronRightIcon className="h-4 w-4" />
+          <ChevronRightIcon className="h-[18px] w-[18px]" />
         </button>
         <button
           onClick={onToggleCollapse}
-          className="w-9 h-9 rounded-lg flex items-center justify-center hover:bg-gray-100 transition-colors text-gray-600"
+          className="w-10 h-10 rounded-xl flex items-center justify-center hover:bg-white/60 active:scale-95 transition-all duration-200 text-[#8e8e93]"
           title="Chat"
         >
-          <MessageSquare className="h-4 w-4" />
+          <MessageSquare className="h-[18px] w-[18px]" />
         </button>
         <button
           onClick={onToggleCollapse}
-          className="w-9 h-9 rounded-lg flex items-center justify-center hover:bg-gray-100 transition-colors text-gray-600"
+          className="w-10 h-10 rounded-xl flex items-center justify-center hover:bg-white/60 active:scale-95 transition-all duration-200 text-[#8e8e93]"
           title="Question"
         >
-          <BookOpen className="h-4 w-4" />
+          <BookOpen className="h-[18px] w-[18px]" />
         </button>
         <div className="flex-1" />
         <button
           onClick={onExit}
-          className="w-9 h-9 rounded-lg flex items-center justify-center hover:bg-red-50 transition-colors text-gray-500 hover:text-red-600"
+          className="w-10 h-10 rounded-xl flex items-center justify-center hover:bg-[#fff0f0] active:scale-95 transition-all duration-200 text-[#8e8e93] hover:text-[#ff3b30]"
           title="Exit"
         >
-          <X className="h-4 w-4" />
+          <X className="h-[18px] w-[18px]" />
         </button>
       </motion.div>
     );
@@ -176,20 +166,20 @@ export function LeftSidebar({
       initial="hidden"
       animate="visible"
       exit="exit"
-      className="w-[360px] h-full bg-white border-r border-gray-200 flex flex-col shrink-0"
+      className="w-[360px] h-full bg-[#f5f5f5]/80 backdrop-blur-xl flex flex-col shrink-0"
     >
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 shrink-0">
+      <div className="flex items-center justify-between px-5 py-4 shrink-0">
         <button
           onClick={onExit}
-          className="flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900 transition-colors"
+          className="flex items-center gap-2 text-[13px] text-[#8e8e93] hover:text-[#1a1a1a] active:scale-95 transition-all duration-200"
         >
           <X className="h-4 w-4" />
           <span>Exit</span>
         </button>
         <button
           onClick={onToggleCollapse}
-          className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors text-gray-500"
+          className="w-8 h-8 rounded-xl flex items-center justify-center hover:bg-white/60 active:scale-95 transition-all duration-200 text-[#8e8e93]"
           title="Collapse sidebar"
         >
           <ChevronLeft className="h-4 w-4" />
@@ -198,47 +188,49 @@ export function LeftSidebar({
 
       {/* AI Greeting (when no messages) */}
       {messages.length === 0 && (
-        <div className="px-4 py-4 border-b border-gray-100">
-          <div className="flex items-center gap-3 mb-1">
-            <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
-              <Bot className="h-4 w-4 text-blue-600" />
+        <div className="px-5 pb-2">
+          <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-4 shadow-[0_0.5px_1px_rgba(0,0,0,0.08),0_1px_3px_rgba(0,0,0,0.06)]">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="w-8 h-8 rounded-full bg-[#e8e8ed] flex items-center justify-center">
+                <Bot className="h-4 w-4 text-[#555]" />
+              </div>
+              <span className="font-headline font-semibold text-[13px] text-[#1a1a1a]">XAM</span>
             </div>
-            <span className="font-headline font-semibold text-sm text-gray-900">XAM</span>
+            <p className="text-[13px] text-[#555] leading-relaxed">
+              Hi there, how can I assist you today?
+            </p>
           </div>
-          <p className="text-sm text-gray-600 mt-2">
-            Hi there, how can I assist you today?
-          </p>
         </div>
       )}
 
       {/* Action Cards - 2x2 grid */}
-      <div className="px-4 py-3 border-b border-gray-100 shrink-0">
-        <div className="grid grid-cols-2 gap-2">
+      <div className="px-5 py-3 shrink-0">
+        <div className="grid grid-cols-2 gap-2.5">
           <ActionCard
-            icon={<ArrowRight className="h-4 w-4 text-blue-600" />}
-            iconBgColor="bg-blue-100"
+            icon={<ArrowRight className="h-4 w-4 text-[#3478f6]" />}
+            iconBgColor="bg-[#e8f0fe]"
             title="Next"
             description="Play the next steps from here"
             onClick={onNextStep}
             disabled={!hasIncompleteObjectives}
           />
           <ActionCard
-            icon={<Search className="h-4 w-4 text-red-600" />}
-            iconBgColor="bg-red-100"
+            icon={<Search className="h-4 w-4 text-[#ff3b30]" />}
+            iconBgColor="bg-[#ffeeed]"
             title="Find"
             description="Locate references or similar ideas"
             onClick={onFind}
           />
           <ActionCard
-            icon={<BookOpen className="h-4 w-4 text-orange-600" />}
-            iconBgColor="bg-orange-100"
+            icon={<BookOpen className="h-4 w-4 text-[#ff9500]" />}
+            iconBgColor="bg-[#fff4e6]"
             title="Explain"
             description="Break the selection down for me"
             onClick={onExplain}
           />
           <ActionCard
-            icon={<CheckCircle className="h-4 w-4 text-green-600" />}
-            iconBgColor="bg-green-100"
+            icon={<CheckCircle className="h-4 w-4 text-[#34c759]" />}
+            iconBgColor="bg-[#e8f8ed]"
             title="Check"
             description="Verify the work for me"
             onClick={onCheck}
@@ -247,24 +239,23 @@ export function LeftSidebar({
       </div>
 
       {/* Question & Progress (collapsible) */}
-      <div className="border-b border-gray-100 shrink-0">
+      <div className="mx-5 rounded-2xl bg-white/80 backdrop-blur-sm shadow-[0_0.5px_1px_rgba(0,0,0,0.08),0_1px_3px_rgba(0,0,0,0.06)] mb-3 shrink-0 overflow-hidden">
         <button
           onClick={() => setQuestionExpanded(!questionExpanded)}
-          className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-gray-50 transition-colors"
+          className="w-full flex items-center justify-between px-4 py-3 hover:bg-white/60 transition-all duration-200"
         >
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+          <div className="flex items-center gap-2.5">
+            <span className="text-[11px] font-semibold text-[#8e8e93] uppercase tracking-wider">
               Progress
             </span>
-            <span className="text-xs font-medium text-gray-700">
+            <span className="text-[11px] font-medium text-[#1a1a1a] bg-[#e8e8ed] px-2 py-0.5 rounded-full">
               {completedCount}/{totalCount}
             </span>
           </div>
-          {questionExpanded ? (
-            <ChevronUp className="h-3.5 w-3.5 text-gray-400" />
-          ) : (
-            <ChevronDown className="h-3.5 w-3.5 text-gray-400" />
-          )}
+          <ChevronDown className={cn(
+            "h-3.5 w-3.5 text-[#8e8e93] transition-transform duration-200",
+            questionExpanded && "rotate-180"
+          )} />
         </button>
 
         <AnimatePresence initial={false}>
@@ -276,15 +267,11 @@ export function LeftSidebar({
               exit="collapsed"
               className="overflow-hidden"
             >
-              <div className="px-4 pb-3 space-y-3">
+              <div className="px-4 pb-4 space-y-3">
                 <Progress value={progressPercent} className="h-1.5" />
-
-                {/* Question Text */}
-                <div className="text-sm text-gray-700 leading-relaxed">
+                <div className="text-[13px] text-[#333] leading-relaxed">
                   <LatexRenderer>{questionText}</LatexRenderer>
                 </div>
-
-                {/* Objectives */}
                 {objectives.length > 0 && (
                   <ul className="space-y-1.5">
                     {objectives.map((objective, index) => {
@@ -293,16 +280,16 @@ export function LeftSidebar({
                         <li
                           key={index}
                           className={cn(
-                            "flex items-start gap-2 text-xs p-2 rounded-lg transition-colors",
+                            "flex items-start gap-2 text-[12px] p-2.5 rounded-xl transition-all duration-200",
                             isCompleted
-                              ? "bg-green-50 text-green-700"
-                              : "bg-gray-50 text-gray-600"
+                              ? "bg-[#e8f8ed] text-[#1b7a3d]"
+                              : "bg-[#f5f5f5] text-[#555]"
                           )}
                         >
                           {isCompleted ? (
-                            <Check className="h-3.5 w-3.5 mt-0.5 shrink-0 text-green-500" />
+                            <Check className="h-3.5 w-3.5 mt-0.5 shrink-0 text-[#34c759]" />
                           ) : (
-                            <Circle className="h-3.5 w-3.5 mt-0.5 shrink-0 text-gray-400" />
+                            <Circle className="h-3.5 w-3.5 mt-0.5 shrink-0 text-[#c7c7cc]" />
                           )}
                           <span className="line-clamp-2">{objective}</span>
                         </li>
@@ -317,8 +304,8 @@ export function LeftSidebar({
       </div>
 
       {/* Chat Messages (scrollable) */}
-      <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-4 py-3 studio-scrollbar-hide">
-        <div className="space-y-3">
+      <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-5 py-3 studio-scrollbar-hide">
+        <div className="space-y-4">
           {messages.map((message, index) => {
             const { youtubeVideoUrls, youtubeSearchUrls, articleUrls } = message.role === 'assistant'
               ? extractUrls(message.content)
@@ -328,7 +315,7 @@ export function LeftSidebar({
               <div
                 key={index}
                 className={cn(
-                  "flex gap-2",
+                  "flex gap-2.5",
                   message.role === 'user' ? "flex-row-reverse" : "flex-row"
                 )}
               >
@@ -337,8 +324,8 @@ export function LeftSidebar({
                     className={cn(
                       "text-xs",
                       message.role === 'user'
-                        ? "bg-gray-900 text-white"
-                        : "bg-blue-100 text-blue-700"
+                        ? "bg-[#1a1a1a] text-white"
+                        : "bg-[#e8e8ed] text-[#555]"
                     )}
                   >
                     {message.role === 'user' ? (
@@ -352,17 +339,17 @@ export function LeftSidebar({
                 <div className="max-w-[85%] space-y-2">
                   <div
                     className={cn(
-                      "rounded-xl px-3 py-2 text-sm",
+                      "rounded-2xl px-3.5 py-2.5 text-[13px] leading-relaxed",
                       message.role === 'user'
-                        ? "bg-gray-900 text-white"
-                        : "bg-gray-100 text-gray-800"
+                        ? "bg-[#1a1a1a] text-white"
+                        : "bg-white/80 backdrop-blur-sm text-[#333] shadow-[0_0.5px_1px_rgba(0,0,0,0.08),0_1px_3px_rgba(0,0,0,0.06)]"
                     )}
                   >
                     {message.imageUrl && (
                       <img
                         src={message.imageUrl}
                         alt="Whiteboard"
-                        className="max-w-full rounded-lg mb-2"
+                        className="max-w-full rounded-xl mb-2"
                       />
                     )}
                     <LatexRenderer>{message.role === 'assistant' ? stripUrls(message.content) : message.content}</LatexRenderer>
@@ -370,42 +357,36 @@ export function LeftSidebar({
 
                   {/* URL Action Buttons */}
                   {(youtubeVideoUrls.length > 0 || youtubeSearchUrls.length > 0 || articleUrls.length > 0) && (
-                    <div className="flex flex-wrap gap-1">
+                    <div className="flex flex-wrap gap-1.5">
                       {youtubeVideoUrls.map((ytUrl, i) => (
-                        <Button
+                        <button
                           key={`yt-${i}`}
-                          variant="outline"
-                          size="sm"
-                          className="h-7 text-xs gap-1 bg-white"
+                          className="h-7 px-2.5 text-[11px] gap-1.5 bg-white/80 backdrop-blur-sm shadow-[0_0.5px_1px_rgba(0,0,0,0.08)] rounded-lg flex items-center text-[#555] hover:bg-white hover:shadow-[0_1px_4px_rgba(0,0,0,0.1)] active:scale-95 transition-all duration-200"
                           onClick={() => onOpenYouTube?.(ytUrl)}
                         >
-                          <Youtube className="h-3 w-3 text-red-500" />
+                          <Youtube className="h-3 w-3 text-[#ff3b30]" />
                           Video {youtubeVideoUrls.length > 1 ? i + 1 : ''}
-                        </Button>
+                        </button>
                       ))}
                       {youtubeSearchUrls.map((searchUrl, i) => (
-                        <Button
+                        <button
                           key={`yts-${i}`}
-                          variant="outline"
-                          size="sm"
-                          className="h-7 text-xs gap-1 bg-white"
+                          className="h-7 px-2.5 text-[11px] gap-1.5 bg-white/80 backdrop-blur-sm shadow-[0_0.5px_1px_rgba(0,0,0,0.08)] rounded-lg flex items-center text-[#555] hover:bg-white hover:shadow-[0_1px_4px_rgba(0,0,0,0.1)] active:scale-95 transition-all duration-200"
                           onClick={() => window.open(searchUrl, '_blank')}
                         >
-                          <Youtube className="h-3 w-3 text-red-500" />
+                          <Youtube className="h-3 w-3 text-[#ff3b30]" />
                           Search {youtubeSearchUrls.length > 1 ? i + 1 : ''}
-                        </Button>
+                        </button>
                       ))}
                       {articleUrls.map((artUrl, i) => (
-                        <Button
+                        <button
                           key={`art-${i}`}
-                          variant="outline"
-                          size="sm"
-                          className="h-7 text-xs gap-1 bg-white"
+                          className="h-7 px-2.5 text-[11px] gap-1.5 bg-white/80 backdrop-blur-sm shadow-[0_0.5px_1px_rgba(0,0,0,0.08)] rounded-lg flex items-center text-[#555] hover:bg-white hover:shadow-[0_1px_4px_rgba(0,0,0,0.1)] active:scale-95 transition-all duration-200"
                           onClick={() => onOpenResource?.(artUrl)}
                         >
-                          <Globe className="h-3 w-3 text-blue-500" />
+                          <Globe className="h-3 w-3 text-[#3478f6]" />
                           Link {articleUrls.length > 1 ? i + 1 : ''}
-                        </Button>
+                        </button>
                       ))}
                     </div>
                   )}
@@ -415,14 +396,14 @@ export function LeftSidebar({
           })}
 
           {isLoading && (
-            <div className="flex gap-2">
+            <div className="flex gap-2.5">
               <Avatar className="h-7 w-7 shrink-0">
-                <AvatarFallback className="bg-blue-100 text-blue-700 text-xs">
+                <AvatarFallback className="bg-[#e8e8ed] text-[#555] text-xs">
                   <Bot className="h-3.5 w-3.5" />
                 </AvatarFallback>
               </Avatar>
-              <div className="bg-gray-100 rounded-xl px-3 py-2">
-                <Loader2 className="h-4 w-4 animate-spin text-gray-500" />
+              <div className="bg-white/80 backdrop-blur-sm shadow-[0_0.5px_1px_rgba(0,0,0,0.08),0_1px_3px_rgba(0,0,0,0.06)] rounded-2xl px-3.5 py-2.5">
+                <Loader2 className="h-4 w-4 animate-spin text-[#8e8e93]" />
               </div>
             </div>
           )}
@@ -431,30 +412,37 @@ export function LeftSidebar({
       </div>
 
       {/* Chat Input */}
-      <div className="px-4 py-3 border-t border-gray-100 shrink-0">
-        <div className="flex gap-2">
-          <Input
-            ref={inputRef}
-            value={inputValue}
-            onChange={(e) => setInputValue(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="Ask anything..."
-            className="flex-1 text-sm h-9 bg-gray-50 border-gray-200"
-            disabled={isLoading}
-          />
-          <Button
-            size="sm"
+      <div className="px-5 py-4 shrink-0">
+        <div className="flex gap-2.5">
+          <div className="flex-1">
+            <Input
+              ref={inputRef}
+              value={inputValue}
+              onChange={(e) => setInputValue(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="Ask anything..."
+              className="text-[13px] h-10 bg-white/80 backdrop-blur-sm border-0 shadow-[0_0.5px_1px_rgba(0,0,0,0.08),0_1px_3px_rgba(0,0,0,0.06)] rounded-xl focus-visible:shadow-[0_0_0_3px_rgba(0,0,0,0.08)] focus-visible:ring-0 placeholder:text-[#c7c7cc]"
+              disabled={isLoading}
+            />
+          </div>
+          <button
             onClick={handleSend}
             disabled={!inputValue.trim() || isLoading}
-            className="h-9 w-9 p-0 bg-gray-900 hover:bg-gray-800 text-white"
+            className={cn(
+              "h-10 w-10 rounded-xl flex items-center justify-center transition-all duration-200",
+              "bg-[#1a1a1a] text-white",
+              "shadow-[0_0.5px_1px_rgba(0,0,0,0.12),0_1px_3px_rgba(0,0,0,0.1)]",
+              "hover:shadow-[0_2px_8px_rgba(0,0,0,0.2)] active:scale-95",
+              "disabled:opacity-25 disabled:active:scale-100"
+            )}
           >
             <Send className="h-4 w-4" />
-          </Button>
+          </button>
         </div>
       </div>
 
       {/* Canvas Context / Widgets */}
-      <div className="px-4 py-2.5 border-t border-gray-100 shrink-0">
+      <div className="px-5 py-2.5 shrink-0">
         <WidgetMenu onAddWidget={onAddWidget} activeWidgets={activeWidgets} />
       </div>
     </motion.aside>

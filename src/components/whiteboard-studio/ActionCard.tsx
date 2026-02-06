@@ -25,25 +25,26 @@ export function ActionCard({
       onClick={onClick}
       disabled={disabled}
       className={cn(
-        "flex items-start gap-3 p-3 rounded-xl text-left",
-        "bg-white border border-gray-200",
-        "transition-colors",
+        "flex items-start gap-3 p-3.5 rounded-2xl text-left",
+        "bg-white/80 backdrop-blur-sm",
+        "shadow-[0_0.5px_1px_rgba(0,0,0,0.08),0_1px_3px_rgba(0,0,0,0.06)]",
+        "transition-all duration-200 ease-out",
         disabled
-          ? "opacity-50 cursor-not-allowed"
-          : "hover:bg-gray-50 cursor-pointer"
+          ? "opacity-40 cursor-not-allowed"
+          : "hover:bg-white hover:shadow-[0_2px_8px_rgba(0,0,0,0.08),0_0.5px_2px_rgba(0,0,0,0.06)] hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
       )}
     >
       <div
         className={cn(
-          "w-8 h-8 rounded-lg flex items-center justify-center shrink-0",
+          "w-8 h-8 rounded-xl flex items-center justify-center shrink-0",
           iconBgColor
         )}
       >
         {icon}
       </div>
       <div className="min-w-0">
-        <p className="font-medium text-sm text-gray-900 leading-tight">{title}</p>
-        <p className="text-xs text-gray-500 mt-0.5 leading-snug">{description}</p>
+        <p className="font-medium text-[13px] text-[#1a1a1a] leading-tight">{title}</p>
+        <p className="text-[11px] text-[#8e8e93] mt-0.5 leading-snug">{description}</p>
       </div>
     </button>
   );
