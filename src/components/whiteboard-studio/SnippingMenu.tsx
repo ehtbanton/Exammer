@@ -110,8 +110,8 @@ export function SnippingMenu({ isOpen, imageData, position, onClose, onAskXam }:
         animate={{ opacity: 1, scale: 1 }}
         exit={{ opacity: 0, scale: 0.9 }}
         className={cn(
-          "fixed z-[250] bg-white dark:bg-gray-900 rounded-xl shadow-2xl",
-          "border border-gray-200 dark:border-gray-700",
+          "fixed z-[250] bg-white rounded-xl shadow-md",
+          "border border-gray-200",
           "overflow-hidden"
         )}
         style={{
@@ -190,9 +190,7 @@ export function SnippingMenu({ isOpen, imageData, position, onClose, onAskXam }:
               size="sm"
               className={cn(
                 "flex-1",
-                showAskInput
-                  ? "bg-purple-600 hover:bg-purple-700"
-                  : "bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
+                "bg-blue-600 hover:bg-blue-700 text-white"
               )}
               onClick={handleAskXam}
             >

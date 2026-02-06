@@ -154,10 +154,9 @@ export function FloatingPanel({
           className={cn(
             "fixed top-0 left-0 cursor-grab active:cursor-grabbing",
             "rounded-xl overflow-hidden",
-            "bg-white/95 dark:bg-gray-900/95",
-            "backdrop-blur-xl",
-            "border border-white/30 dark:border-gray-700/50",
-            isDragging ? "shadow-2xl scale-110" : "shadow-lg hover:shadow-xl",
+            "bg-white",
+            "border border-gray-200",
+            isDragging ? "shadow-md" : "shadow-sm hover:shadow-md",
             "transition-shadow"
           )}
           style={{
@@ -191,11 +190,10 @@ export function FloatingPanel({
         animate={{ x: position.x, y: position.y }}
         transition={{ type: "spring", stiffness: 400, damping: 30 }}
         className={cn(
-          "fixed top-0 left-0 rounded-2xl flex flex-col",
-          "bg-white/90 dark:bg-gray-900/90",
-          "backdrop-blur-xl",
-          "border border-white/30 dark:border-gray-700/50",
-          isDragging ? "shadow-2xl scale-[1.02]" : "shadow-lg",
+          "fixed top-0 left-0 rounded-xl flex flex-col",
+          "bg-white",
+          "border border-gray-200",
+          isDragging ? "shadow-md" : "shadow-sm",
           "transition-shadow",
           className
         )}
@@ -214,11 +212,11 @@ export function FloatingPanel({
           onPointerDown={(e) => dragControls.start(e)}
           className={cn(
             "drag-handle flex items-center justify-between px-4 py-3 shrink-0",
-            "bg-gradient-to-r from-gray-50/80 to-gray-100/80 dark:from-gray-800/80 dark:to-gray-850/80",
-            "border-b border-gray-200/50 dark:border-gray-700/50",
+            "bg-white",
+            "border-b border-gray-100",
             "cursor-grab active:cursor-grabbing",
             "select-none touch-none",
-            "rounded-t-2xl"
+            "rounded-t-xl"
           )}
         >
           <div className="flex items-center gap-2">
@@ -269,7 +267,7 @@ export function FloatingPanel({
               initial="collapsed"
               animate="expanded"
               exit="collapsed"
-              className="flex-1 flex flex-col min-h-0 overflow-hidden rounded-b-2xl"
+              className="flex-1 flex flex-col min-h-0 overflow-hidden rounded-b-xl"
             >
               <div className="p-4 flex-1 flex flex-col min-h-0 overflow-hidden">
                 {children}

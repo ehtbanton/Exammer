@@ -2,11 +2,11 @@
 
 import React, { useCallback, useRef, useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { Send } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import type { Editor } from 'tldraw';
-import { QuestionPanel } from './QuestionPanel';
-import { ChatPanel } from './ChatPanel';
-import { StudioToolbar } from './StudioToolbar';
+import { LeftSidebar } from './LeftSidebar';
+import { VerticalToolbar, DrawingTool } from './VerticalToolbar';
 import { SnippingTool } from './SnippingTool';
 import { SnippingMenu } from './SnippingMenu';
 import { YouTubeWidget } from './YouTubeWidget';
@@ -16,6 +16,7 @@ import { ResourceViewer, isEmbeddableSite } from './ResourceViewer';
 import { WidgetType } from './WidgetMenu';
 import { overlayVariants, canvasVariants } from './animations';
 import { useToast } from '@/hooks/use-toast';
+import { cn } from '@/lib/utils';
 
 // Dynamically import tldraw to avoid SSR issues
 const Tldraw = dynamic(
@@ -23,7 +24,7 @@ const Tldraw = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div className="flex items-center justify-center h-full bg-gray-50 dark:bg-gray-950">
+      <div className="flex items-center justify-center h-full bg-gray-50">
         <div className="text-gray-400">Loading canvas...</div>
       </div>
     ),
@@ -71,6 +72,9 @@ export function WhiteboardStudio({
   const [showPages, setShowPages] = useState(false);
   const [youtubeInitialUrl, setYoutubeInitialUrl] = useState<string | undefined>();
   const [resourceUrl, setResourceUrl] = useState<string | null>(null);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [activeTool, setActiveTool] = useState<DrawingTool>('draw');
+  const [activeColor, setActiveColor] = useState('black');
   const { toast } = useToast();
 
   // Page dimensions (A4 at 96 DPI)
@@ -101,7 +105,6 @@ export function WhiteboardStudio({
       img.onload = () => {
         const canvas = document.createElement('canvas');
 
-        // Calculate scaled dimensions if needed (max 1024px)
         let { width, height } = img;
         const maxDim = 1024;
         if (width > maxDim || height > maxDim) {
@@ -119,12 +122,10 @@ export function WhiteboardStudio({
           return;
         }
 
-        // White background
         ctx.fillStyle = '#FFFFFF';
         ctx.fillRect(0, 0, width, height);
         ctx.drawImage(img, 0, 0, width, height);
 
-        // Try progressively lower quality until under target size
         const tryCompress = (quality: number) => {
           canvas.toBlob(
             (compressedBlob) => {
@@ -132,10 +133,8 @@ export function WhiteboardStudio({
                 reject(new Error('Compression failed'));
                 return;
               }
-
               const sizeKB = compressedBlob.size / 1024;
               if (sizeKB <= targetSizeKB || quality <= 0.4) {
-                console.log(`Compressed to ${sizeKB.toFixed(0)}KB at quality ${quality}`);
                 resolve(compressedBlob);
               } else {
                 tryCompress(quality - 0.1);
@@ -161,18 +160,13 @@ export function WhiteboardStudio({
     if (!editor) return null;
 
     try {
-      // Get all shape IDs on the canvas
       const shapeIds = editor.getCurrentPageShapeIds();
+      if (shapeIds.size === 0) return null;
 
-      if (shapeIds.size === 0) {
-        return null; // No shapes to export
-      }
-
-      // Optimized export settings for smaller file size
       const result = await editor.toImage([...shapeIds], {
-        format: 'jpeg',      // Lossy format = much smaller
-        quality: 0.85,       // Good quality/size balance
-        scale: 1,            // 1x scale is sufficient for AI analysis
+        format: 'jpeg',
+        quality: 0.85,
+        scale: 1,
         background: true,
         padding: 10,
       });
@@ -181,20 +175,14 @@ export function WhiteboardStudio({
 
       let finalBlob = result.blob;
       const initialSizeKB = finalBlob.size / 1024;
-      console.log(`Initial export size: ${initialSizeKB.toFixed(0)}KB`);
 
-      // If still too large (>500KB), compress further
       if (initialSizeKB > 500) {
-        console.log(`Image too large, compressing...`);
         finalBlob = await compressImageBlob(finalBlob, 500);
       }
 
-      // Convert blob to base64
       return new Promise((resolve) => {
         const reader = new FileReader();
-        reader.onloadend = () => {
-          resolve(reader.result as string);
-        };
+        reader.onloadend = () => resolve(reader.result as string);
         reader.readAsDataURL(finalBlob);
       });
     } catch (error) {
@@ -222,7 +210,6 @@ export function WhiteboardStudio({
         title: "Answer submitted",
         description: "XAM is analyzing your work...",
       });
-      // Clear canvas after successful submit
       editorRef.current?.selectAll();
       editorRef.current?.deleteShapes(editorRef.current.getSelectedShapeIds());
     } catch (error) {
@@ -246,42 +233,35 @@ export function WhiteboardStudio({
   }, []);
 
   // Handle undo/redo
-  const handleUndo = useCallback(() => {
-    editorRef.current?.undo();
-  }, []);
+  const handleUndo = useCallback(() => { editorRef.current?.undo(); }, []);
+  const handleRedo = useCallback(() => { editorRef.current?.redo(); }, []);
 
-  const handleRedo = useCallback(() => {
-    editorRef.current?.redo();
-  }, []);
-
-  // Handle zoom
-  const handleZoomIn = useCallback(() => {
-    editorRef.current?.zoomIn();
-  }, []);
-
-  const handleZoomOut = useCallback(() => {
-    editorRef.current?.zoomOut();
-  }, []);
-
-  const handleResetZoom = useCallback(() => {
-    editorRef.current?.resetZoom();
-  }, []);
-
-  // Handle label image - switches to text tool so user can add a label
-  const handleLabelImage = useCallback(() => {
+  // Handle tool change from vertical toolbar
+  const handleToolChange = useCallback((tool: DrawingTool) => {
     const editor = editorRef.current;
     if (!editor) return;
 
-    // Switch to text tool so user can click to add text
-    editor.setCurrentTool('text');
+    setActiveTool(tool);
+    editor.setCurrentTool(tool);
+  }, []);
 
-    toast({
-      title: "Text tool selected",
-      description: "Click anywhere to add a label, then select both and group with Ctrl+G",
-    });
-  }, [toast]);
+  // Handle color change from vertical toolbar
+  const handleColorChange = useCallback((color: string) => {
+    const editor = editorRef.current;
+    if (!editor) return;
 
-  // Handle chat message from panel
+    setActiveColor(color);
+    // tldraw uses DefaultColorStyle for setting drawing color
+    try {
+      const { DefaultColorStyle } = require('tldraw');
+      editor.setStyleForNextShapes(DefaultColorStyle, color);
+    } catch {
+      // Fallback if import fails
+      console.warn('Could not set color style');
+    }
+  }, []);
+
+  // Handle chat message from sidebar
   const handleChatMessage = useCallback((content: string) => {
     onSendMessage(content);
   }, [onSendMessage]);
@@ -301,13 +281,11 @@ export function WhiteboardStudio({
     if (!editor) return;
 
     try {
-      // Get all shapes that intersect with the selection bounds
       const allShapes = editor.getCurrentPageShapes();
       const selectedShapeIds = allShapes
         .filter(shape => {
           const shapeBounds = editor.getShapePageBounds(shape.id);
           if (!shapeBounds) return false;
-          // Check if shape intersects with selection
           return (
             shapeBounds.x < bounds.x + bounds.width &&
             shapeBounds.x + shapeBounds.width > bounds.x &&
@@ -326,7 +304,6 @@ export function WhiteboardStudio({
         return;
       }
 
-      // Export the selected area
       const result = await editor.toImage(selectedShapeIds, {
         format: 'png',
         quality: 1,
@@ -336,15 +313,10 @@ export function WhiteboardStudio({
       });
 
       if (!result?.blob) {
-        toast({
-          title: "Failed to capture",
-          description: "Could not capture selection",
-          variant: "destructive",
-        });
+        toast({ title: "Failed to capture", variant: "destructive" });
         return;
       }
 
-      // Convert to base64
       const reader = new FileReader();
       reader.onloadend = () => {
         setSnipResult({
@@ -355,24 +327,15 @@ export function WhiteboardStudio({
       reader.readAsDataURL(result.blob);
     } catch (error) {
       console.error('Snip error:', error);
-      toast({
-        title: "Snip failed",
-        description: "Could not capture selection",
-        variant: "destructive",
-      });
+      toast({ title: "Snip failed", variant: "destructive" });
     }
   }, [toast]);
 
-  const handleSnipMenuClose = useCallback(() => {
-    setSnipResult(null);
-  }, []);
+  const handleSnipMenuClose = useCallback(() => { setSnipResult(null); }, []);
 
   const handleAskXamWithSnip = useCallback(async (message: string, imageData: string) => {
     setSnipResult(null);
-    toast({
-      title: "Sending to XAM",
-      description: "XAM is analyzing your selection...",
-    });
+    toast({ title: "Sending to XAM", description: "XAM is analyzing your selection..." });
     await onSendMessage(message, imageData);
   }, [onSendMessage, toast]);
 
@@ -385,231 +348,231 @@ export function WhiteboardStudio({
 
   const handleRemoveWidget = useCallback((type: WidgetType) => {
     setActiveWidgets(prev => prev.filter(w => w !== type));
-    // Clear initial URLs when closing widgets
     if (type === 'youtube') setYoutubeInitialUrl(undefined);
   }, []);
 
-  // Open YouTube widget with a specific video URL
   const handleOpenYouTube = useCallback((url: string) => {
     setYoutubeInitialUrl(url);
     if (!activeWidgets.includes('youtube')) {
       setActiveWidgets(prev => [...prev, 'youtube']);
     }
-    toast({
-      title: "Opening in YouTube widget",
-      description: "Video loading...",
-    });
+    toast({ title: "Opening in YouTube widget" });
   }, [activeWidgets, toast]);
 
-  // Open Resource Viewer with a specific URL (for embeddable sites like Wikipedia)
   const handleOpenResource = useCallback((url: string) => {
-    console.log('handleOpenResource called with:', url);
-    console.log('isEmbeddableSite result:', isEmbeddableSite(url));
-
     if (isEmbeddableSite(url)) {
       setResourceUrl(url);
-      toast({
-        title: "Opening resource",
-        description: "Loading content...",
-      });
+      toast({ title: "Opening resource" });
     } else {
-      // For non-embeddable sites, open in new tab
       window.open(url, '_blank');
-      toast({
-        title: "Opening in new tab",
-        description: "This site cannot be embedded.",
-      });
+      toast({ title: "Opening in new tab" });
     }
   }, [toast]);
 
-  const handleCloseResource = useCallback(() => {
-    setResourceUrl(null);
-  }, []);
+  const handleCloseResource = useCallback(() => { setResourceUrl(null); }, []);
 
-  // Handle grid and pages toggles
-  const handleToggleGrid = useCallback(() => {
-    setShowGrid(prev => !prev);
-  }, []);
+  const handleToggleGrid = useCallback(() => { setShowGrid(prev => !prev); }, []);
+  const handleTogglePages = useCallback(() => { setShowPages(prev => !prev); }, []);
 
-  const handleTogglePages = useCallback(() => {
-    setShowPages(prev => !prev);
-  }, []);
-
-  // Handle Next Step - ask XAM for focused guidance on next objective
+  // Handle Next Step
   const handleNextStep = useCallback(() => {
     const incompleteIndex = objectives.findIndex(
       (_, idx) => !completedObjectives.includes(idx)
     );
     if (incompleteIndex !== -1) {
       onSendMessage('[NEXT_STEP] Help me with the next step of this question.');
-      toast({
-        title: "Asking XAM for guidance",
-        description: "Getting help with the next step...",
-      });
+      toast({ title: "Asking XAM for guidance" });
     }
   }, [objectives, completedObjectives, onSendMessage, toast]);
 
-  // Prevent body scroll and boost tldraw menu z-index
+  // Handle Find
+  const handleFind = useCallback(() => {
+    onSendMessage('Find me some resources, YouTube videos, and articles related to this topic.');
+    toast({ title: "Finding resources" });
+  }, [onSendMessage, toast]);
+
+  // Handle Explain
+  const handleExplain = useCallback(async () => {
+    const imageData = await exportCanvas();
+    if (imageData) {
+      onSendMessage('Explain what I have written so far and help me understand it better.', imageData);
+      toast({ title: "Explaining your work" });
+    } else {
+      onSendMessage('Can you explain the current topic in more detail?');
+      toast({ title: "Asking for explanation" });
+    }
+  }, [exportCanvas, onSendMessage, toast]);
+
+  // Handle Check
+  const handleCheck = useCallback(async () => {
+    const imageData = await exportCanvas();
+    if (imageData) {
+      onSendMessage('Check my work and verify if my answer is correct.', imageData);
+      toast({ title: "Checking your work" });
+    } else {
+      toast({
+        title: "Nothing to check",
+        description: "Draw something on the canvas first",
+        variant: "destructive",
+      });
+    }
+  }, [exportCanvas, onSendMessage, toast]);
+
+  // Prevent body scroll
   useEffect(() => {
     document.body.style.overflow = 'hidden';
-
-    // Add style to make tldraw menus appear above floating panels
-    const style = document.createElement('style');
-    style.id = 'whiteboard-studio-styles';
-    style.textContent = `
-      /* Boost all tldraw UI elements above floating panels */
-      .tl-container [data-radix-popper-content-wrapper],
-      .tl-container [data-radix-menu-content],
-      [data-radix-popper-content-wrapper],
-      [data-radix-menu-content],
-      .tlui-popover,
-      .tlui-menu,
-      .tlui-dialog,
-      .tlui-dropdown,
-      .tlui-menu__content,
-      .tlui-popover__content {
-        z-index: 9999 !important;
-      }
-    `;
-    document.head.appendChild(style);
-
-    return () => {
-      document.body.style.overflow = '';
-      const existingStyle = document.getElementById('whiteboard-studio-styles');
-      if (existingStyle) existingStyle.remove();
-    };
+    return () => { document.body.style.overflow = ''; };
   }, []);
 
   return (
     <AnimatePresence>
       <motion.div
-        className="fixed inset-0 z-50"
+        className="fixed inset-0 z-50 studio-theme"
         variants={overlayVariants}
         initial="hidden"
         animate="visible"
         exit="exit"
       >
-        {/* Background */}
-        <div className="absolute inset-0 bg-gray-50 dark:bg-gray-950" />
-
-        {/* Canvas Container */}
-        <motion.div
-          className="absolute inset-0"
-          variants={canvasVariants}
-          initial="hidden"
-          animate="visible"
-          exit="exit"
-        >
-          <Tldraw
-            onMount={handleMount}
-            persistenceKey={`whiteboard-${questionId}`}
-            autoFocus
+        <div className="flex h-full">
+          {/* Left Sidebar */}
+          <LeftSidebar
+            questionText={questionText}
+            objectives={objectives}
+            completedObjectives={completedObjectives}
+            messages={chatHistory}
+            onSendMessage={handleChatMessage}
+            isLoading={isLoading}
+            onOpenYouTube={handleOpenYouTube}
+            onOpenResource={handleOpenResource}
+            onNextStep={handleNextStep}
+            onFind={handleFind}
+            onExplain={handleExplain}
+            onCheck={handleCheck}
+            hasIncompleteObjectives={completedObjectives.length < objectives.length}
+            onAddWidget={handleAddWidget}
+            activeWidgets={activeWidgets}
+            isCollapsed={sidebarCollapsed}
+            onToggleCollapse={() => setSidebarCollapsed(prev => !prev)}
+            onExit={onExit}
           />
-        </motion.div>
 
-        {/* Grid Overlay */}
-        {showGrid && (
-          <div
-            className="absolute inset-0 pointer-events-none z-[5]"
-            style={{
-              backgroundImage: `
-                linear-gradient(to right, rgba(0,0,0,0.06) 1px, transparent 1px),
-                linear-gradient(to bottom, rgba(0,0,0,0.06) 1px, transparent 1px)
-              `,
-              backgroundSize: '25px 25px',
-            }}
-          />
-        )}
+          {/* Canvas Area */}
+          <main className="flex-1 relative bg-gray-50">
+            {/* tldraw Canvas */}
+            <motion.div
+              className="absolute inset-0"
+              variants={canvasVariants}
+              initial="hidden"
+              animate="visible"
+              exit="exit"
+            >
+              <Tldraw
+                onMount={handleMount}
+                persistenceKey={`whiteboard-${questionId}`}
+                autoFocus
+                hideUi
+              />
+            </motion.div>
 
-        {/* Page Boundary Overlay */}
-        {showPages && (
-          <div
-            className="absolute pointer-events-none z-[6]"
-            style={{
-              top: '50%',
-              left: '50%',
-              transform: 'translate(-50%, -50%)',
-              width: PAGE_WIDTH,
-              height: PAGE_HEIGHT,
-              border: '2px dashed rgba(100, 100, 100, 0.3)',
-              borderRadius: '4px',
-            }}
-          >
-            <div className="absolute -top-6 left-0 text-xs text-gray-400 bg-white/80 dark:bg-gray-900/80 px-2 py-0.5 rounded">
-              A4 Page
+            {/* Grid Overlay */}
+            {showGrid && (
+              <div
+                className="absolute inset-0 pointer-events-none z-[5]"
+                style={{
+                  backgroundImage: `
+                    linear-gradient(to right, rgba(0,0,0,0.06) 1px, transparent 1px),
+                    linear-gradient(to bottom, rgba(0,0,0,0.06) 1px, transparent 1px)
+                  `,
+                  backgroundSize: '25px 25px',
+                }}
+              />
+            )}
+
+            {/* Page Boundary Overlay */}
+            {showPages && (
+              <div
+                className="absolute pointer-events-none z-[6]"
+                style={{
+                  top: '50%',
+                  left: '50%',
+                  transform: 'translate(-50%, -50%)',
+                  width: PAGE_WIDTH,
+                  height: PAGE_HEIGHT,
+                  border: '2px dashed rgba(100, 100, 100, 0.3)',
+                  borderRadius: '4px',
+                }}
+              >
+                <div className="absolute -top-6 left-0 text-xs text-gray-400 bg-white px-2 py-0.5 rounded">
+                  A4 Page
+                </div>
+              </div>
+            )}
+
+            {/* Submit Answer Button (bottom center of canvas) */}
+            <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-[10]">
+              <button
+                onClick={handleSubmit}
+                disabled={isSubmitting}
+                className={cn(
+                  "flex items-center gap-2 px-6 py-2.5",
+                  "bg-blue-600 hover:bg-blue-700 text-white",
+                  "rounded-xl shadow-md font-medium text-sm",
+                  "transition-colors",
+                  isSubmitting && "opacity-70 cursor-not-allowed"
+                )}
+              >
+                <Send className="h-4 w-4" />
+                {isSubmitting ? 'Sending...' : 'Submit Answer'}
+              </button>
             </div>
-          </div>
-        )}
 
-        {/* Question Panel (top-left) */}
-        <QuestionPanel
-          questionText={questionText}
-          objectives={objectives}
-          completedObjectives={completedObjectives}
-          defaultPosition={{ x: 20, y: 70 }}
-        />
+            {/* Snipping Tool Overlay */}
+            <AnimatePresence>
+              {isSnipping && (
+                <SnippingTool
+                  isActive={isSnipping}
+                  onSelectionComplete={handleSnipComplete}
+                  onCancel={handleSnipCancel}
+                />
+              )}
+            </AnimatePresence>
 
-        {/* Chat Panel (top-right) */}
-        <ChatPanel
-          messages={chatHistory}
-          onSendMessage={handleChatMessage}
-          isLoading={isLoading}
-          onOpenYouTube={handleOpenYouTube}
-          onOpenResource={handleOpenResource}
-        />
-
-        {/* Bottom Toolbar */}
-        <StudioToolbar
-          onExit={onExit}
-          onSubmit={handleSubmit}
-          onClear={handleClear}
-          onUndo={handleUndo}
-          onRedo={handleRedo}
-          onZoomIn={handleZoomIn}
-          onZoomOut={handleZoomOut}
-          onResetZoom={handleResetZoom}
-          onLabelImage={handleLabelImage}
-          onSnip={handleSnipStart}
-          onNextStep={handleNextStep}
-          hasIncompleteObjectives={completedObjectives.length < objectives.length}
-          onAddWidget={handleAddWidget}
-          activeWidgets={activeWidgets}
-          onToggleGrid={handleToggleGrid}
-          showGrid={showGrid}
-          onTogglePages={handleTogglePages}
-          showPages={showPages}
-          isSubmitting={isSubmitting}
-          isSnipping={isSnipping}
-          canUndo={canUndo}
-          canRedo={canRedo}
-        />
-
-        {/* Snipping Tool Overlay */}
-        <AnimatePresence>
-          {isSnipping && (
-            <SnippingTool
-              isActive={isSnipping}
-              onSelectionComplete={handleSnipComplete}
-              onCancel={handleSnipCancel}
+            {/* Snipping Menu */}
+            <SnippingMenu
+              isOpen={!!snipResult}
+              imageData={snipResult?.imageData || null}
+              position={snipResult?.position || { x: 0, y: 0 }}
+              onClose={handleSnipMenuClose}
+              onAskXam={handleAskXamWithSnip}
             />
-          )}
-        </AnimatePresence>
+          </main>
 
-        {/* Snipping Menu */}
-        <SnippingMenu
-          isOpen={!!snipResult}
-          imageData={snipResult?.imageData || null}
-          position={snipResult?.position || { x: 0, y: 0 }}
-          onClose={handleSnipMenuClose}
-          onAskXam={handleAskXamWithSnip}
-        />
+          {/* Right Vertical Toolbar */}
+          <VerticalToolbar
+            activeTool={activeTool}
+            onToolChange={handleToolChange}
+            activeColor={activeColor}
+            onColorChange={handleColorChange}
+            onSnip={handleSnipStart}
+            isSnipping={isSnipping}
+            onToggleGrid={handleToggleGrid}
+            showGrid={showGrid}
+            onTogglePages={handleTogglePages}
+            showPages={showPages}
+            onClear={handleClear}
+            onUndo={handleUndo}
+            onRedo={handleRedo}
+            canUndo={canUndo}
+            canRedo={canRedo}
+          />
+        </div>
 
-        {/* Media Widgets */}
+        {/* Floating Media Widgets */}
         <AnimatePresence>
           {activeWidgets.includes('youtube') && (
             <YouTubeWidget
               key="youtube"
-              defaultPosition={{ x: 800, y: 70 }}
+              defaultPosition={{ x: 500, y: 70 }}
               initialUrl={youtubeInitialUrl}
               onClose={() => handleRemoveWidget('youtube')}
             />
@@ -617,14 +580,14 @@ export function WhiteboardStudio({
           {activeWidgets.includes('spotify') && (
             <SpotifyWidget
               key="spotify"
-              defaultPosition={{ x: 800, y: 400 }}
+              defaultPosition={{ x: 500, y: 400 }}
               onClose={() => handleRemoveWidget('spotify')}
             />
           )}
           {resourceUrl && (
             <ResourceViewer
               key="resource"
-              defaultPosition={{ x: 100, y: 100 }}
+              defaultPosition={{ x: 400, y: 100 }}
               url={resourceUrl}
               onClose={handleCloseResource}
             />
@@ -632,7 +595,7 @@ export function WhiteboardStudio({
           {activeWidgets.includes('flashcards') && (
             <FlashcardPanel
               key="flashcards"
-              defaultPosition={{ x: 420, y: 70 }}
+              defaultPosition={{ x: 500, y: 70 }}
               onClose={() => handleRemoveWidget('flashcards')}
             />
           )}

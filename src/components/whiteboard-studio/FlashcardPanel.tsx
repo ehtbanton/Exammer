@@ -290,10 +290,10 @@ export function FlashcardPanel({ defaultPosition = { x: 800, y: 70 }, onClose }:
                       "flex-1 rounded-xl p-4 cursor-pointer min-h-0",
                       "flex items-center justify-center text-center",
                       "transition-all duration-300 transform-gpu",
-                      "bg-gradient-to-br overflow-auto",
+                      "overflow-auto",
                       isFlipped
-                        ? "from-green-50 to-emerald-100 dark:from-green-900/30 dark:to-emerald-900/30"
-                        : "from-blue-50 to-indigo-100 dark:from-blue-900/30 dark:to-indigo-900/30"
+                        ? "bg-green-50"
+                        : "bg-blue-50"
                     )}
                     onClick={() => setIsFlipped(!isFlipped)}
                   >
