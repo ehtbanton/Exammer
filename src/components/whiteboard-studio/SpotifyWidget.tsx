@@ -90,7 +90,7 @@ export function SpotifyWidget({ defaultPosition = { x: 800, y: 400 }, onClose }:
           )}
 
           {/* Spotify Player */}
-          <div className="flex-1 min-h-0 bg-gray-900 rounded-lg overflow-hidden">
+          <div className="flex-1 min-h-0 bg-gray-50 rounded-lg border border-gray-200 overflow-hidden">
             {embed ? (
               <iframe
                 src={`https://open.spotify.com/embed/${embed.type}/${embed.id}?theme=0`}

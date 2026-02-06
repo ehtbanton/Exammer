@@ -930,7 +930,7 @@ function InterviewPageContent() {
                       <Button
                         onClick={() => setIsWhiteboardStudio(true)}
                         disabled={isLoading || isCompleted}
-                        className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white"
+                        className="w-full bg-gray-900 hover:bg-gray-800 text-white"
                       >
                         <Maximize2 className="h-4 w-4 mr-2" />
                         Open Whiteboard Studio

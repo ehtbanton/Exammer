@@ -292,8 +292,8 @@ export function FlashcardPanel({ defaultPosition = { x: 800, y: 70 }, onClose }:
                       "transition-all duration-300 transform-gpu",
                       "overflow-auto",
                       isFlipped
-                        ? "bg-green-50"
-                        : "bg-blue-50"
+                        ? "bg-white border border-green-200 border-l-2 border-l-green-400"
+                        : "bg-white border border-gray-200"
                     )}
                     onClick={() => setIsFlipped(!isFlipped)}
                   >
@@ -332,7 +332,7 @@ export function FlashcardPanel({ defaultPosition = { x: 800, y: 70 }, onClose }:
                   </div>
 
                   {/* Actions */}
-                  <div className="flex gap-1 pt-2 border-t border-gray-200 dark:border-gray-700 shrink-0">
+                  <div className="flex gap-1 pt-2 border-t border-gray-200 shrink-0">
                     <Button
                       variant="ghost"
                       size="sm"

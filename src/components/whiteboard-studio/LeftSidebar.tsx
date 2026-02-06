@@ -102,7 +102,7 @@ export function LeftSidebar({
   onExit,
 }: LeftSidebarProps) {
   const [inputValue, setInputValue] = useState('');
-  const [questionExpanded, setQuestionExpanded] = useState(true);
+  const [questionExpanded, setQuestionExpanded] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 

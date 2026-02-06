@@ -212,8 +212,8 @@ export function FloatingPanel({
           onPointerDown={(e) => dragControls.start(e)}
           className={cn(
             "drag-handle flex items-center justify-between px-4 py-3 shrink-0",
-            "bg-white",
-            "border-b border-gray-100",
+            "bg-gray-50",
+            "border-b border-gray-200",
             "cursor-grab active:cursor-grabbing",
             "select-none touch-none",
             "rounded-t-xl"
@@ -221,8 +221,8 @@ export function FloatingPanel({
         >
           <div className="flex items-center gap-2">
             <GripHorizontal className="h-4 w-4 text-gray-400" />
-            <span className="text-gray-500 dark:text-gray-400">{icon}</span>
-            <h3 className="font-semibold text-sm text-gray-800 dark:text-gray-200">
+            <span className="text-gray-500">{icon}</span>
+            <h3 className="font-semibold text-sm text-gray-800">
               {title}
             </h3>
           </div>
@@ -233,8 +233,8 @@ export function FloatingPanel({
                 onClick={() => setIsCollapsed(!isCollapsed)}
                 className={cn(
                   "p-1 rounded-md transition-colors",
-                  "hover:bg-gray-200/50 dark:hover:bg-gray-700/50",
-                  "text-gray-500 dark:text-gray-400"
+                  "hover:bg-gray-100",
+                  "text-gray-500"
                 )}
               >
                 {isCollapsed ? (
@@ -249,8 +249,8 @@ export function FloatingPanel({
                 onClick={onClose}
                 className={cn(
                   "p-1 rounded-md transition-colors",
-                  "hover:bg-red-100 dark:hover:bg-red-900/30",
-                  "text-gray-500 hover:text-red-600 dark:text-gray-400 dark:hover:text-red-400"
+                  "hover:bg-red-50",
+                  "text-gray-500 hover:text-red-600"
                 )}
               >
                 <X className="h-4 w-4" />
@@ -283,8 +283,8 @@ export function FloatingPanel({
             className={cn(
               "absolute bottom-0 right-0 w-4 h-4 cursor-se-resize",
               "flex items-center justify-center",
-              "hover:bg-gray-200/50 dark:hover:bg-gray-700/50 rounded-tl",
-              isResizing && "bg-blue-200/50 dark:bg-blue-700/50"
+              "hover:bg-gray-100 rounded-tl",
+              isResizing && "bg-gray-200"
             )}
             style={{ touchAction: 'none' }}
           >
