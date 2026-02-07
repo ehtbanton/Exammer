@@ -77,9 +77,11 @@ export function WhiteboardStudio({
   const [activeColor, setActiveColor] = useState('black');
   const [studioTheme, setStudioTheme] = useState<'light' | 'dark'>(() => {
     if (typeof window !== 'undefined') {
-      return document.documentElement.classList.contains('dark') ? 'dark' : 'light';
+      // Match Exammer's theme: localStorage 'theme' key, defaults to dark
+      const savedTheme = localStorage.getItem('theme');
+      return savedTheme === 'light' ? 'light' : 'dark';
     }
-    return 'light';
+    return 'dark';
   });
   const { toast } = useToast();
 
