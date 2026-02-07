@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Youtube, ExternalLink } from 'lucide-react';
 import { FloatingPanel } from './FloatingPanel';
@@ -34,6 +34,18 @@ export function YouTubeWidget({ defaultPosition = { x: 800, y: 70 }, initialUrl,
     return null;
   });
   const [error, setError] = useState('');
+
+  // Update when initialUrl changes (e.g. clicking a new video link)
+  useEffect(() => {
+    if (initialUrl) {
+      setUrl(initialUrl);
+      const id = extractYouTubeId(initialUrl);
+      if (id) {
+        setVideoId(id);
+        setError('');
+      }
+    }
+  }, [initialUrl]);
 
   const handleLoadVideo = () => {
     const id = extractYouTubeId(url);
