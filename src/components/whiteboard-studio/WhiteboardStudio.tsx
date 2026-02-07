@@ -294,16 +294,26 @@ export function WhiteboardStudio({
     if (!editor) return;
 
     try {
+      // Convert screen coordinates to tldraw page coordinates
+      const topLeft = editor.screenToPage({ x: bounds.x, y: bounds.y });
+      const bottomRight = editor.screenToPage({ x: bounds.x + bounds.width, y: bounds.y + bounds.height });
+      const pageBounds = {
+        x: topLeft.x,
+        y: topLeft.y,
+        width: bottomRight.x - topLeft.x,
+        height: bottomRight.y - topLeft.y,
+      };
+
       const allShapes = editor.getCurrentPageShapes();
       const selectedShapeIds = allShapes
         .filter(shape => {
           const shapeBounds = editor.getShapePageBounds(shape.id);
           if (!shapeBounds) return false;
           return (
-            shapeBounds.x < bounds.x + bounds.width &&
-            shapeBounds.x + shapeBounds.width > bounds.x &&
-            shapeBounds.y < bounds.y + bounds.height &&
-            shapeBounds.y + shapeBounds.height > bounds.y
+            shapeBounds.x < pageBounds.x + pageBounds.width &&
+            shapeBounds.x + shapeBounds.width > pageBounds.x &&
+            shapeBounds.y < pageBounds.y + pageBounds.height &&
+            shapeBounds.y + shapeBounds.height > pageBounds.y
           );
         })
         .map(shape => shape.id);
