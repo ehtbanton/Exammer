@@ -2,10 +2,9 @@
 
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Music, ExternalLink } from 'lucide-react';
+import { Music, ExternalLink, ArrowRight } from 'lucide-react';
 import { FloatingPanel } from './FloatingPanel';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 
 interface SpotifyWidgetProps {
   defaultPosition?: { x: number; y: number };
@@ -13,7 +12,6 @@ interface SpotifyWidgetProps {
 }
 
 function extractSpotifyEmbed(url: string): { type: string; id: string } | null {
-  // Match track, album, playlist, or episode
   const patterns = [
     /spotify\.com\/(track|album|playlist|episode)\/([a-zA-Z0-9]+)/,
     /open\.spotify\.com\/(track|album|playlist|episode)\/([a-zA-Z0-9]+)/,
@@ -55,7 +53,7 @@ export function SpotifyWidget({ defaultPosition = { x: 800, y: 400 }, onClose }:
     >
       <FloatingPanel
         title="Spotify"
-        icon={<Music className="h-4 w-4 text-green-500" />}
+        icon={<Music className="h-4 w-4 text-[#1DB954]" />}
         defaultPosition={defaultPosition}
         minWidth={200}
         maxWidth={800}
@@ -68,29 +66,32 @@ export function SpotifyWidget({ defaultPosition = { x: 800, y: 400 }, onClose }:
         onClose={onClose}
         zIndex={108}
         squareMinimize={true}
-        minimizedIcon={<Music className="h-5 w-5 text-green-500" />}
+        minimizedIcon={<Music className="h-5 w-5 text-[#1DB954]" />}
       >
-        <div className="flex flex-col h-full space-y-3">
+        <div className="flex flex-col h-full gap-3">
           {/* URL Input */}
           <div className="flex gap-2 shrink-0">
-            <Input
+            <input
               value={url}
               onChange={(e) => setUrl(e.target.value)}
               onKeyDown={handleKeyDown}
               placeholder="Paste Spotify URL..."
-              className="text-sm h-8"
+              className="flex-1 h-8 px-3 text-[13px] rounded-lg bg-[var(--s-input-bg)] text-[var(--s-text)] placeholder:text-[var(--s-text-placeholder)] outline-none focus:[box-shadow:var(--s-focus-ring)] transition-shadow"
             />
-            <Button size="sm" className="h-8" onClick={handleLoadTrack}>
+            <button
+              onClick={handleLoadTrack}
+              className="h-8 px-3 rounded-lg bg-[var(--s-accent)] text-white text-[12px] font-medium hover:bg-[var(--s-accent-hover)] active:scale-95 transition-all"
+            >
               Load
-            </Button>
+            </button>
           </div>
 
           {error && (
-            <p className="text-xs text-red-500">{error}</p>
+            <p className="text-[11px] text-[var(--s-danger)]">{error}</p>
           )}
 
           {/* Spotify Player */}
-          <div className="flex-1 min-h-0 bg-gray-50 rounded-lg border border-gray-200 overflow-hidden">
+          <div className="flex-1 min-h-0 rounded-xl overflow-hidden bg-[var(--s-input-bg)]">
             {embed ? (
               <iframe
                 src={`https://open.spotify.com/embed/${embed.type}/${embed.id}?theme=0`}
@@ -99,11 +100,11 @@ export function SpotifyWidget({ defaultPosition = { x: 800, y: 400 }, onClose }:
                 loading="lazy"
               />
             ) : (
-              <div className="w-full h-full flex items-center justify-center text-gray-500">
+              <div className="w-full h-full flex items-center justify-center text-[var(--s-text-muted)]">
                 <div className="text-center">
-                  <Music className="h-10 w-10 mx-auto mb-2 opacity-50" />
-                  <p className="text-sm">Paste a Spotify URL above</p>
-                  <p className="text-xs text-gray-600">Track, album, or playlist</p>
+                  <Music className="h-10 w-10 mx-auto mb-2 opacity-30" />
+                  <p className="text-[13px]">Paste a Spotify URL above</p>
+                  <p className="text-[11px] text-[var(--s-text-muted)] mt-0.5">Track, album, or playlist</p>
                 </div>
               </div>
             )}
@@ -111,15 +112,13 @@ export function SpotifyWidget({ defaultPosition = { x: 800, y: 400 }, onClose }:
 
           {/* Open in Spotify */}
           {embed && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="w-full"
+            <button
               onClick={() => window.open(`https://open.spotify.com/${embed.type}/${embed.id}`, '_blank')}
+              className="w-full h-8 flex items-center justify-center gap-1.5 rounded-lg text-[12px] text-[var(--s-text-muted)] hover:bg-[var(--s-hover)] active:scale-[0.98] transition-all"
             >
-              <ExternalLink className="h-3 w-3 mr-1" />
+              <ExternalLink className="h-3 w-3" />
               Open in Spotify
-            </Button>
+            </button>
           )}
         </div>
       </FloatingPanel>

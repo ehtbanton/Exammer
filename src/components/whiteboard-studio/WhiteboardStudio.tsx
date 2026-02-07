@@ -13,7 +13,7 @@ import { YouTubeWidget } from './YouTubeWidget';
 import { SpotifyWidget } from './SpotifyWidget';
 import { FlashcardPanel } from './FlashcardPanel';
 import { ResourceViewer, isEmbeddableSite } from './ResourceViewer';
-import { WidgetType } from './WidgetMenu';
+import { WidgetMenu, WidgetType } from './WidgetMenu';
 import { overlayVariants, canvasVariants } from './animations';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
@@ -24,8 +24,8 @@ const Tldraw = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div className="flex items-center justify-center h-full bg-gray-50">
-        <div className="text-gray-400">Loading canvas...</div>
+      <div className="flex items-center justify-center h-full">
+        <div className="text-[#8e8e93]">Loading canvas...</div>
       </div>
     ),
   }
@@ -75,6 +75,12 @@ export function WhiteboardStudio({
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [activeTool, setActiveTool] = useState<DrawingTool>('draw');
   const [activeColor, setActiveColor] = useState('black');
+  const [studioTheme, setStudioTheme] = useState<'light' | 'dark'>(() => {
+    if (typeof window !== 'undefined') {
+      return document.documentElement.classList.contains('dark') ? 'dark' : 'light';
+    }
+    return 'light';
+  });
   const { toast } = useToast();
 
   // Page dimensions (A4 at 96 DPI)
@@ -88,6 +94,11 @@ export function WhiteboardStudio({
     // Set initial tool to draw
     editor.setCurrentTool('draw');
 
+    // Sync dark mode with studio theme on mount
+    if (studioTheme === 'dark') {
+      editor.user.updateUserPreferences({ colorScheme: 'dark' });
+    }
+
     // Update undo/redo state
     const updateState = () => {
       setCanUndo(editor.getCanUndo());
@@ -96,7 +107,7 @@ export function WhiteboardStudio({
 
     editor.store.listen(updateState);
     updateState();
-  }, []);
+  }, [studioTheme]);
 
   // Helper function to compress image blob if too large
   const compressImageBlob = useCallback(async (blob: Blob, targetSizeKB: number): Promise<Blob> => {
@@ -418,6 +429,26 @@ export function WhiteboardStudio({
     }
   }, [exportCanvas, onSendMessage, toast]);
 
+  // Theme toggle handler
+  const handleToggleTheme = useCallback(() => {
+    setStudioTheme(prev => {
+      const next = prev === 'light' ? 'dark' : 'light';
+      // Sync tldraw color scheme
+      const editor = editorRef.current;
+      if (editor) {
+        editor.user.updateUserPreferences({ colorScheme: next });
+      }
+      return next;
+    });
+  }, []);
+
+  // Sync tldraw color scheme on theme change
+  useEffect(() => {
+    if (editorRef.current) {
+      editorRef.current.user.updateUserPreferences({ colorScheme: studioTheme });
+    }
+  }, [studioTheme]);
+
   // Prevent body scroll
   useEffect(() => {
     document.body.style.overflow = 'hidden';
@@ -428,6 +459,7 @@ export function WhiteboardStudio({
     <AnimatePresence>
       <motion.div
         className="fixed inset-0 z-50 studio-theme"
+        data-theme={studioTheme}
         variants={overlayVariants}
         initial="hidden"
         animate="visible"
@@ -449,15 +481,13 @@ export function WhiteboardStudio({
             onExplain={handleExplain}
             onCheck={handleCheck}
             hasIncompleteObjectives={completedObjectives.length < objectives.length}
-            onAddWidget={handleAddWidget}
-            activeWidgets={activeWidgets}
             isCollapsed={sidebarCollapsed}
             onToggleCollapse={() => setSidebarCollapsed(prev => !prev)}
             onExit={onExit}
           />
 
           {/* Canvas Area */}
-          <main className="flex-1 relative bg-gray-50">
+          <main className="flex-1 relative bg-[var(--s-canvas)]">
             {/* tldraw Canvas */}
             <motion.div
               className="absolute inset-0"
@@ -479,10 +509,11 @@ export function WhiteboardStudio({
               <div
                 className="absolute inset-0 pointer-events-none z-[5]"
                 style={{
-                  backgroundImage: `
-                    linear-gradient(to right, rgba(0,0,0,0.06) 1px, transparent 1px),
-                    linear-gradient(to bottom, rgba(0,0,0,0.06) 1px, transparent 1px)
-                  `,
+                  backgroundImage: studioTheme === 'dark'
+                    ? `linear-gradient(to right, rgba(255,255,255,0.06) 1px, transparent 1px),
+                       linear-gradient(to bottom, rgba(255,255,255,0.06) 1px, transparent 1px)`
+                    : `linear-gradient(to right, rgba(0,0,0,0.06) 1px, transparent 1px),
+                       linear-gradient(to bottom, rgba(0,0,0,0.06) 1px, transparent 1px)`,
                   backgroundSize: '25px 25px',
                 }}
               />
@@ -502,23 +533,27 @@ export function WhiteboardStudio({
                   borderRadius: '4px',
                 }}
               >
-                <div className="absolute -top-6 left-0 text-xs text-gray-400 bg-white px-2 py-0.5 rounded">
+                <div className="absolute -top-6 left-0 text-xs text-[var(--s-text-muted)] bg-[var(--s-surface-solid)] px-2 py-0.5 rounded">
                   A4 Page
                 </div>
               </div>
             )}
 
-            {/* Submit Answer Button (bottom center of canvas) */}
-            <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-[10]">
+            {/* Bottom Canvas Bar: Widgets + Submit */}
+            <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-[10] flex items-center gap-3">
+              {/* Widgets Pill */}
+              <WidgetMenu onAddWidget={handleAddWidget} activeWidgets={activeWidgets} />
+
+              {/* Submit Answer Button */}
               <button
                 onClick={handleSubmit}
                 disabled={isSubmitting}
                 className={cn(
                   "flex items-center gap-2 px-6 py-2.5",
-                  "bg-[#1a1a1a] hover:bg-[#333] text-white",
+                  "bg-[var(--s-accent)] hover:bg-[var(--s-accent-hover)] text-white",
                   "rounded-xl font-medium text-[13px]",
-                  "shadow-[0_2px_8px_rgba(0,0,0,0.15),0_1px_3px_rgba(0,0,0,0.08)]",
-                  "hover:shadow-[0_4px_14px_rgba(0,0,0,0.2),0_2px_4px_rgba(0,0,0,0.08)]",
+                  "[box-shadow:0_2px_8px_var(--s-accent-glow),0_1px_3px_rgba(0,0,0,0.08)]",
+                  "hover:[box-shadow:0_4px_14px_var(--s-accent-glow-hover),0_2px_4px_rgba(0,0,0,0.08)]",
                   "hover:-translate-y-px",
                   "transition-all duration-200",
                   isSubmitting && "opacity-60 cursor-not-allowed hover:translate-y-0"
@@ -567,6 +602,8 @@ export function WhiteboardStudio({
             onRedo={handleRedo}
             canUndo={canUndo}
             canRedo={canRedo}
+            studioTheme={studioTheme}
+            onToggleTheme={handleToggleTheme}
           />
         </div>
 

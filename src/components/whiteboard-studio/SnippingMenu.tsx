@@ -3,8 +3,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Copy, Download, MessageSquare, X, Send } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 
@@ -110,9 +108,9 @@ export function SnippingMenu({ isOpen, imageData, position, onClose, onAskXam }:
         animate={{ opacity: 1, scale: 1 }}
         exit={{ opacity: 0, scale: 0.9 }}
         className={cn(
-          "fixed z-[250] bg-white rounded-xl shadow-md",
-          "border border-gray-200",
-          "overflow-hidden"
+          "fixed z-[250] rounded-xl overflow-hidden",
+          "bg-[var(--s-card-solid)] backdrop-blur-xl",
+          "[box-shadow:var(--s-shadow-lg)]"
         )}
         style={{
           left: Math.min(position.x, window.innerWidth - 320),
@@ -121,21 +119,19 @@ export function SnippingMenu({ isOpen, imageData, position, onClose, onAskXam }:
         onKeyDown={handleKeyDown}
       >
         {/* Preview */}
-        <div className="p-3 border-b border-gray-200 dark:border-gray-700">
+        <div className="p-3 border-b border-[var(--s-divider)]">
           <div className="relative">
             <img
               src={imageData}
               alt="Selection preview"
               className="max-w-[280px] max-h-[200px] rounded-lg object-contain mx-auto"
             />
-            <Button
-              variant="ghost"
-              size="icon"
-              className="absolute top-1 right-1 h-6 w-6 bg-black/50 hover:bg-black/70 text-white"
+            <button
+              className="absolute top-1 right-1 h-6 w-6 rounded-md flex items-center justify-center bg-black/50 hover:bg-black/70 text-white transition-colors"
               onClick={onClose}
             >
               <X className="h-3 w-3" />
-            </Button>
+            </button>
           </div>
         </div>
 
@@ -150,17 +146,20 @@ export function SnippingMenu({ isOpen, imageData, position, onClose, onAskXam }:
                 exit={{ height: 0, opacity: 0 }}
                 className="overflow-hidden"
               >
-                <div className="flex gap-2 p-2 bg-gray-50 dark:bg-gray-800 rounded-lg mb-2">
-                  <Input
+                <div className="flex gap-2 p-2 bg-[var(--s-input-bg)] rounded-lg mb-2">
+                  <input
                     value={askMessage}
                     onChange={(e) => setAskMessage(e.target.value)}
                     placeholder="Ask XAM about this image..."
-                    className="text-sm h-8"
+                    className="flex-1 text-sm h-8 px-3 rounded-lg bg-[var(--s-card)] text-[var(--s-text)] placeholder:text-[var(--s-text-placeholder)] outline-none focus:[box-shadow:var(--s-focus-ring)] transition-shadow"
                     autoFocus
                   />
-                  <Button size="sm" className="h-8 px-2" onClick={handleAskXam}>
+                  <button
+                    className="h-8 px-3 rounded-lg bg-[var(--s-accent)] text-white hover:bg-[var(--s-accent-hover)] active:scale-95 transition-all"
+                    onClick={handleAskXam}
+                  >
                     <Send className="h-3 w-3" />
-                  </Button>
+                  </button>
                 </div>
               </motion.div>
             )}
@@ -168,35 +167,27 @@ export function SnippingMenu({ isOpen, imageData, position, onClose, onAskXam }:
 
           {/* Action Buttons */}
           <div className="flex gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              className="flex-1"
+            <button
+              className="flex-1 h-8 flex items-center justify-center gap-1 rounded-lg text-[12px] font-medium text-[var(--s-text-secondary)] bg-[var(--s-hover)] hover:bg-[var(--s-hover-strong)] active:scale-95 transition-all"
               onClick={handleCopy}
             >
-              <Copy className="h-4 w-4 mr-1" />
+              <Copy className="h-3.5 w-3.5" />
               Copy
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="flex-1"
+            </button>
+            <button
+              className="flex-1 h-8 flex items-center justify-center gap-1 rounded-lg text-[12px] font-medium text-[var(--s-text-secondary)] bg-[var(--s-hover)] hover:bg-[var(--s-hover-strong)] active:scale-95 transition-all"
               onClick={handleDownload}
             >
-              <Download className="h-4 w-4 mr-1" />
-              Download
-            </Button>
-            <Button
-              size="sm"
-              className={cn(
-                "flex-1",
-                "bg-blue-600 hover:bg-blue-700 text-white"
-              )}
+              <Download className="h-3.5 w-3.5" />
+              Save
+            </button>
+            <button
+              className="flex-1 h-8 flex items-center justify-center gap-1 rounded-lg text-[12px] font-medium bg-[var(--s-accent)] text-white hover:bg-[var(--s-accent-hover)] active:scale-95 transition-all"
               onClick={handleAskXam}
             >
-              <MessageSquare className="h-4 w-4 mr-1" />
+              <MessageSquare className="h-3.5 w-3.5" />
               Ask XAM
-            </Button>
+            </button>
           </div>
         </div>
       </motion.div>

@@ -90,7 +90,6 @@ export function FloatingPanel({
   // Handle drag end with snapping
   const handleDragEnd = useCallback((_: any, info: any) => {
     setIsDragging(false);
-    // Calculate new position from current position + drag offset
     const newX = position.x + info.offset.x;
     const newY = position.y + info.offset.y;
     const snapped = calculateSnappedPosition(newX, newY);
@@ -153,11 +152,11 @@ export function FloatingPanel({
           transition={{ type: "spring", stiffness: 400, damping: 30 }}
           className={cn(
             "fixed top-0 left-0 cursor-grab active:cursor-grabbing",
-            "rounded-xl overflow-hidden",
-            "bg-white",
-            "border border-gray-200",
-            isDragging ? "shadow-md" : "shadow-sm hover:shadow-md",
-            "transition-shadow"
+            "rounded-2xl overflow-hidden",
+            "bg-[var(--s-surface)] backdrop-blur-xl",
+            "[box-shadow:var(--s-shadow-sm)]",
+            isDragging && "[box-shadow:var(--s-shadow-lg)]",
+            "transition-shadow duration-200"
           )}
           style={{
             zIndex,
@@ -190,11 +189,11 @@ export function FloatingPanel({
         animate={{ x: position.x, y: position.y }}
         transition={{ type: "spring", stiffness: 400, damping: 30 }}
         className={cn(
-          "fixed top-0 left-0 rounded-xl flex flex-col",
-          "bg-white",
-          "border border-gray-200",
-          isDragging ? "shadow-md" : "shadow-sm",
-          "transition-shadow",
+          "fixed top-0 left-0 rounded-2xl flex flex-col",
+          "bg-[var(--s-surface)] backdrop-blur-xl",
+          "[box-shadow:var(--s-shadow-lg)]",
+          isDragging && "[box-shadow:var(--s-shadow-lg)]",
+          "transition-shadow duration-200",
           className
         )}
         ref={panelRef}
@@ -212,17 +211,15 @@ export function FloatingPanel({
           onPointerDown={(e) => dragControls.start(e)}
           className={cn(
             "drag-handle flex items-center justify-between px-4 py-3 shrink-0",
-            "bg-gray-50",
-            "border-b border-gray-200",
             "cursor-grab active:cursor-grabbing",
             "select-none touch-none",
-            "rounded-t-xl"
+            "rounded-t-2xl"
           )}
         >
           <div className="flex items-center gap-2">
-            <GripHorizontal className="h-4 w-4 text-gray-400" />
-            <span className="text-gray-500">{icon}</span>
-            <h3 className="font-semibold text-sm text-gray-800">
+            <GripHorizontal className="h-4 w-4 text-[var(--s-text-muted)]" />
+            <span className="text-[var(--s-text-muted)]">{icon}</span>
+            <h3 className="font-semibold text-[13px] text-[var(--s-text)]">
               {title}
             </h3>
           </div>
@@ -231,11 +228,7 @@ export function FloatingPanel({
             {collapsible && (
               <button
                 onClick={() => setIsCollapsed(!isCollapsed)}
-                className={cn(
-                  "p-1 rounded-md transition-colors",
-                  "hover:bg-gray-100",
-                  "text-gray-500"
-                )}
+                className="w-7 h-7 rounded-lg flex items-center justify-center text-[var(--s-text-muted)] hover:bg-[var(--s-hover)] transition-colors active:scale-95"
               >
                 {isCollapsed ? (
                   <ChevronDown className="h-4 w-4" />
@@ -247,16 +240,17 @@ export function FloatingPanel({
             {closable && onClose && (
               <button
                 onClick={onClose}
-                className={cn(
-                  "p-1 rounded-md transition-colors",
-                  "hover:bg-red-50",
-                  "text-gray-500 hover:text-red-600"
-                )}
+                className="w-7 h-7 rounded-lg flex items-center justify-center text-[var(--s-text-muted)] hover:bg-[var(--s-danger-hover-bg)] hover:text-[var(--s-danger)] transition-colors active:scale-95"
               >
                 <X className="h-4 w-4" />
               </button>
             )}
           </div>
+        </div>
+
+        {/* Divider */}
+        <div className="mx-3">
+          <div className="h-px bg-gradient-to-r from-transparent via-[var(--s-divider)] to-transparent" />
         </div>
 
         {/* Content */}
@@ -267,7 +261,7 @@ export function FloatingPanel({
               initial="collapsed"
               animate="expanded"
               exit="collapsed"
-              className="flex-1 flex flex-col min-h-0 overflow-hidden rounded-b-xl"
+              className="flex-1 flex flex-col min-h-0 overflow-hidden rounded-b-2xl"
             >
               <div className="p-4 flex-1 flex flex-col min-h-0 overflow-hidden">
                 {children}
@@ -281,10 +275,10 @@ export function FloatingPanel({
           <div
             onPointerDown={handleResizeStart}
             className={cn(
-              "absolute bottom-0 right-0 w-4 h-4 cursor-se-resize",
+              "absolute bottom-0 right-0 w-5 h-5 cursor-se-resize",
               "flex items-center justify-center",
-              "hover:bg-gray-100 rounded-tl",
-              isResizing && "bg-gray-200"
+              "rounded-tl-lg opacity-0 hover:opacity-100 transition-opacity",
+              isResizing && "opacity-100"
             )}
             style={{ touchAction: 'none' }}
           >
@@ -292,7 +286,7 @@ export function FloatingPanel({
               width="10"
               height="10"
               viewBox="0 0 10 10"
-              className="text-gray-400"
+              className="text-[var(--s-text-muted)]"
             >
               <path
                 d="M9 1L1 9M9 5L5 9M9 9L9 9"

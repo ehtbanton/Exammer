@@ -78,21 +78,100 @@ body {
   }
 }
 
-/* Studio-scoped design tokens (matches site grayscale + iOS depth) */
+/* Studio-scoped design tokens — light theme (default) */
 .studio-theme {
-  --studio-bg: #e8e8ed;
-  --studio-surface: #f5f5f5;
-  --studio-surface-raised: #ffffff;
-  --studio-text-primary: #1a1a1a;
-  --studio-text-secondary: #555;
-  --studio-text-muted: #8e8e93;
-  --studio-shadow-sm: 0 0.5px 1px rgba(0, 0, 0, 0.08), 0 1px 3px rgba(0, 0, 0, 0.06);
-  --studio-shadow-md: 0 2px 8px rgba(0, 0, 0, 0.08), 0 0.5px 2px rgba(0, 0, 0, 0.06);
-  --studio-shadow-lg: 0 4px 16px rgba(0, 0, 0, 0.12), 0 1px 4px rgba(0, 0, 0, 0.06);
-  --studio-radius: 12px;
-  --studio-radius-sm: 8px;
+  /* Backgrounds */
+  --s-bg: #e8e8ed;
+  --s-surface: rgba(245, 245, 245, 0.72);
+  --s-surface-solid: #f5f5f5;
+  --s-card: rgba(255, 255, 255, 0.8);
+  --s-card-solid: #ffffff;
+  --s-card-hover: rgba(255, 255, 255, 1);
+  --s-hover: rgba(0, 0, 0, 0.04);
+  --s-hover-strong: rgba(0, 0, 0, 0.06);
+  --s-input-bg: rgba(0, 0, 0, 0.04);
+  --s-canvas: #f9f9f9;
+  /* Text */
+  --s-text: #1a1a1a;
+  --s-text-secondary: #555;
+  --s-text-muted: #8e8e93;
+  --s-text-placeholder: #c7c7cc;
+  /* Accent (iOS blue for light) */
+  --s-accent: #007AFF;
+  --s-accent-hover: #0071e3;
+  --s-accent-glow: rgba(0, 122, 255, 0.3);
+  --s-accent-glow-hover: rgba(0, 122, 255, 0.35);
+  /* Semantic */
+  --s-danger: #ff3b30;
+  --s-danger-hover-bg: rgba(255, 59, 48, 0.08);
+  --s-success: #34c759;
+  /* Dividers & borders */
+  --s-divider: #e0e0e0;
+  /* Shadows */
+  --s-shadow-sm: 0 0.5px 1px rgba(0,0,0,0.08), 0 1px 3px rgba(0,0,0,0.06);
+  --s-shadow-md: 0 2px 8px rgba(0,0,0,0.08), 0 0.5px 2px rgba(0,0,0,0.06);
+  --s-shadow-lg: 0 4px 16px rgba(0,0,0,0.12), 0 1px 4px rgba(0,0,0,0.06);
+  --s-shadow-xl: 0 8px 30px rgba(0,0,0,0.16), 0 2px 6px rgba(0,0,0,0.08);
+  --s-focus-ring: 0 0 0 3px rgba(0, 0, 0, 0.08);
+  /* Action card icon tints */
+  --s-icon-blue-bg: #e8f0fe;
+  --s-icon-red-bg: #ffeeed;
+  --s-icon-orange-bg: #fff4e6;
+  --s-icon-green-bg: #e8f8ed;
+  --s-icon-blue: #3478f6;
+  /* Objectives */
+  --s-completed-bg: #e8f8ed;
+  --s-completed-text: #1b7a3d;
+  --s-objective-bg: #f5f5f5;
+  --s-objective-text: #555;
+  /* Tool */
+  --s-tool-active-bg: rgba(255, 255, 255, 0.9);
+  --s-tool-active-shadow: 0 0.5px 1px rgba(0,0,0,0.1), 0 1px 3px rgba(0,0,0,0.06);
+  /* Font smoothing */
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* Studio dark theme */
+.studio-theme[data-theme="dark"] {
+  --s-bg: #1c1c1e;
+  --s-surface: rgba(44, 44, 46, 0.72);
+  --s-surface-solid: #2c2c2e;
+  --s-card: rgba(58, 58, 60, 0.75);
+  --s-card-solid: #3a3a3c;
+  --s-card-hover: rgba(68, 68, 70, 0.9);
+  --s-hover: rgba(255, 255, 255, 0.08);
+  --s-hover-strong: rgba(255, 255, 255, 0.12);
+  --s-input-bg: rgba(255, 255, 255, 0.1);
+  --s-canvas: #2c2c2e;
+  --s-text: #f5f5f7;
+  --s-text-secondary: #c7c7cc;
+  --s-text-muted: #98989d;
+  --s-text-placeholder: #636366;
+  --s-accent: #5E5CE6;
+  --s-accent-hover: #5250d4;
+  --s-accent-glow: rgba(94, 92, 230, 0.3);
+  --s-accent-glow-hover: rgba(94, 92, 230, 0.4);
+  --s-danger: #ff453a;
+  --s-danger-hover-bg: rgba(255, 69, 58, 0.15);
+  --s-success: #30d158;
+  --s-divider: #3a3a3c;
+  --s-shadow-sm: 0 0.5px 1px rgba(0,0,0,0.3), 0 1px 3px rgba(0,0,0,0.25);
+  --s-shadow-md: 0 2px 8px rgba(0,0,0,0.3), 0 0.5px 2px rgba(0,0,0,0.25);
+  --s-shadow-lg: 0 4px 16px rgba(0,0,0,0.4), 0 1px 4px rgba(0,0,0,0.3);
+  --s-shadow-xl: 0 8px 30px rgba(0,0,0,0.5), 0 2px 6px rgba(0,0,0,0.35);
+  --s-focus-ring: 0 0 0 3px rgba(255, 255, 255, 0.1);
+  --s-icon-blue-bg: rgba(52, 120, 246, 0.15);
+  --s-icon-red-bg: rgba(255, 59, 48, 0.15);
+  --s-icon-orange-bg: rgba(255, 149, 0, 0.15);
+  --s-icon-green-bg: rgba(52, 199, 89, 0.15);
+  --s-icon-blue: #64a0ff;
+  --s-completed-bg: rgba(48, 209, 88, 0.15);
+  --s-completed-text: #5dd97b;
+  --s-objective-bg: rgba(255, 255, 255, 0.08);
+  --s-objective-text: #c7c7cc;
+  --s-tool-active-bg: rgba(58, 58, 60, 0.9);
+  --s-tool-active-shadow: 0 0.5px 1px rgba(0,0,0,0.3), 0 1px 3px rgba(0,0,0,0.25);
 }
 
 .studio-theme * {
@@ -107,6 +186,11 @@ body {
 .studio-scrollbar-hide {
   scrollbar-width: none;
   -ms-overflow-style: none;
+}
+
+/* Hide tldraw watermark */
+.tl-watermark_SEE-LICENSE {
+  display: none !important;
 }
 
 @layer base {

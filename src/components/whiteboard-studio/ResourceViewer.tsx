@@ -4,7 +4,6 @@ import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { BookOpen, ExternalLink, Copy, Check } from 'lucide-react';
 import { FloatingPanel } from './FloatingPanel';
-import { Button } from '@/components/ui/button';
 
 interface ResourceViewerProps {
   defaultPosition?: { x: number; y: number };
@@ -103,37 +102,33 @@ export function ResourceViewer({
         <div className="flex flex-col h-full space-y-2">
           {/* Action Bar */}
           <div className="flex items-center justify-between gap-2 shrink-0 px-1">
-            <p className="text-xs text-gray-500 truncate flex-1" title={url}>
+            <p className="text-xs text-[var(--s-text-muted)] truncate flex-1" title={url}>
               {url}
             </p>
             <div className="flex gap-1">
-              <Button
-                size="sm"
-                variant="ghost"
-                className="h-7 px-2"
+              <button
+                className="h-7 w-7 rounded-lg flex items-center justify-center text-[var(--s-text-muted)] hover:bg-[var(--s-hover)] transition-colors"
                 onClick={handleCopy}
                 title="Copy URL"
               >
                 {copied ? (
-                  <Check className="h-3.5 w-3.5 text-green-500" />
+                  <Check className="h-3.5 w-3.5 text-[var(--s-success)]" />
                 ) : (
                   <Copy className="h-3.5 w-3.5" />
                 )}
-              </Button>
-              <Button
-                size="sm"
-                variant="ghost"
-                className="h-7 px-2"
+              </button>
+              <button
+                className="h-7 w-7 rounded-lg flex items-center justify-center text-[var(--s-text-muted)] hover:bg-[var(--s-hover)] transition-colors"
                 onClick={handleOpenExternal}
                 title="Open in New Tab"
               >
                 <ExternalLink className="h-3.5 w-3.5" />
-              </Button>
+              </button>
             </div>
           </div>
 
           {/* Content Frame */}
-          <div className="flex-1 min-h-0 bg-white rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700">
+          <div className="flex-1 min-h-0 rounded-lg overflow-hidden bg-[var(--s-card-solid)]">
             <iframe
               src={url}
               className="w-full h-full"

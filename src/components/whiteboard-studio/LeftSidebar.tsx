@@ -15,7 +15,6 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Progress } from '@/components/ui/progress';
 import { LatexRenderer } from '@/components/latex-renderer';
 import { ActionCard } from './ActionCard';
-import { WidgetMenu, WidgetType } from './WidgetMenu';
 import { sidebarVariants, collapseVariants } from './animations';
 import { cn } from '@/lib/utils';
 
@@ -39,8 +38,6 @@ interface LeftSidebarProps {
   onExplain: () => void;
   onCheck: () => void;
   hasIncompleteObjectives: boolean;
-  onAddWidget: (type: WidgetType) => void;
-  activeWidgets: WidgetType[];
   isCollapsed: boolean;
   onToggleCollapse: () => void;
   onExit: () => void;
@@ -86,8 +83,6 @@ export function LeftSidebar({
   onExplain,
   onCheck,
   hasIncompleteObjectives,
-  onAddWidget,
-  activeWidgets,
   isCollapsed,
   onToggleCollapse,
   onExit,
@@ -125,25 +120,25 @@ export function LeftSidebar({
       <motion.div
         initial={{ width: 56 }}
         animate={{ width: 56 }}
-        className="h-full bg-[#f5f5f5]/80 backdrop-blur-xl flex flex-col items-center py-4 gap-2 shrink-0"
+        className="h-full bg-[var(--s-surface)] backdrop-blur-xl flex flex-col items-center py-4 gap-2 shrink-0"
       >
         <button
           onClick={onToggleCollapse}
-          className="w-10 h-10 rounded-xl flex items-center justify-center hover:bg-white/60 active:scale-95 transition-all duration-200 text-[#8e8e93]"
+          className="w-10 h-10 rounded-xl flex items-center justify-center hover:bg-[var(--s-hover)] active:scale-95 transition-all duration-200 text-[var(--s-text-muted)]"
           title="Expand sidebar"
         >
           <ChevronRightIcon className="h-[18px] w-[18px]" />
         </button>
         <button
           onClick={onToggleCollapse}
-          className="w-10 h-10 rounded-xl flex items-center justify-center hover:bg-white/60 active:scale-95 transition-all duration-200 text-[#8e8e93]"
+          className="w-10 h-10 rounded-xl flex items-center justify-center hover:bg-[var(--s-hover)] active:scale-95 transition-all duration-200 text-[var(--s-text-muted)]"
           title="Chat"
         >
           <MessageSquare className="h-[18px] w-[18px]" />
         </button>
         <button
           onClick={onToggleCollapse}
-          className="w-10 h-10 rounded-xl flex items-center justify-center hover:bg-white/60 active:scale-95 transition-all duration-200 text-[#8e8e93]"
+          className="w-10 h-10 rounded-xl flex items-center justify-center hover:bg-[var(--s-hover)] active:scale-95 transition-all duration-200 text-[var(--s-text-muted)]"
           title="Question"
         >
           <BookOpen className="h-[18px] w-[18px]" />
@@ -151,7 +146,7 @@ export function LeftSidebar({
         <div className="flex-1" />
         <button
           onClick={onExit}
-          className="w-10 h-10 rounded-xl flex items-center justify-center hover:bg-[#fff0f0] active:scale-95 transition-all duration-200 text-[#8e8e93] hover:text-[#ff3b30]"
+          className="w-10 h-10 rounded-xl flex items-center justify-center hover:bg-[var(--s-danger-hover-bg)] active:scale-95 transition-all duration-200 text-[var(--s-text-muted)] hover:text-[var(--s-danger)]"
           title="Exit"
         >
           <X className="h-[18px] w-[18px]" />
@@ -166,20 +161,20 @@ export function LeftSidebar({
       initial="hidden"
       animate="visible"
       exit="exit"
-      className="w-[360px] h-full bg-[#f5f5f5]/80 backdrop-blur-xl flex flex-col shrink-0"
+      className="w-[360px] h-full bg-[var(--s-surface)] backdrop-blur-xl flex flex-col shrink-0"
     >
       {/* Header */}
       <div className="flex items-center justify-between px-5 py-4 shrink-0">
         <button
           onClick={onExit}
-          className="flex items-center gap-2 text-[13px] text-[#8e8e93] hover:text-[#1a1a1a] active:scale-95 transition-all duration-200"
+          className="flex items-center gap-2 text-[13px] text-[var(--s-text-muted)] hover:text-[var(--s-text)] active:scale-95 transition-all duration-200"
         >
           <X className="h-4 w-4" />
           <span>Exit</span>
         </button>
         <button
           onClick={onToggleCollapse}
-          className="w-8 h-8 rounded-xl flex items-center justify-center hover:bg-white/60 active:scale-95 transition-all duration-200 text-[#8e8e93]"
+          className="w-8 h-8 rounded-xl flex items-center justify-center hover:bg-[var(--s-hover)] active:scale-95 transition-all duration-200 text-[var(--s-text-muted)]"
           title="Collapse sidebar"
         >
           <ChevronLeft className="h-4 w-4" />
@@ -189,14 +184,14 @@ export function LeftSidebar({
       {/* AI Greeting (when no messages) */}
       {messages.length === 0 && (
         <div className="px-5 pb-2">
-          <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-4 shadow-[0_0.5px_1px_rgba(0,0,0,0.08),0_1px_3px_rgba(0,0,0,0.06)]">
+          <div className="bg-[var(--s-card)] backdrop-blur-sm rounded-2xl p-4 [box-shadow:var(--s-shadow-sm)]">
             <div className="flex items-center gap-3 mb-2">
-              <div className="w-8 h-8 rounded-full bg-[#e8e8ed] flex items-center justify-center">
-                <Bot className="h-4 w-4 text-[#555]" />
+              <div className="w-8 h-8 rounded-full bg-[var(--s-surface-solid)] flex items-center justify-center">
+                <Bot className="h-4 w-4 text-[var(--s-text-secondary)]" />
               </div>
-              <span className="font-headline font-semibold text-[13px] text-[#1a1a1a]">XAM</span>
+              <span className="font-headline font-semibold text-[13px] text-[var(--s-text)]">XAM</span>
             </div>
-            <p className="text-[13px] text-[#555] leading-relaxed">
+            <p className="text-[13px] text-[var(--s-text-secondary)] leading-relaxed">
               Hi there, how can I assist you today?
             </p>
           </div>
@@ -207,30 +202,30 @@ export function LeftSidebar({
       <div className="px-5 py-3 shrink-0">
         <div className="grid grid-cols-2 gap-2.5">
           <ActionCard
-            icon={<ArrowRight className="h-4 w-4 text-[#3478f6]" />}
-            iconBgColor="bg-[#e8f0fe]"
+            icon={<ArrowRight className="h-4 w-4 text-[var(--s-icon-blue)]" />}
+            iconBgColor="bg-[var(--s-icon-blue-bg)]"
             title="Next"
             description="Play the next steps from here"
             onClick={onNextStep}
             disabled={!hasIncompleteObjectives}
           />
           <ActionCard
-            icon={<Search className="h-4 w-4 text-[#ff3b30]" />}
-            iconBgColor="bg-[#ffeeed]"
+            icon={<Search className="h-4 w-4 text-[var(--s-danger)]" />}
+            iconBgColor="bg-[var(--s-icon-red-bg)]"
             title="Find"
             description="Locate references or similar ideas"
             onClick={onFind}
           />
           <ActionCard
             icon={<BookOpen className="h-4 w-4 text-[#ff9500]" />}
-            iconBgColor="bg-[#fff4e6]"
+            iconBgColor="bg-[var(--s-icon-orange-bg)]"
             title="Explain"
             description="Break the selection down for me"
             onClick={onExplain}
           />
           <ActionCard
-            icon={<CheckCircle className="h-4 w-4 text-[#34c759]" />}
-            iconBgColor="bg-[#e8f8ed]"
+            icon={<CheckCircle className="h-4 w-4 text-[var(--s-success)]" />}
+            iconBgColor="bg-[var(--s-icon-green-bg)]"
             title="Check"
             description="Verify the work for me"
             onClick={onCheck}
@@ -239,21 +234,21 @@ export function LeftSidebar({
       </div>
 
       {/* Question & Progress (collapsible) */}
-      <div className="mx-5 rounded-2xl bg-white/80 backdrop-blur-sm shadow-[0_0.5px_1px_rgba(0,0,0,0.08),0_1px_3px_rgba(0,0,0,0.06)] mb-3 shrink-0 overflow-hidden">
+      <div className="mx-5 rounded-2xl bg-[var(--s-card)] backdrop-blur-sm [box-shadow:var(--s-shadow-sm)] mb-3 shrink-0 overflow-hidden">
         <button
           onClick={() => setQuestionExpanded(!questionExpanded)}
-          className="w-full flex items-center justify-between px-4 py-3 hover:bg-white/60 transition-all duration-200"
+          className="w-full flex items-center justify-between px-4 py-3 hover:bg-[var(--s-hover)] transition-all duration-200"
         >
           <div className="flex items-center gap-2.5">
-            <span className="text-[11px] font-semibold text-[#8e8e93] uppercase tracking-wider">
+            <span className="text-[11px] font-semibold text-[var(--s-text-muted)] uppercase tracking-wider">
               Progress
             </span>
-            <span className="text-[11px] font-medium text-[#1a1a1a] bg-[#e8e8ed] px-2 py-0.5 rounded-full">
+            <span className="text-[11px] font-medium text-[var(--s-text)] bg-[var(--s-surface-solid)] px-2 py-0.5 rounded-full">
               {completedCount}/{totalCount}
             </span>
           </div>
           <ChevronDown className={cn(
-            "h-3.5 w-3.5 text-[#8e8e93] transition-transform duration-200",
+            "h-3.5 w-3.5 text-[var(--s-text-muted)] transition-transform duration-200",
             questionExpanded && "rotate-180"
           )} />
         </button>
@@ -269,7 +264,7 @@ export function LeftSidebar({
             >
               <div className="px-4 pb-4 space-y-3">
                 <Progress value={progressPercent} className="h-1.5" />
-                <div className="text-[13px] text-[#333] leading-relaxed">
+                <div className="text-[13px] text-[var(--s-text-secondary)] leading-relaxed">
                   <LatexRenderer>{questionText}</LatexRenderer>
                 </div>
                 {objectives.length > 0 && (
@@ -282,14 +277,14 @@ export function LeftSidebar({
                           className={cn(
                             "flex items-start gap-2 text-[12px] p-2.5 rounded-xl transition-all duration-200",
                             isCompleted
-                              ? "bg-[#e8f8ed] text-[#1b7a3d]"
-                              : "bg-[#f5f5f5] text-[#555]"
+                              ? "bg-[var(--s-completed-bg)] text-[var(--s-completed-text)]"
+                              : "bg-[var(--s-objective-bg)] text-[var(--s-objective-text)]"
                           )}
                         >
                           {isCompleted ? (
-                            <Check className="h-3.5 w-3.5 mt-0.5 shrink-0 text-[#34c759]" />
+                            <Check className="h-3.5 w-3.5 mt-0.5 shrink-0 text-[var(--s-success)]" />
                           ) : (
-                            <Circle className="h-3.5 w-3.5 mt-0.5 shrink-0 text-[#c7c7cc]" />
+                            <Circle className="h-3.5 w-3.5 mt-0.5 shrink-0 text-[var(--s-text-placeholder)]" />
                           )}
                           <span className="line-clamp-2">{objective}</span>
                         </li>
@@ -324,8 +319,8 @@ export function LeftSidebar({
                     className={cn(
                       "text-xs",
                       message.role === 'user'
-                        ? "bg-[#1a1a1a] text-white"
-                        : "bg-[#e8e8ed] text-[#555]"
+                        ? "bg-[var(--s-accent)] text-white"
+                        : "bg-[var(--s-surface-solid)] text-[var(--s-text-secondary)]"
                     )}
                   >
                     {message.role === 'user' ? (
@@ -341,8 +336,8 @@ export function LeftSidebar({
                     className={cn(
                       "rounded-2xl px-3.5 py-2.5 text-[13px] leading-relaxed",
                       message.role === 'user'
-                        ? "bg-[#1a1a1a] text-white"
-                        : "bg-white/80 backdrop-blur-sm text-[#333] shadow-[0_0.5px_1px_rgba(0,0,0,0.08),0_1px_3px_rgba(0,0,0,0.06)]"
+                        ? "bg-[var(--s-accent)] text-white"
+                        : "bg-[var(--s-card)] backdrop-blur-sm text-[var(--s-text-secondary)] [box-shadow:var(--s-shadow-sm)]"
                     )}
                   >
                     {message.imageUrl && (
@@ -361,30 +356,30 @@ export function LeftSidebar({
                       {youtubeVideoUrls.map((ytUrl, i) => (
                         <button
                           key={`yt-${i}`}
-                          className="h-7 px-2.5 text-[11px] gap-1.5 bg-white/80 backdrop-blur-sm shadow-[0_0.5px_1px_rgba(0,0,0,0.08)] rounded-lg flex items-center text-[#555] hover:bg-white hover:shadow-[0_1px_4px_rgba(0,0,0,0.1)] active:scale-95 transition-all duration-200"
+                          className="h-7 px-2.5 text-[11px] gap-1.5 bg-[var(--s-card)] backdrop-blur-sm [box-shadow:var(--s-shadow-sm)] rounded-lg flex items-center text-[var(--s-text-secondary)] hover:bg-[var(--s-card-hover)] hover:[box-shadow:var(--s-shadow-md)] active:scale-95 transition-all duration-200"
                           onClick={() => onOpenYouTube?.(ytUrl)}
                         >
-                          <Youtube className="h-3 w-3 text-[#ff3b30]" />
+                          <Youtube className="h-3 w-3 text-[var(--s-danger)]" />
                           Video {youtubeVideoUrls.length > 1 ? i + 1 : ''}
                         </button>
                       ))}
                       {youtubeSearchUrls.map((searchUrl, i) => (
                         <button
                           key={`yts-${i}`}
-                          className="h-7 px-2.5 text-[11px] gap-1.5 bg-white/80 backdrop-blur-sm shadow-[0_0.5px_1px_rgba(0,0,0,0.08)] rounded-lg flex items-center text-[#555] hover:bg-white hover:shadow-[0_1px_4px_rgba(0,0,0,0.1)] active:scale-95 transition-all duration-200"
+                          className="h-7 px-2.5 text-[11px] gap-1.5 bg-[var(--s-card)] backdrop-blur-sm [box-shadow:var(--s-shadow-sm)] rounded-lg flex items-center text-[var(--s-text-secondary)] hover:bg-[var(--s-card-hover)] hover:[box-shadow:var(--s-shadow-md)] active:scale-95 transition-all duration-200"
                           onClick={() => window.open(searchUrl, '_blank')}
                         >
-                          <Youtube className="h-3 w-3 text-[#ff3b30]" />
+                          <Youtube className="h-3 w-3 text-[var(--s-danger)]" />
                           Search {youtubeSearchUrls.length > 1 ? i + 1 : ''}
                         </button>
                       ))}
                       {articleUrls.map((artUrl, i) => (
                         <button
                           key={`art-${i}`}
-                          className="h-7 px-2.5 text-[11px] gap-1.5 bg-white/80 backdrop-blur-sm shadow-[0_0.5px_1px_rgba(0,0,0,0.08)] rounded-lg flex items-center text-[#555] hover:bg-white hover:shadow-[0_1px_4px_rgba(0,0,0,0.1)] active:scale-95 transition-all duration-200"
+                          className="h-7 px-2.5 text-[11px] gap-1.5 bg-[var(--s-card)] backdrop-blur-sm [box-shadow:var(--s-shadow-sm)] rounded-lg flex items-center text-[var(--s-text-secondary)] hover:bg-[var(--s-card-hover)] hover:[box-shadow:var(--s-shadow-md)] active:scale-95 transition-all duration-200"
                           onClick={() => onOpenResource?.(artUrl)}
                         >
-                          <Globe className="h-3 w-3 text-[#3478f6]" />
+                          <Globe className="h-3 w-3 text-[var(--s-icon-blue)]" />
                           Link {articleUrls.length > 1 ? i + 1 : ''}
                         </button>
                       ))}
@@ -398,12 +393,12 @@ export function LeftSidebar({
           {isLoading && (
             <div className="flex gap-2.5">
               <Avatar className="h-7 w-7 shrink-0">
-                <AvatarFallback className="bg-[#e8e8ed] text-[#555] text-xs">
+                <AvatarFallback className="bg-[var(--s-surface-solid)] text-[var(--s-text-secondary)] text-xs">
                   <Bot className="h-3.5 w-3.5" />
                 </AvatarFallback>
               </Avatar>
-              <div className="bg-white/80 backdrop-blur-sm shadow-[0_0.5px_1px_rgba(0,0,0,0.08),0_1px_3px_rgba(0,0,0,0.06)] rounded-2xl px-3.5 py-2.5">
-                <Loader2 className="h-4 w-4 animate-spin text-[#8e8e93]" />
+              <div className="bg-[var(--s-card)] backdrop-blur-sm [box-shadow:var(--s-shadow-sm)] rounded-2xl px-3.5 py-2.5">
+                <Loader2 className="h-4 w-4 animate-spin text-[var(--s-text-muted)]" />
               </div>
             </div>
           )}
@@ -421,7 +416,7 @@ export function LeftSidebar({
               onChange={(e) => setInputValue(e.target.value)}
               onKeyDown={handleKeyDown}
               placeholder="Ask anything..."
-              className="text-[13px] h-10 bg-white/80 backdrop-blur-sm border-0 shadow-[0_0.5px_1px_rgba(0,0,0,0.08),0_1px_3px_rgba(0,0,0,0.06)] rounded-xl focus-visible:shadow-[0_0_0_3px_rgba(0,0,0,0.08)] focus-visible:ring-0 placeholder:text-[#c7c7cc]"
+              className="text-[13px] h-10 bg-[var(--s-card)] backdrop-blur-sm border-0 [box-shadow:var(--s-shadow-sm)] rounded-xl focus-visible:[box-shadow:var(--s-focus-ring)] focus-visible:ring-0 placeholder:text-[var(--s-text-placeholder)] text-[var(--s-text)]"
               disabled={isLoading}
             />
           </div>
@@ -430,9 +425,9 @@ export function LeftSidebar({
             disabled={!inputValue.trim() || isLoading}
             className={cn(
               "h-10 w-10 rounded-xl flex items-center justify-center transition-all duration-200",
-              "bg-[#1a1a1a] text-white",
-              "shadow-[0_0.5px_1px_rgba(0,0,0,0.12),0_1px_3px_rgba(0,0,0,0.1)]",
-              "hover:shadow-[0_2px_8px_rgba(0,0,0,0.2)] active:scale-95",
+              "bg-[var(--s-accent)] text-white",
+              "[box-shadow:0_1px_3px_var(--s-accent-glow),0_0.5px_1px_rgba(0,0,0,0.08)]",
+              "hover:bg-[var(--s-accent-hover)] hover:[box-shadow:0_2px_8px_var(--s-accent-glow-hover)] active:scale-95",
               "disabled:opacity-25 disabled:active:scale-100"
             )}
           >
@@ -441,10 +436,6 @@ export function LeftSidebar({
         </div>
       </div>
 
-      {/* Canvas Context / Widgets */}
-      <div className="px-5 py-2.5 shrink-0">
-        <WidgetMenu onAddWidget={onAddWidget} activeWidgets={activeWidgets} />
-      </div>
     </motion.aside>
   );
 }

@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import {
   MousePointer2, Pencil, Eraser, Type, Scissors,
-  Grid3X3, FileText, Trash2, Undo, Redo,
+  Grid3X3, FileText, Trash2, Undo, Redo, Sun, Moon,
 } from 'lucide-react';
 import { rightToolbarVariants } from './animations';
 import { cn } from '@/lib/utils';
@@ -27,6 +27,8 @@ interface VerticalToolbarProps {
   onRedo: () => void;
   canUndo: boolean;
   canRedo: boolean;
+  studioTheme: 'light' | 'dark';
+  onToggleTheme: () => void;
 }
 
 const DRAWING_TOOLS: { id: DrawingTool; icon: React.ElementType; label: string }[] = [
@@ -37,12 +39,12 @@ const DRAWING_TOOLS: { id: DrawingTool; icon: React.ElementType; label: string }
 ];
 
 const COLORS = [
-  { value: 'black', bg: 'bg-[#1a1a1a]', shadow: 'shadow-[0_0_0_2px_#f5f5f5,0_0_0_3.5px_#1a1a1a]' },
-  { value: 'blue', bg: 'bg-[#3478f6]', shadow: 'shadow-[0_0_0_2px_#f5f5f5,0_0_0_3.5px_#3478f6]' },
-  { value: 'red', bg: 'bg-[#ff3b30]', shadow: 'shadow-[0_0_0_2px_#f5f5f5,0_0_0_3.5px_#ff3b30]' },
-  { value: 'green', bg: 'bg-[#34c759]', shadow: 'shadow-[0_0_0_2px_#f5f5f5,0_0_0_3.5px_#34c759]' },
-  { value: 'orange', bg: 'bg-[#ff9500]', shadow: 'shadow-[0_0_0_2px_#f5f5f5,0_0_0_3.5px_#ff9500]' },
-  { value: 'grey', bg: 'bg-[#8e8e93]', shadow: 'shadow-[0_0_0_2px_#f5f5f5,0_0_0_3.5px_#8e8e93]' },
+  { value: 'black', hex: '#1a1a1a' },
+  { value: 'blue', hex: '#3478f6' },
+  { value: 'red', hex: '#ff3b30' },
+  { value: 'green', hex: '#34c759' },
+  { value: 'orange', hex: '#ff9500' },
+  { value: 'grey', hex: '#8e8e93' },
 ];
 
 function ToolButton({
@@ -64,9 +66,9 @@ function ToolButton({
       title={title}
       className={cn(
         "w-9 h-9 rounded-xl flex items-center justify-center transition-all duration-200",
-        active && variant === 'default' && "bg-white/90 text-[#1a1a1a] shadow-[0_0.5px_1px_rgba(0,0,0,0.1),0_1px_3px_rgba(0,0,0,0.06)]",
-        !active && variant === 'default' && "text-[#8e8e93] hover:text-[#555] hover:bg-white/60",
-        variant === 'danger' && "text-[#8e8e93] hover:bg-[#fff5f5] hover:text-[#ff3b30]",
+        active && variant === 'default' && "bg-[var(--s-tool-active-bg)] text-[var(--s-text)] [box-shadow:var(--s-tool-active-shadow)]",
+        !active && variant === 'default' && "text-[var(--s-text-muted)] hover:text-[var(--s-text-secondary)] hover:bg-[var(--s-hover)]",
+        variant === 'danger' && "text-[var(--s-text-muted)] hover:bg-[var(--s-danger-hover-bg)] hover:text-[var(--s-danger)]",
       )}
     >
       {children}
@@ -90,6 +92,8 @@ export function VerticalToolbar({
   onRedo,
   canUndo,
   canRedo,
+  studioTheme,
+  onToggleTheme,
 }: VerticalToolbarProps) {
   return (
     <motion.div
@@ -97,8 +101,26 @@ export function VerticalToolbar({
       initial="hidden"
       animate="visible"
       exit="exit"
-      className="w-[56px] h-full bg-[#f5f5f5]/80 backdrop-blur-xl flex flex-col items-center py-4 gap-1 shrink-0"
+      className="w-[56px] h-full bg-[var(--s-surface)] backdrop-blur-xl flex flex-col items-center py-4 gap-1 shrink-0"
     >
+      {/* Theme Toggle */}
+      <ToolButton
+        active={false}
+        onClick={onToggleTheme}
+        title={studioTheme === 'light' ? 'Switch to dark mode' : 'Switch to light mode'}
+      >
+        {studioTheme === 'light' ? (
+          <Moon className="h-[18px] w-[18px]" />
+        ) : (
+          <Sun className="h-[18px] w-[18px]" />
+        )}
+      </ToolButton>
+
+      {/* Divider */}
+      <div className="w-7 my-1">
+        <div className="h-px bg-gradient-to-r from-transparent via-[var(--s-divider)] to-transparent" />
+      </div>
+
       {/* Drawing Tools */}
       {DRAWING_TOOLS.map(({ id, icon: Icon, label }) => (
         <ToolButton
@@ -122,28 +144,39 @@ export function VerticalToolbar({
 
       {/* Divider */}
       <div className="w-7 my-2">
-        <div className="h-px bg-gradient-to-r from-transparent via-[#e0e0e0] to-transparent" />
+        <div className="h-px bg-gradient-to-r from-transparent via-[var(--s-divider)] to-transparent" />
       </div>
 
       {/* Color Palette */}
       <div className="flex flex-col items-center gap-2">
-        {COLORS.map(({ value, bg, shadow }) => (
+        {COLORS.map(({ value, hex }) => (
           <button
             key={value}
             onClick={() => onColorChange(value)}
             title={value}
-            className={cn(
-              "w-[18px] h-[18px] rounded-full transition-all duration-200",
-              bg,
-              activeColor === value ? shadow : "hover:scale-110",
-            )}
+            className="w-[18px] h-[18px] rounded-full transition-all duration-200"
+            style={{
+              backgroundColor: hex,
+              boxShadow: activeColor === value
+                ? `0 0 0 2px var(--s-surface-solid), 0 0 0 3.5px ${hex}`
+                : undefined,
+              transform: activeColor !== value ? undefined : undefined,
+            }}
+            onMouseEnter={(e) => {
+              if (activeColor !== value) {
+                (e.target as HTMLElement).style.transform = 'scale(1.1)';
+              }
+            }}
+            onMouseLeave={(e) => {
+              (e.target as HTMLElement).style.transform = '';
+            }}
           />
         ))}
       </div>
 
       {/* Divider */}
       <div className="w-7 my-2">
-        <div className="h-px bg-gradient-to-r from-transparent via-[#e0e0e0] to-transparent" />
+        <div className="h-px bg-gradient-to-r from-transparent via-[var(--s-divider)] to-transparent" />
       </div>
 
       {/* Canvas Controls */}

@@ -91,8 +91,8 @@ export function SnippingTool({ isActive, onSelectionComplete, onCancel }: Snippi
       <div className="absolute inset-0 bg-black/30" />
 
       {/* Instructions */}
-      <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-white dark:bg-gray-800 px-4 py-2 rounded-lg shadow-lg text-sm">
-        Drag to select area • Press <kbd className="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 rounded text-xs">Esc</kbd> to cancel
+      <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-[var(--s-card-solid)] text-[var(--s-text)] px-4 py-2 rounded-lg [box-shadow:var(--s-shadow-lg)] text-sm">
+        Drag to select area • Press <kbd className="px-1.5 py-0.5 bg-[var(--s-input-bg)] rounded text-xs">Esc</kbd> to cancel
       </div>
 
       {/* Selection Rectangle */}

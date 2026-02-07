@@ -4,8 +4,7 @@ import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Youtube, ExternalLink } from 'lucide-react';
 import { FloatingPanel } from './FloatingPanel';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 
 interface YouTubeWidgetProps {
   defaultPosition?: { x: number; y: number };
@@ -29,7 +28,6 @@ function extractYouTubeId(url: string): string | null {
 export function YouTubeWidget({ defaultPosition = { x: 800, y: 70 }, initialUrl, onClose }: YouTubeWidgetProps) {
   const [url, setUrl] = useState(initialUrl || '');
   const [videoId, setVideoId] = useState<string | null>(() => {
-    // Auto-extract video ID from initial URL if provided
     if (initialUrl) {
       return extractYouTubeId(initialUrl);
     }
@@ -61,7 +59,7 @@ export function YouTubeWidget({ defaultPosition = { x: 800, y: 70 }, initialUrl,
     >
       <FloatingPanel
         title="YouTube"
-        icon={<Youtube className="h-4 w-4 text-red-500" />}
+        icon={<Youtube className="h-4 w-4 text-[#ff3b30]" />}
         defaultPosition={defaultPosition}
         minWidth={200}
         maxWidth={1200}
@@ -74,29 +72,32 @@ export function YouTubeWidget({ defaultPosition = { x: 800, y: 70 }, initialUrl,
         onClose={onClose}
         zIndex={110}
         squareMinimize={true}
-        minimizedIcon={<Youtube className="h-5 w-5 text-red-500" />}
+        minimizedIcon={<Youtube className="h-5 w-5 text-[#ff3b30]" />}
       >
-        <div className="flex flex-col h-full space-y-2">
+        <div className="flex flex-col h-full gap-2">
           {/* URL Input */}
           <div className="flex gap-2 shrink-0">
-            <Input
+            <input
               value={url}
               onChange={(e) => setUrl(e.target.value)}
               onKeyDown={handleKeyDown}
               placeholder="Paste YouTube URL..."
-              className="text-sm h-8"
+              className="flex-1 h-8 px-3 text-[13px] rounded-lg bg-[var(--s-input-bg)] text-[var(--s-text)] placeholder:text-[var(--s-text-placeholder)] outline-none focus:[box-shadow:var(--s-focus-ring)] transition-shadow"
             />
-            <Button size="sm" className="h-8" onClick={handleLoadVideo}>
+            <button
+              onClick={handleLoadVideo}
+              className="h-8 px-3 rounded-lg bg-[var(--s-accent)] text-white text-[12px] font-medium hover:bg-[var(--s-accent-hover)] active:scale-95 transition-all"
+            >
               Load
-            </Button>
+            </button>
           </div>
 
           {error && (
-            <p className="text-xs text-red-500 shrink-0">{error}</p>
+            <p className="text-[11px] text-[var(--s-danger)] shrink-0">{error}</p>
           )}
 
-          {/* Video Player - 16:9 aspect ratio */}
-          <div className="w-full bg-black rounded-lg overflow-hidden" style={{ aspectRatio: '16/9' }}>
+          {/* Video Player */}
+          <div className="w-full rounded-xl overflow-hidden bg-[var(--s-input-bg)]" style={{ aspectRatio: '16/9' }}>
             {videoId ? (
               <iframe
                 src={`https://www.youtube-nocookie.com/embed/${videoId}?enablejsapi=1&origin=${typeof window !== 'undefined' ? window.location.origin : ''}&rel=0`}
@@ -106,10 +107,10 @@ export function YouTubeWidget({ defaultPosition = { x: 800, y: 70 }, initialUrl,
                 referrerPolicy="strict-origin-when-cross-origin"
               />
             ) : (
-              <div className="w-full h-full flex items-center justify-center text-gray-500">
+              <div className="w-full h-full flex items-center justify-center text-[var(--s-text-muted)]">
                 <div className="text-center">
-                  <Youtube className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                  <p className="text-sm">Paste a YouTube URL above</p>
+                  <Youtube className="h-12 w-12 mx-auto mb-2 opacity-30" />
+                  <p className="text-[13px]">Paste a YouTube URL above</p>
                 </div>
               </div>
             )}
@@ -117,15 +118,13 @@ export function YouTubeWidget({ defaultPosition = { x: 800, y: 70 }, initialUrl,
 
           {/* Open in new tab */}
           {videoId && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="w-full shrink-0"
+            <button
               onClick={() => window.open(`https://youtube.com/watch?v=${videoId}`, '_blank')}
+              className="w-full h-8 flex items-center justify-center gap-1.5 rounded-lg text-[12px] text-[var(--s-text-muted)] hover:bg-[var(--s-hover)] active:scale-[0.98] transition-all shrink-0"
             >
-              <ExternalLink className="h-3 w-3 mr-1" />
+              <ExternalLink className="h-3 w-3" />
               Open in YouTube
-            </Button>
+            </button>
           )}
         </div>
       </FloatingPanel>
