@@ -1,6 +1,10 @@
 export { WhiteboardStudio } from './WhiteboardStudio';
 export { FloatingPanel } from './FloatingPanel';
 export { LeftSidebar } from './LeftSidebar';
+export { QuestionHeader } from './QuestionHeader';
 export { VerticalToolbar } from './VerticalToolbar';
 export { ActionCard } from './ActionCard';
+export { VoiceInputPanel } from './VoiceInputPanel';
+export { FinishQuestionDialog } from './FinishQuestionDialog';
+export { AIDiagram } from './AIDiagram';
 export * from './animations';

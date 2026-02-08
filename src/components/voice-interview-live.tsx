@@ -220,7 +220,7 @@ export function VoiceInterviewLive({ question, solutionObjectives, subsection, o
       const genai = new GoogleGenAI({ apiKey })
 
       const session = await genai.live.connect({
-        model: 'gemini-3-flash-preview',
+        model: 'gemini-2.5-flash-lite',
         config: {
           responseModalities: ['AUDIO'],
           inputAudioTranscription: {},

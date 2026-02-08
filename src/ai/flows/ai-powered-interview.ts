@@ -261,7 +261,7 @@ Guide the student step-by-step through just this one objective. Be like a helpfu
 ` : '';
 
       const response = await ai.generate({
-        model: 'googleai/gemini-3-flash-preview',
+        model: 'googleai/gemini-2.5-flash-lite',
         prompt: [
           {text: `You are Xam, a friendly AI teaching assistant acting as an exam marker. You are checking a student's work against the official markscheme for a real exam question, just like a teacher would do when marking exams.
 

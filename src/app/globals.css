@@ -188,6 +188,25 @@ body {
   -ms-overflow-style: none;
 }
 
+/* Subtle visible scrollbar for studio panels */
+.studio-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+.studio-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.studio-scrollbar::-webkit-scrollbar-thumb {
+  background: var(--s-text-placeholder);
+  border-radius: 3px;
+}
+.studio-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: var(--s-text-muted);
+}
+.studio-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: var(--s-text-placeholder) transparent;
+}
+
 /* Hide tldraw watermark */
 .tl-watermark_SEE-LICENSE {
   display: none !important;

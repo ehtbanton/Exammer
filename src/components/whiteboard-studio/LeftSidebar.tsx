@@ -1,21 +1,20 @@
 "use client";
 
 import React, { useRef, useEffect, useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import {
   Bot, User, Send, Loader2, Youtube, Globe,
-  X, ChevronLeft, ChevronRight as ChevronRightIcon,
+  ChevronLeft, ChevronRight as ChevronRightIcon,
   ArrowRight, Search, BookOpen, CheckCircle,
-  Check, Circle, Plus, ChevronDown, ChevronUp,
-  MessageSquare,
+  MessageSquare, Mic, PenTool, ArrowLeft,
+  Flag,
 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Progress } from '@/components/ui/progress';
 import { LatexRenderer } from '@/components/latex-renderer';
 import { ActionCard } from './ActionCard';
-import { sidebarVariants, collapseVariants } from './animations';
+import { VoiceInputPanel } from './VoiceInputPanel';
+import { sidebarVariants } from './animations';
 import { cn } from '@/lib/utils';
 
 interface ChatMessage {
@@ -23,6 +22,8 @@ interface ChatMessage {
   content: string;
   imageUrl?: string;
 }
+
+type InputMode = 'text' | 'voice' | 'canvas';
 
 interface LeftSidebarProps {
   questionText: string;
@@ -41,6 +42,17 @@ interface LeftSidebarProps {
   isCollapsed: boolean;
   onToggleCollapse: () => void;
   onExit: () => void;
+  // New props for full question page features
+  onFinishQuestion?: () => void;
+  currentScore?: number;
+  previousScore?: number;
+  examQuestionSummary?: string;
+  onVoiceMessage?: (role: 'user' | 'assistant', content: string) => void;
+  onVoiceEvaluation?: (userAnswer: string) => Promise<void>;
+  diagramDescription?: string;
+  accessLevel?: number | null;
+  onSubmitCanvas?: () => void;
+  isSubmittingCanvas?: boolean;
 }
 
 function extractUrls(text: string): { youtubeVideoUrls: string[]; youtubeSearchUrls: string[]; articleUrls: string[] } {
@@ -86,15 +98,34 @@ export function LeftSidebar({
   isCollapsed,
   onToggleCollapse,
   onExit,
+  onFinishQuestion,
+  currentScore = 0,
+  previousScore = 0,
+  examQuestionSummary = '',
+  onVoiceMessage,
+  onVoiceEvaluation,
+  diagramDescription,
+  accessLevel,
+  onSubmitCanvas,
+  isSubmittingCanvas = false,
 }: LeftSidebarProps) {
   const [inputValue, setInputValue] = useState('');
-  const [questionExpanded, setQuestionExpanded] = useState(false);
+  const [inputMode, setInputMode] = useState<InputMode>('text');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const completedCount = completedObjectives.length;
   const totalCount = objectives.length;
-  const progressPercent = totalCount > 0 ? (completedCount / totalCount) * 100 : 0;
+
+  // Calculate score colors for finish button
+  const newScorePercent = totalCount > 0 ? (completedCount / totalCount) * 100 : 0;
+  const getFinishButtonColor = () => {
+    if (newScorePercent > previousScore) return 'bg-[var(--s-success)] hover:bg-[var(--s-success)]/90';
+    if (newScorePercent < previousScore) return 'bg-[var(--s-danger)] hover:bg-[var(--s-danger)]/90';
+    return 'bg-[#ff9500] hover:bg-[#ff9500]/90'; // Amber for unchanged
+  };
+
+  const isCompleted = completedCount === totalCount && totalCount > 0;
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -144,12 +175,26 @@ export function LeftSidebar({
           <BookOpen className="h-[18px] w-[18px]" />
         </button>
         <div className="flex-1" />
+        {onFinishQuestion && (
+          <button
+            onClick={onFinishQuestion}
+            disabled={messages.length <= 1}
+            className={cn(
+              "w-10 h-10 rounded-xl flex items-center justify-center active:scale-95 transition-all duration-200 text-white",
+              getFinishButtonColor(),
+              messages.length <= 1 && "opacity-50 cursor-not-allowed"
+            )}
+            title="Finish Question"
+          >
+            <Flag className="h-[18px] w-[18px]" />
+          </button>
+        )}
         <button
           onClick={onExit}
-          className="w-10 h-10 rounded-xl flex items-center justify-center hover:bg-[var(--s-danger-hover-bg)] active:scale-95 transition-all duration-200 text-[var(--s-text-muted)] hover:text-[var(--s-danger)]"
-          title="Exit"
+          className="w-10 h-10 rounded-xl flex items-center justify-center hover:bg-[var(--s-hover)] active:scale-95 transition-all duration-200 text-[var(--s-text-muted)]"
+          title="Back to Topic"
         >
-          <X className="h-[18px] w-[18px]" />
+          <ArrowLeft className="h-[18px] w-[18px]" />
         </button>
       </motion.div>
     );
@@ -169,8 +214,8 @@ export function LeftSidebar({
           onClick={onExit}
           className="flex items-center gap-2 text-[13px] text-[var(--s-text-muted)] hover:text-[var(--s-text)] active:scale-95 transition-all duration-200"
         >
-          <X className="h-4 w-4" />
-          <span>Exit</span>
+          <ArrowLeft className="h-4 w-4" />
+          <span>Back to Topic</span>
         </button>
         <button
           onClick={onToggleCollapse}
@@ -180,6 +225,26 @@ export function LeftSidebar({
           <ChevronLeft className="h-4 w-4" />
         </button>
       </div>
+
+      {/* Finish Question Button */}
+      {onFinishQuestion && (
+        <div className="px-5 pb-3 shrink-0">
+          <button
+            onClick={onFinishQuestion}
+            disabled={messages.length <= 1}
+            className={cn(
+              "w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl",
+              "text-[13px] font-semibold text-white transition-all duration-200",
+              "[box-shadow:0_2px_8px_rgba(0,0,0,0.15)]",
+              getFinishButtonColor(),
+              messages.length <= 1 && "opacity-50 cursor-not-allowed"
+            )}
+          >
+            <Flag className="h-4 w-4" />
+            Finish Question
+          </button>
+        </div>
+      )}
 
       {/* AI Greeting (when no messages) */}
       {messages.length === 0 && (
@@ -231,71 +296,6 @@ export function LeftSidebar({
             onClick={onCheck}
           />
         </div>
-      </div>
-
-      {/* Question & Progress (collapsible) */}
-      <div className="mx-5 rounded-2xl bg-[var(--s-card)] backdrop-blur-sm [box-shadow:var(--s-shadow-sm)] mb-3 shrink-0 overflow-hidden">
-        <button
-          onClick={() => setQuestionExpanded(!questionExpanded)}
-          className="w-full flex items-center justify-between px-4 py-3 hover:bg-[var(--s-hover)] transition-all duration-200"
-        >
-          <div className="flex items-center gap-2.5">
-            <span className="text-[11px] font-semibold text-[var(--s-text-muted)] uppercase tracking-wider">
-              Progress
-            </span>
-            <span className="text-[11px] font-medium text-[var(--s-text)] bg-[var(--s-surface-solid)] px-2 py-0.5 rounded-full">
-              {completedCount}/{totalCount}
-            </span>
-          </div>
-          <ChevronDown className={cn(
-            "h-3.5 w-3.5 text-[var(--s-text-muted)] transition-transform duration-200",
-            questionExpanded && "rotate-180"
-          )} />
-        </button>
-
-        <AnimatePresence initial={false}>
-          {questionExpanded && (
-            <motion.div
-              variants={collapseVariants}
-              initial="collapsed"
-              animate="expanded"
-              exit="collapsed"
-              className="overflow-hidden"
-            >
-              <div className="px-4 pb-4 space-y-3">
-                <Progress value={progressPercent} className="h-1.5" />
-                <div className="text-[13px] text-[var(--s-text-secondary)] leading-relaxed">
-                  <LatexRenderer>{questionText}</LatexRenderer>
-                </div>
-                {objectives.length > 0 && (
-                  <ul className="space-y-1.5">
-                    {objectives.map((objective, index) => {
-                      const isCompleted = completedObjectives.includes(index);
-                      return (
-                        <li
-                          key={index}
-                          className={cn(
-                            "flex items-start gap-2 text-[12px] p-2.5 rounded-xl transition-all duration-200",
-                            isCompleted
-                              ? "bg-[var(--s-completed-bg)] text-[var(--s-completed-text)]"
-                              : "bg-[var(--s-objective-bg)] text-[var(--s-objective-text)]"
-                          )}
-                        >
-                          {isCompleted ? (
-                            <Check className="h-3.5 w-3.5 mt-0.5 shrink-0 text-[var(--s-success)]" />
-                          ) : (
-                            <Circle className="h-3.5 w-3.5 mt-0.5 shrink-0 text-[var(--s-text-placeholder)]" />
-                          )}
-                          <span className="line-clamp-2">{objective}</span>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                )}
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
       </div>
 
       {/* Chat Messages (scrollable) */}
@@ -406,34 +406,117 @@ export function LeftSidebar({
         </div>
       </div>
 
-      {/* Chat Input */}
-      <div className="px-5 py-4 shrink-0">
-        <div className="flex gap-2.5">
-          <div className="flex-1">
-            <Input
-              ref={inputRef}
-              value={inputValue}
-              onChange={(e) => setInputValue(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder="Ask anything..."
-              className="text-[13px] h-10 bg-[var(--s-card)] backdrop-blur-sm border-0 [box-shadow:var(--s-shadow-sm)] rounded-xl focus-visible:[box-shadow:var(--s-focus-ring)] focus-visible:ring-0 placeholder:text-[var(--s-text-placeholder)] text-[var(--s-text)]"
-              disabled={isLoading}
-            />
-          </div>
+      {/* Input Mode Tabs */}
+      <div className="px-5 py-4 shrink-0 space-y-3">
+        {/* Tab Switcher */}
+        <div className="flex rounded-xl bg-[var(--s-card)] p-1 [box-shadow:var(--s-shadow-sm)]">
           <button
-            onClick={handleSend}
-            disabled={!inputValue.trim() || isLoading}
+            onClick={() => setInputMode('text')}
+            disabled={isLoading || isCompleted}
             className={cn(
-              "h-10 w-10 rounded-xl flex items-center justify-center transition-all duration-200",
-              "bg-[var(--s-accent)] text-white",
-              "[box-shadow:0_1px_3px_var(--s-accent-glow),0_0.5px_1px_rgba(0,0,0,0.08)]",
-              "hover:bg-[var(--s-accent-hover)] hover:[box-shadow:0_2px_8px_var(--s-accent-glow-hover)] active:scale-95",
-              "disabled:opacity-25 disabled:active:scale-100"
+              "flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-[12px] font-medium transition-all duration-200",
+              inputMode === 'text'
+                ? "bg-[var(--s-surface-solid)] text-[var(--s-text)] [box-shadow:var(--s-shadow-sm)]"
+                : "text-[var(--s-text-muted)] hover:text-[var(--s-text)]",
+              (isLoading || isCompleted) && "opacity-50 cursor-not-allowed"
             )}
           >
-            <Send className="h-4 w-4" />
+            <MessageSquare className="h-3.5 w-3.5" />
+            Text
+          </button>
+          <button
+            onClick={() => setInputMode('voice')}
+            disabled={isLoading || isCompleted || !onVoiceMessage || !onVoiceEvaluation}
+            className={cn(
+              "flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-[12px] font-medium transition-all duration-200",
+              inputMode === 'voice'
+                ? "bg-[var(--s-surface-solid)] text-[var(--s-text)] [box-shadow:var(--s-shadow-sm)]"
+                : "text-[var(--s-text-muted)] hover:text-[var(--s-text)]",
+              (isLoading || isCompleted || !onVoiceMessage) && "opacity-50 cursor-not-allowed"
+            )}
+          >
+            <Mic className="h-3.5 w-3.5" />
+            Voice
+          </button>
+          <button
+            onClick={() => setInputMode('canvas')}
+            disabled={isLoading || isCompleted}
+            className={cn(
+              "flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-[12px] font-medium transition-all duration-200",
+              inputMode === 'canvas'
+                ? "bg-[var(--s-surface-solid)] text-[var(--s-text)] [box-shadow:var(--s-shadow-sm)]"
+                : "text-[var(--s-text-muted)] hover:text-[var(--s-text)]",
+              (isLoading || isCompleted) && "opacity-50 cursor-not-allowed"
+            )}
+          >
+            <PenTool className="h-3.5 w-3.5" />
+            Canvas
           </button>
         </div>
+
+        {/* Input Content based on mode */}
+        {inputMode === 'text' && (
+          <div className="flex gap-2.5">
+            <div className="flex-1">
+              <Input
+                ref={inputRef}
+                value={inputValue}
+                onChange={(e) => setInputValue(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder="Ask anything..."
+                className="text-[13px] h-10 bg-[var(--s-card)] backdrop-blur-sm border-0 [box-shadow:var(--s-shadow-sm)] rounded-xl focus-visible:[box-shadow:var(--s-focus-ring)] focus-visible:ring-0 placeholder:text-[var(--s-text-placeholder)] text-[var(--s-text)]"
+                disabled={isLoading || isCompleted}
+              />
+            </div>
+            <button
+              onClick={handleSend}
+              disabled={!inputValue.trim() || isLoading || isCompleted}
+              className={cn(
+                "h-10 w-10 rounded-xl flex items-center justify-center transition-all duration-200",
+                "bg-[var(--s-accent)] text-white",
+                "[box-shadow:0_1px_3px_var(--s-accent-glow),0_0.5px_1px_rgba(0,0,0,0.08)]",
+                "hover:bg-[var(--s-accent-hover)] hover:[box-shadow:0_2px_8px_var(--s-accent-glow-hover)] active:scale-95",
+                "disabled:opacity-25 disabled:active:scale-100"
+              )}
+            >
+              <Send className="h-4 w-4" />
+            </button>
+          </div>
+        )}
+
+        {inputMode === 'voice' && onVoiceMessage && onVoiceEvaluation && (
+          <VoiceInputPanel
+            question={questionText}
+            solutionObjectives={objectives}
+            subsection={examQuestionSummary}
+            onAddMessage={onVoiceMessage}
+            onEvaluateAnswer={onVoiceEvaluation}
+            disabled={isCompleted}
+          />
+        )}
+
+        {inputMode === 'canvas' && (
+          <div className="space-y-2">
+            <button
+              onClick={onSubmitCanvas}
+              disabled={isSubmittingCanvas || isLoading || isCompleted}
+              className={cn(
+                "w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl",
+                "text-[13px] font-medium transition-all duration-200",
+                "bg-[var(--s-accent)] text-white",
+                "[box-shadow:0_2px_8px_var(--s-accent-glow)]",
+                "hover:bg-[var(--s-accent-hover)] hover:[box-shadow:0_4px_14px_var(--s-accent-glow-hover)]",
+                "disabled:opacity-50 disabled:cursor-not-allowed"
+              )}
+            >
+              <Send className="h-4 w-4" />
+              {isSubmittingCanvas ? 'Submitting...' : 'Submit Canvas'}
+            </button>
+            <p className="text-[11px] text-[var(--s-text-placeholder)] text-center">
+              Draw on the canvas, then submit for XAM to analyze
+            </p>
+          </div>
+        )}
       </div>
 
     </motion.aside>
