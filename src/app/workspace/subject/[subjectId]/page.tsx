@@ -18,6 +18,7 @@ import { PaperType } from '@/lib/types';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { UnderstandingIndicator } from '@/components/ui/understanding-indicator';
+import { EnrichmentPanel } from '@/components/enrichment/EnrichmentPanel';
 
 export default function SubjectPage() {
   return (
@@ -409,6 +410,9 @@ function SubjectPageContent() {
           </Card>
         )}
       </div>
+
+      {/* Curriculum Enrichment */}
+      <EnrichmentPanel subjectId={subjectId} />
     </div>
   );
 }

@@ -1,5 +1,5 @@
 {
-  "currentVersion": 11,
+  "currentVersion": 17,
   "versions": {
     "0": {
       "description": "Initial schema - subjects owned by users",
@@ -428,6 +428,63 @@
             "action": "create_index",
             "table": "conversation_messages",
             "sql": "CREATE INDEX IF NOT EXISTS idx_conversation_messages_conversation_id ON conversation_messages(conversation_id)"
+          }
+        ]
+      }
+    },
+    "17": {
+      "description": "Curriculum enrichment system - field classification, cross-curriculum gap detection, and breakthrough suggestions",
+      "schema": {
+        "subjects": {
+          "columns": ["id", "name", "syllabus_content", "class_id", "field_classification", "created_at", "updated_at"],
+          "note": "field_classification stores JSON with field, subfield, level, and keywords for curriculum comparison"
+        },
+        "enrichment_suggestions": {
+          "columns": ["id", "subject_id", "type", "source_subject_id", "source_topic_name", "source_topic_description", "breakthrough_title", "breakthrough_summary", "breakthrough_source", "breakthrough_relevance", "field", "confidence_score", "created_at", "expires_at"],
+          "note": "Stores gap suggestions (from cross-curriculum comparison) and breakthrough suggestions (from web search fallback)"
+        },
+        "enrichment_dismissals": {
+          "columns": ["id", "user_id", "suggestion_id", "dismissed_at"],
+          "note": "Per-user dismissals so suggestions don't reappear"
+        }
+      },
+      "migration": {
+        "from": 16,
+        "steps": [
+          {
+            "action": "add_column",
+            "table": "subjects",
+            "sql": "ALTER TABLE subjects ADD COLUMN field_classification TEXT"
+          },
+          {
+            "action": "create_table",
+            "table": "enrichment_suggestions",
+            "sql": "CREATE TABLE IF NOT EXISTS enrichment_suggestions (id INTEGER PRIMARY KEY AUTOINCREMENT, subject_id INTEGER NOT NULL, type TEXT NOT NULL CHECK(type IN ('gap', 'breakthrough')), source_subject_id INTEGER, source_topic_name TEXT, source_topic_description TEXT, breakthrough_title TEXT, breakthrough_summary TEXT, breakthrough_source TEXT, breakthrough_relevance TEXT, field TEXT NOT NULL, confidence_score INTEGER DEFAULT 50, created_at INTEGER DEFAULT (unixepoch()), expires_at INTEGER, FOREIGN KEY (subject_id) REFERENCES subjects(id) ON DELETE CASCADE, FOREIGN KEY (source_subject_id) REFERENCES subjects(id) ON DELETE SET NULL)"
+          },
+          {
+            "action": "create_index",
+            "table": "enrichment_suggestions",
+            "sql": "CREATE INDEX IF NOT EXISTS idx_enrichment_suggestions_subject_id ON enrichment_suggestions(subject_id)"
+          },
+          {
+            "action": "create_index",
+            "table": "enrichment_suggestions",
+            "sql": "CREATE INDEX IF NOT EXISTS idx_enrichment_suggestions_type ON enrichment_suggestions(type)"
+          },
+          {
+            "action": "create_index",
+            "table": "enrichment_suggestions",
+            "sql": "CREATE INDEX IF NOT EXISTS idx_enrichment_suggestions_field ON enrichment_suggestions(field)"
+          },
+          {
+            "action": "create_table",
+            "table": "enrichment_dismissals",
+            "sql": "CREATE TABLE IF NOT EXISTS enrichment_dismissals (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, suggestion_id INTEGER NOT NULL, dismissed_at INTEGER DEFAULT (unixepoch()), FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE, FOREIGN KEY (suggestion_id) REFERENCES enrichment_suggestions(id) ON DELETE CASCADE, UNIQUE(user_id, suggestion_id))"
+          },
+          {
+            "action": "create_index",
+            "table": "enrichment_dismissals",
+            "sql": "CREATE INDEX IF NOT EXISTS idx_enrichment_dismissals_user_id ON enrichment_dismissals(user_id)"
           }
         ]
       }
