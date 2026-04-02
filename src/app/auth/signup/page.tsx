@@ -45,13 +45,13 @@ function SignUpContent() {
 
     // Validate passwords match
     if (password !== confirmPassword) {
-      setError('Passwords do not match');
+      setError('Las contraseñas no coinciden');
       setLoading(false);
       return;
     }
 
     if (password.length < 8) {
-      setError('Password must be at least 8 characters long');
+      setError('La contraseña debe tener al menos 8 caracteres');
       setLoading(false);
       return;
     }
@@ -66,7 +66,7 @@ function SignUpContent() {
       const data = await response.json();
 
       if (!response.ok) {
-        setError(data.error || 'An error occurred during signup');
+        setError(data.error || 'Ocurrió un error durante el registro');
         setLoading(false);
         return;
       }
@@ -75,7 +75,7 @@ function SignUpContent() {
       setSuccess(true);
       setLoading(false);
     } catch (err) {
-      setError('An unexpected error occurred');
+      setError('Ocurrió un error inesperado');
       setLoading(false);
     }
   };
@@ -95,27 +95,27 @@ function SignUpContent() {
       <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4 py-12 sm:px-6 lg:px-8">
         <Card className="w-full max-w-md">
           <CardHeader>
-            <CardTitle className="text-2xl font-bold">Check Your Email</CardTitle>
-            <CardDescription>We've sent you a verification link</CardDescription>
+            <CardTitle className="text-2xl font-bold">Revisa tu Correo</CardTitle>
+            <CardDescription>Te hemos enviado un enlace de verificación</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <Alert>
               <AlertDescription>
-                A verification email has been sent to <strong>{email}</strong>.
-                Please check your inbox and click the link to verify your account.
+                Se ha enviado un correo de verificación a <strong>{email}</strong>.
+                Revisa tu bandeja de entrada y haz clic en el enlace para verificar tu cuenta.
               </AlertDescription>
             </Alert>
             <p className="text-sm text-muted-foreground">
-              Didn't receive the email? Check your spam folder or{' '}
+              ¿No recibiste el correo? Revisa tu carpeta de spam o{' '}
               <Link href="/auth/resend-verification" className="font-medium text-primary hover:underline">
-                request a new verification email
+                solicita un nuevo correo de verificación
               </Link>.
             </p>
           </CardContent>
           <CardFooter>
             <Link href="/auth/signin" className="w-full">
               <Button className="w-full" variant="outline">
-                Back to Sign In
+                Volver a Iniciar Sesión
               </Button>
             </Link>
           </CardFooter>
@@ -134,8 +134,8 @@ function SignUpContent() {
     <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4 py-12 sm:px-6 lg:px-8">
       <Card className="w-full max-w-md">
         <CardHeader>
-          <CardTitle className="text-2xl font-bold">Create Account</CardTitle>
-          <CardDescription>Enter your information to get started</CardDescription>
+          <CardTitle className="text-2xl font-bold">Crear Cuenta</CardTitle>
+          <CardDescription>Ingresa tu información para comenzar</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -146,7 +146,7 @@ function SignUpContent() {
             )}
 
             <div className="space-y-2">
-              <Label htmlFor="name">Name (optional)</Label>
+              <Label htmlFor="name">Nombre (opcional)</Label>
               <Input
                 id="name"
                 type="text"
@@ -158,7 +158,7 @@ function SignUpContent() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="email">Correo electrónico</Label>
               <Input
                 id="email"
                 type="email"
@@ -171,11 +171,11 @@ function SignUpContent() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
+              <Label htmlFor="password">Contraseña</Label>
               <Input
                 id="password"
                 type="password"
-                placeholder="Min. 8 characters"
+                placeholder="Mín. 8 caracteres"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
@@ -184,7 +184,7 @@ function SignUpContent() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="confirmPassword">Confirm Password</Label>
+              <Label htmlFor="confirmPassword">Confirmar Contraseña</Label>
               <Input
                 id="confirmPassword"
                 type="password"
@@ -196,15 +196,15 @@ function SignUpContent() {
             </div>
 
             <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? 'Creating account...' : 'Sign Up'}
+              {loading ? 'Creando cuenta...' : 'Registrarse'}
             </Button>
           </form>
         </CardContent>
         <CardFooter>
           <div className="text-sm text-muted-foreground">
-            Already have an account?{' '}
+            ¿Ya tienes cuenta?{' '}
             <Link href="/auth/signin" className="font-medium text-primary hover:underline">
-              Sign in
+              Iniciar sesión
             </Link>
           </div>
         </CardFooter>
@@ -215,7 +215,7 @@ function SignUpContent() {
 
 export default function SignUpPage() {
   return (
-    <Suspense fallback={<div className="flex min-h-screen items-center justify-center">Loading...</div>}>
+    <Suspense fallback={<div className="flex min-h-screen items-center justify-center">Cargando...</div>}>
       <SignUpContent />
     </Suspense>
   );

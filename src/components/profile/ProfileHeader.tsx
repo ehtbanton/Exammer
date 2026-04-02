@@ -24,10 +24,10 @@ export function ProfileHeader({ user, profileUrl }: ProfileHeaderProps) {
     try {
       await navigator.clipboard.writeText(profileUrl);
       setCopied(true);
-      toast.success("Profile URL copied to clipboard!");
+      toast.success("¡URL del perfil copiada al portapapeles!");
       setTimeout(() => setCopied(false), 2000);
     } catch {
-      toast.error("Failed to copy URL");
+      toast.error("Error al copiar la URL");
     }
   };
 
@@ -42,7 +42,7 @@ export function ProfileHeader({ user, profileUrl }: ProfileHeaderProps) {
 
   const formatMemberSince = (dateStr: string) => {
     const date = new Date(dateStr);
-    return date.toLocaleDateString("en-GB", {
+    return date.toLocaleDateString("es-MX", {
       month: "long",
       year: "numeric",
     });
@@ -61,7 +61,7 @@ export function ProfileHeader({ user, profileUrl }: ProfileHeaderProps) {
         <h1 className="text-3xl font-bold text-foreground">{user.name}</h1>
         <div className="flex items-center gap-2 mt-1 text-muted-foreground">
           <Calendar className="h-4 w-4" />
-          <span>Member since {formatMemberSince(user.memberSince)}</span>
+          <span>Miembro desde {formatMemberSince(user.memberSince)}</span>
         </div>
       </div>
 
@@ -73,12 +73,12 @@ export function ProfileHeader({ user, profileUrl }: ProfileHeaderProps) {
         {copied ? (
           <>
             <Check className="h-4 w-4" />
-            Copied!
+            ¡Copiado!
           </>
         ) : (
           <>
             <Share2 className="h-4 w-4" />
-            Share Profile
+            Compartir Perfil
           </>
         )}
       </Button>

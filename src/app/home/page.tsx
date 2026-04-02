@@ -26,7 +26,7 @@ export default function HomePage() {
               Exammer
             </h1>
             <p className="text-xl text-muted-foreground">
-              Get hooked on Revision
+              Aprende con inteligencia
             </p>
           </div>
         </Link>
@@ -99,8 +99,8 @@ export default function HomePage() {
 
         {/* Product Description */}
         <p className="mt-6 max-w-4xl text-center text-3xl text-muted-foreground px-4 leading-snug">
-          Exammer is an AI framework that turns past papers for your course into a structured revision plan,
-          using an interactive tutor and gamified progress tracking to replace guesswork with clarity.
+          Exammer es una plataforma de IA que convierte tus documentos en un plan de aprendizaje estructurado,
+          con un tutor interactivo y seguimiento gamificado para reemplazar la improvisación con claridad.
         </p>
       </div>
 
@@ -113,12 +113,12 @@ export default function HomePage() {
             <CardHeader>
               <div className="flex items-center gap-3">
                 <BookOpen className="h-8 w-8 text-primary" />
-                <CardTitle>The Workspace</CardTitle>
+                <CardTitle>El Espacio de Trabajo</CardTitle>
               </div>
             </CardHeader>
             <CardContent>
               <p className="text-muted-foreground mb-4">
-                Your personal study hub where all subjects and topics are organized.
+                Tu centro de aprendizaje personal donde todos los cursos y temas están organizados.
               </p>
               <div className="grid grid-cols-1 gap-3 mb-4">
                 {/* Subject Card 1 */}
@@ -130,7 +130,7 @@ export default function HomePage() {
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="pt-0">
-                    <p className="text-xs text-muted-foreground">4 paper types identified.</p>
+                    <p className="text-xs text-muted-foreground">4 módulos identificados.</p>
                   </CardContent>
                 </Card>
                 {/* Subject Card 2 */}
@@ -142,7 +142,7 @@ export default function HomePage() {
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="pt-0">
-                    <p className="text-xs text-muted-foreground">3 paper types identified.</p>
+                    <p className="text-xs text-muted-foreground">3 módulos identificados.</p>
                   </CardContent>
                 </Card>
               </div>
@@ -150,19 +150,19 @@ export default function HomePage() {
               <ul className="space-y-1.5 text-sm text-muted-foreground">
                 <li className="flex items-start gap-2">
                   <span className="text-primary mt-0.5">•</span>
-                  <span>All your revision in one place</span>
+                  <span>Todo tu aprendizaje en un solo lugar</span>
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="text-primary mt-0.5">•</span>
-                  <span>Search and add new subjects</span>
+                  <span>Busca y agrega nuevos cursos</span>
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="text-primary mt-0.5">•</span>
-                  <span>Track progress across all topics</span>
+                  <span>Sigue tu progreso en todos los temas</span>
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="text-primary mt-0.5">•</span>
-                  <span>Compete with peers in classrooms</span>
+                  <span>Compite con tus compañeros en las clases</span>
                 </li>
               </ul>
             </CardContent>
@@ -175,12 +175,12 @@ export default function HomePage() {
                 <div className="[&>div>div:last-child]:hidden">
                   <UnderstandingIndicator percentage={75} size="lg" />
                 </div>
-                <CardTitle>Levels of Understanding</CardTitle>
+                <CardTitle>Niveles de Comprensión</CardTitle>
               </div>
             </CardHeader>
             <CardContent>
               <p className="text-muted-foreground mb-4">
-                Every question, topic, and paper type is categorized by your understanding level, helping you focus on what needs improvement.
+                Cada pregunta, tema y módulo se clasifica según tu nivel de comprensión, ayudándote a enfocarte en lo que necesitas mejorar.
               </p>
               <div className="grid grid-cols-1 gap-3">
                 {/* Green with few questions completed */}
@@ -219,12 +219,12 @@ export default function HomePage() {
             <CardHeader>
               <div className="flex items-center gap-3">
                 <Users className="h-8 w-8 text-primary" />
-                <CardTitle>Classrooms</CardTitle>
+                <CardTitle>Aulas</CardTitle>
               </div>
             </CardHeader>
             <CardContent>
               <p className="text-muted-foreground mb-4">
-                Share progress, compare understanding levels, identify weak spots, and work together towards exam success.
+                Comparte tu progreso, compara niveles de comprensión, identifica áreas débiles y trabaja en equipo hacia el éxito.
               </p>
               <div className="space-y-3">
                 {/* Classroom Card Example */}
@@ -234,14 +234,14 @@ export default function HomePage() {
                     <span className="font-semibold text-sm">Year 12 Maths</span>
                   </div>
                   <div className="flex items-center justify-between text-xs text-muted-foreground mb-2">
-                    <span>24 students</span>
-                    <span>Code: ABC123</span>
+                    <span>24 estudiantes</span>
+                    <span>Código: ABC123</span>
                   </div>
-                  <div className="text-xs text-muted-foreground mb-1">Class Average</div>
+                  <div className="text-xs text-muted-foreground mb-1">Promedio de la clase</div>
                   <div className="w-full bg-muted rounded-full h-2 mb-1">
                     <div className="bg-green-500 h-2 rounded-full" style={{width: '68%'}}></div>
                   </div>
-                  <div className="text-xs text-muted-foreground">68% understanding</div>
+                  <div className="text-xs text-muted-foreground">68% comprensión</div>
                 </div>
               </div>
             </CardContent>
@@ -252,19 +252,19 @@ export default function HomePage() {
             <CardHeader>
               <div className="flex items-center gap-3">
                 <Bot className="h-8 w-8 text-primary" />
-                <CardTitle>Xam - Your AI Tutor</CardTitle>
+                <CardTitle>Xam - Tu Tutor de IA</CardTitle>
               </div>
             </CardHeader>
             <CardContent>
               <p className="text-muted-foreground mb-4">
-                Meet Xam, your personal AI tutor. Get instant feedback, hints, and guidance as you work
-                through questions. Xam tracks your objectives and helps you master each topic step by step.
+                Conoce a Xam, tu tutor personal de IA. Recibe retroalimentación instantánea, pistas y orientación mientras
+                trabajas en las preguntas. Xam da seguimiento a tus objetivos y te ayuda a dominar cada tema paso a paso.
               </p>
               <div className="bg-muted rounded-lg p-3 space-y-2">
                 {/* User Message */}
                 <div className="flex gap-2 justify-end">
                   <div className="bg-primary text-primary-foreground rounded-lg p-2 text-xs max-w-[80%]">
-                    I got x = 5, is that correct?
+                    Obtuve x = 5, ¿es correcto?
                   </div>
                   <div className="w-6 h-6 rounded-full bg-gray-700 flex items-center justify-center text-white text-xs font-bold shrink-0">U</div>
                 </div>
@@ -272,14 +272,14 @@ export default function HomePage() {
                 <div className="flex gap-2">
                   <Bot className="w-6 h-6 text-primary shrink-0" />
                   <div className="bg-secondary text-secondary-foreground rounded-lg p-2 text-xs">
-                    Great work! You've correctly solved for x = 5. That's objective 3 complete! Now try substituting this back into the original equation to verify.
+                    ¡Excelente trabajo! Has resuelto correctamente x = 5. ¡Objetivo 3 completado! Ahora intenta sustituir este valor en la ecuación original para verificar.
                   </div>
                 </div>
                 {/* Objectives Progress */}
                 <div className="flex items-center gap-2 text-xs pt-1">
                   <div className="flex items-center gap-1">
                     <div className="w-2 h-2 rounded-full bg-green-500"></div>
-                    <span className="text-muted-foreground">3/4 objectives</span>
+                    <span className="text-muted-foreground">3/4 objetivos</span>
                   </div>
                 </div>
               </div>
@@ -290,10 +290,10 @@ export default function HomePage() {
 
       {/* Footer CTA */}
       <div className="container mx-auto px-4 py-12 text-center">
-        <h3 className="text-2xl font-bold mb-4">Ready to transform your revision?</h3>
-        <Link href="/auth/signup">
+        <h3 className="text-2xl font-bold mb-4">¿Listo para transformar tu aprendizaje?</h3>
+        <Link href="/auth/signin">
           <Button size="lg" variant="default" className="text-lg px-8 py-6">
-            Sign Up Now
+            Iniciar Sesión
           </Button>
         </Link>
       </div>

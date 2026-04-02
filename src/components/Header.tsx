@@ -17,8 +17,6 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { LogOut, User, Terminal, ArrowLeft, Users, Home } from 'lucide-react';
 import { ThemeToggle } from './theme-toggle';
-import FeedbackButton from './FeedbackButton';
-import DonationButton from './DonationButton';
 
 export default function Header() {
   const { data: session, status } = useSession();
@@ -90,7 +88,7 @@ export default function Header() {
                     >
                       <Link href="/workspace">
                         <Home className="h-4 w-4 mr-2" />
-                        Workspace
+                        Espacio de trabajo
                       </Link>
                     </Button>
                     <Button
@@ -101,7 +99,7 @@ export default function Header() {
                     >
                       <Link href={accessLevel === 1 ? "/classes/join" : "/classes"}>
                         <Users className="h-4 w-4 mr-2" />
-                        Classes
+                        Clases
                       </Link>
                     </Button>
                   </>
@@ -131,19 +129,6 @@ export default function Header() {
               <div className="h-8 w-8 rounded-full bg-gray-200 animate-pulse" />
             ) : session ? (
               <>
-                {/* Feedback button */}
-                <FeedbackButton
-                  variant="default"
-                  size="sm"
-                  className="bg-green-600 hover:bg-green-700 text-white shadow-md"
-                />
-
-                {/* Donation button */}
-                <DonationButton
-                  variant="default"
-                  size="sm"
-                  className="bg-gray-500 hover:bg-gray-600 text-white shadow-md"
-                />
 
                 <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -165,13 +150,13 @@ export default function Header() {
                   <DropdownMenuItem asChild>
                     <Link href={`/profile/${session.user?.id}`}>
                       <User className="mr-2 h-4 w-4" />
-                      <span>My Profile</span>
+                      <span>Mi Perfil</span>
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={() => signOut({ callbackUrl: '/auth/signin' })} className="text-red-600">
                     <LogOut className="mr-2 h-4 w-4" />
-                    <span>Log out</span>
+                    <span>Cerrar sesión</span>
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -180,7 +165,7 @@ export default function Header() {
               </>
             ) : (
               <Button variant="ghost" asChild>
-                <Link href="/auth/signin">Login</Link>
+                <Link href="/auth/signin">Iniciar sesión</Link>
               </Button>
             )}
           </div>

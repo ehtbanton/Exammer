@@ -36,7 +36,7 @@ export function EmployerSearch({ userId }: EmployerSearchProps) {
 
   const handleSearch = async () => {
     if (!query.trim()) {
-      toast.error("Please enter a search query");
+      toast.error("Por favor ingresa una búsqueda");
       return;
     }
 
@@ -66,7 +66,7 @@ export function EmployerSearch({ userId }: EmployerSearchProps) {
       setTotalConversations(data.totalConversations || 0);
     } catch (error: any) {
       console.error("Search error:", error);
-      toast.error(error.message || "Search failed");
+      toast.error(error.message || "Error en la búsqueda");
       setResults([]);
     } finally {
       setLoading(false);
@@ -74,7 +74,7 @@ export function EmployerSearch({ userId }: EmployerSearchProps) {
   };
 
   const formatDate = (timestamp: number) => {
-    return new Date(timestamp * 1000).toLocaleDateString("en-GB", {
+    return new Date(timestamp * 1000).toLocaleDateString("es-MX", {
       day: "numeric",
       month: "short",
       year: "numeric",
@@ -86,16 +86,16 @@ export function EmployerSearch({ userId }: EmployerSearchProps) {
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Search className="h-5 w-5" />
-          Search Work History
+          Buscar Historial
         </CardTitle>
         <CardDescription>
-          Paste job requirements or skills to find relevant work this candidate has completed
+          Pega los requisitos del puesto o habilidades para encontrar trabajo relevante que este candidato ha completado
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="space-y-2">
           <Textarea
-            placeholder="e.g., Experience with calculus, problem-solving skills, mathematical proofs, data analysis..."
+            placeholder="Ej., Experiencia con cálculo, habilidades de resolución de problemas, demostraciones matemáticas, análisis de datos..."
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             className="min-h-[100px]"
@@ -108,12 +108,12 @@ export function EmployerSearch({ userId }: EmployerSearchProps) {
             {loading ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Searching...
+                Buscando...
               </>
             ) : (
               <>
                 <Search className="mr-2 h-4 w-4" />
-                Search
+                Buscar
               </>
             )}
           </Button>
@@ -123,10 +123,10 @@ export function EmployerSearch({ userId }: EmployerSearchProps) {
           <div className="space-y-4">
             <div className="text-sm text-muted-foreground">
               {results.length > 0
-                ? `Found ${results.length} relevant results from ${totalConversations} total conversations`
+                ? `Se encontraron ${results.length} resultados relevantes de ${totalConversations} conversaciones en total`
                 : totalConversations > 0
-                ? `No relevant results found in ${totalConversations} conversations. Try different search terms.`
-                : "This user hasn't completed any interviews yet."}
+                ? `No se encontraron resultados relevantes en ${totalConversations} conversaciones. Intenta con otros términos de búsqueda.`
+                : "Este usuario aún no ha completado ninguna entrevista."}
             </div>
 
             {results.length > 0 && (
@@ -154,13 +154,13 @@ export function EmployerSearch({ userId }: EmployerSearchProps) {
                               {result.summary}
                             </p>
                             <p className="text-xs text-muted-foreground mt-2 line-clamp-2">
-                              Question: {result.questionSummary}
+                              Pregunta: {result.questionSummary}
                             </p>
                           </div>
                           <div className="text-right text-xs text-muted-foreground shrink-0">
                             <div className="flex items-center gap-1 justify-end">
                               <Award className="h-3 w-3" />
-                              {Math.round(result.relevanceScore * 100)}% match
+                              {Math.round(result.relevanceScore * 100)}% coincidencia
                             </div>
                             <div className="flex items-center gap-1 justify-end mt-1">
                               <Calendar className="h-3 w-3" />

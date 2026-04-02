@@ -150,9 +150,9 @@ function SubjectPageContent() {
   if (!subject) {
     return (
       <div className="text-center">
-        <h1 className="text-2xl font-bold">Subject not found</h1>
+        <h1 className="text-2xl font-bold">Curso no encontrado</h1>
         <Button asChild variant="link" className="mt-4">
-          <Link href="/">Go back to subjects</Link>
+          <Link href="/">Volver a cursos</Link>
         </Button>
       </div>
     );
@@ -170,7 +170,7 @@ function SubjectPageContent() {
     <div className="container mx-auto">
       <Button variant="ghost" onClick={() => router.push('/')} className="mb-4">
         <ArrowLeft />
-        Back to Subjects
+        Volver a Cursos
       </Button>
       <div className="flex items-center gap-2 mb-2">
         <h1 className="text-3xl font-bold font-headline">{subject?.name}</h1>
@@ -181,7 +181,7 @@ function SubjectPageContent() {
         )}
       </div>
       <p className="text-muted-foreground mb-8">
-        {subject?.isCreator ? 'Manage your subject, syllabus, and past papers' : 'View and practice questions from this subject'}
+        {subject?.isCreator ? 'Administra tu curso y documentos' : 'Ve y practica las preguntas de este curso'}
       </p>
 
       {/* Syllabus and Past Papers Info - Only show for creators */}
@@ -189,42 +189,42 @@ function SubjectPageContent() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
           <Card className="md:col-span-1">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2"><FileText /> Syllabus Info</CardTitle>
+              <CardTitle className="flex items-center gap-2"><FileText /> Info del Documento</CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-green-600">Syllabus uploaded and {paperTypes.length} paper types identified.</p>
+              <p className="text-green-600">Documento subido y {paperTypes.length} módulos identificados.</p>
             </CardContent>
           </Card>
 
           <Card className="md:col-span-2">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2"><List /> Past Papers</CardTitle>
-              <CardDescription>Resets existing past papers that were previously uploaded.</CardDescription>
+              <CardTitle className="flex items-center gap-2"><List /> Documentos Adicionales</CardTitle>
+              <CardDescription>Sube más documentos para extraer preguntas adicionales.</CardDescription>
             </CardHeader>
             <CardFooter className="flex gap-2">
               <Dialog open={isPaperDialogOpen} onOpenChange={setPaperDialogOpen}>
                 <DialogTrigger asChild>
-                  <Button variant="secondary">Add All Past Papers</Button>
+                  <Button variant="secondary">Agregar Documentos</Button>
                 </DialogTrigger>
                 <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
                   <DialogHeader>
-                    <DialogTitle>Upload Past Exam Papers</DialogTitle>
+                    <DialogTitle>Subir Documentos</DialogTitle>
                     <DialogDescription>
-                      Upload past exam papers to extract real exam questions for all topics in "{subject.name}". You can upload markschemes separately later.
+                      Sube documentos para extraer preguntas de todos los temas en "{subject.name}". Opcionalmente puedes subir guías de respuestas después.
                     </DialogDescription>
                   </DialogHeader>
 
                   <div className="space-y-4">
                     <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
                       <p className="text-sm text-blue-800 dark:text-blue-200">
-                        <strong>Note:</strong> Questions will be extracted even without markschemes. You can add markschemes later to enable objective-based grading.
+                        <strong>Nota:</strong> Las preguntas se extraerán automáticamente. Opcionalmente puedes agregar guías de respuestas después para calificación por objetivos.
                       </p>
                     </div>
 
                     <div>
                       <Button onClick={() => paperInputRef.current?.click()} variant="outline" type="button" className="w-full">
                         <FileText className="mr-2 h-4 w-4" />
-                        Add Exam Papers
+                        Agregar Documentos
                       </Button>
                       <Input
                         type="file"
@@ -241,7 +241,7 @@ function SubjectPageContent() {
                             <div key={index} className="flex items-center justify-between gap-2 p-2 bg-muted rounded">
                               <span className="text-sm flex-1">{truncateFilename(paper.name)}</span>
                               <Button variant="ghost" size="sm" onClick={() => removePaper(index)} className="shrink-0 whitespace-nowrap">
-                                <span className="text-xs">Remove</span>
+                                <span className="text-xs">Quitar</span>
                               </Button>
                             </div>
                           ))}
@@ -255,14 +255,14 @@ function SubjectPageContent() {
                         onClick={handleCancelPaperDialog}
                         className="flex-1"
                       >
-                        Cancel
+                        Cancelar
                       </Button>
                       <Button
                         onClick={handleUploadPapers}
                         className="flex-1"
                         disabled={isPaperLoading || selectedPapers.length === 0}
                       >
-                        {isPaperLoading ? <LoadingSpinner /> : 'Process Papers & Extract Questions'}
+                        {isPaperLoading ? <LoadingSpinner /> : 'Procesar y Extraer Preguntas'}
                       </Button>
                     </div>
                   </div>
@@ -271,27 +271,27 @@ function SubjectPageContent() {
 
               <Dialog open={isMarkschemeDialogOpen} onOpenChange={setMarkschemeDialogOpen}>
                 <DialogTrigger asChild>
-                  <Button variant="outline">Upload Markschemes</Button>
+                  <Button variant="outline">Subir Guías de Respuestas</Button>
                 </DialogTrigger>
                 <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
                   <DialogHeader>
-                    <DialogTitle>Upload Markschemes</DialogTitle>
+                    <DialogTitle>Subir Guías de Respuestas</DialogTitle>
                     <DialogDescription>
-                      Upload markschemes to match with existing questions and enable objective-based grading.
+                      Sube guías de respuestas para vincularlas con las preguntas existentes y habilitar la calificación por objetivos.
                     </DialogDescription>
                   </DialogHeader>
 
                   <div className="space-y-4">
                     <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
                       <p className="text-sm text-blue-800 dark:text-blue-200">
-                        <strong>Note:</strong> Markschemes will be automatically matched to existing questions based on paper date and question number.
+                        <strong>Nota:</strong> Las guías de respuestas se vincularán automáticamente con las preguntas existentes.
                       </p>
                     </div>
 
                     <div>
                       <Button onClick={() => markschemeInputRef.current?.click()} variant="outline" type="button" className="w-full">
                         <FileText className="mr-2 h-4 w-4" />
-                        Add Markschemes
+                        Agregar Guías
                       </Button>
                       <Input
                         type="file"
@@ -308,7 +308,7 @@ function SubjectPageContent() {
                             <div key={index} className="flex items-center justify-between gap-2 p-2 bg-muted rounded">
                               <span className="text-sm flex-1">{truncateFilename(markscheme.name)}</span>
                               <Button variant="ghost" size="sm" onClick={() => removeMarkscheme(index)} className="shrink-0 whitespace-nowrap">
-                                <span className="text-xs">Remove</span>
+                                <span className="text-xs">Quitar</span>
                               </Button>
                             </div>
                           ))}
@@ -322,14 +322,14 @@ function SubjectPageContent() {
                         onClick={handleCancelMarkschemeDialog}
                         className="flex-1"
                       >
-                        Cancel
+                        Cancelar
                       </Button>
                       <Button
                         onClick={handleUploadMarkschemes}
                         className="flex-1"
                         disabled={isMarkschemeLoading || selectedMarkschemes.length === 0}
                       >
-                        {isMarkschemeLoading ? <LoadingSpinner /> : 'Process Markschemes & Match'}
+                        {isMarkschemeLoading ? <LoadingSpinner /> : 'Procesar Guías y Vincular'}
                       </Button>
                     </div>
                   </div>
@@ -342,14 +342,14 @@ function SubjectPageContent() {
 
       <div>
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-2xl font-bold font-headline flex items-center gap-2"><BookCopy /> Paper Types</h2>
+          <h2 className="text-2xl font-bold font-headline flex items-center gap-2"><BookCopy /> Módulos</h2>
           <div className="flex items-center gap-2">
             <Switch
               id="hide-empty-papers"
               checked={hideEmptyPapers}
               onCheckedChange={setHideEmptyPapers}
             />
-            <Label htmlFor="hide-empty-papers" className="text-sm">Hide papers without questions</Label>
+            <Label htmlFor="hide-empty-papers" className="text-sm">Ocultar módulos sin preguntas</Label>
           </div>
         </div>
         {filteredPaperTypes.length > 0 ? (
@@ -390,7 +390,7 @@ function SubjectPageContent() {
                   </CardHeader>
                   <CardContent className="space-y-2">
                     <p className="text-sm text-black">
-                      {hasQuestions ? `${paperType.attempted_questions}/${paperType.total_questions} attempted` : 'No questions yet'}
+                      {hasQuestions ? `${paperType.attempted_questions}/${paperType.total_questions} intentadas` : 'Sin preguntas aún'}
                     </p>
                     {hasQuestions && (
                       <Progress value={progressPercentage} className="h-2" />
@@ -403,8 +403,8 @@ function SubjectPageContent() {
         ) : (
           <Card className="text-center py-12">
             <CardContent>
-              <h3 className="text-lg font-semibold">No paper types found</h3>
-              <p className="text-muted-foreground mt-1">This subject has no paper types.</p>
+              <h3 className="text-lg font-semibold">No se encontraron módulos</h3>
+              <p className="text-muted-foreground mt-1">Este curso aún no tiene módulos.</p>
             </CardContent>
           </Card>
         )}

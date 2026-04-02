@@ -8,142 +8,142 @@ export default function TermsOfService() {
       <Link href="/">
         <Button variant="ghost" size="sm" className="mb-6">
           <ArrowLeft className="mr-2 h-4 w-4" />
-          Back to Home
+          Volver al Inicio
         </Button>
       </Link>
 
-      <h1 className="text-4xl font-bold mb-2">Terms of Service</h1>
-      <p className="text-muted-foreground mb-8">Last updated: November 19, 2025</p>
+      <h1 className="text-4xl font-bold mb-2">Términos de Servicio</h1>
+      <p className="text-muted-foreground mb-8">Última actualización: 19 de noviembre de 2025</p>
 
       <div className="prose prose-neutral dark:prose-invert max-w-none space-y-6">
         <section>
-          <h2 className="text-2xl font-semibold mb-3">Agreement to Terms</h2>
+          <h2 className="text-2xl font-semibold mb-3">Aceptación de los Términos</h2>
           <p className="text-muted-foreground">
-            By accessing or using Exammer, you agree to be bound by these Terms of Service. If you disagree with any part of these terms, you may not use our service.
+            Al acceder o usar Exammer, aceptas estar sujeto a estos Términos de Servicio. Si no estás de acuerdo con alguna parte de estos términos, no podrás usar nuestro servicio.
           </p>
         </section>
 
         <section>
-          <h2 className="text-2xl font-semibold mb-3">Description of Service</h2>
+          <h2 className="text-2xl font-semibold mb-3">Descripción del Servicio</h2>
           <p className="text-muted-foreground">
-            Exammer is an AI-powered exam preparation tool that helps students organize study materials, practice past exam questions, and track their understanding across topics. The service includes AI-generated feedback, progress tracking, and collaborative classroom features.
+            Exammer es una herramienta de preparación de exámenes impulsada por inteligencia artificial que ayuda a los estudiantes a organizar materiales de estudio, practicar con preguntas de exámenes anteriores y dar seguimiento a su comprensión de los temas. El servicio incluye retroalimentación generada por IA, seguimiento de progreso y funciones colaborativas de aula.
           </p>
         </section>
 
         <section>
-          <h2 className="text-2xl font-semibold mb-3">Account Registration</h2>
+          <h2 className="text-2xl font-semibold mb-3">Registro de Cuenta</h2>
           <p className="text-muted-foreground mb-3">
-            To use Exammer, you must:
+            Para usar Exammer, debes:
           </p>
           <ul className="list-disc pl-6 text-muted-foreground space-y-1">
-            <li>Provide accurate and complete registration information</li>
-            <li>Maintain the security of your password</li>
-            <li>Be at least 13 years old (or have parental consent)</li>
-            <li>Not share your account with others</li>
-            <li>Notify us immediately of any unauthorized access</li>
+            <li>Proporcionar información de registro precisa y completa</li>
+            <li>Mantener la seguridad de tu contraseña</li>
+            <li>Tener al menos 13 años de edad (o contar con el consentimiento de tus padres)</li>
+            <li>No compartir tu cuenta con otras personas</li>
+            <li>Notificarnos de inmediato sobre cualquier acceso no autorizado</li>
           </ul>
           <p className="text-muted-foreground mt-3">
-            You are responsible for all activities that occur under your account.
+            Eres responsable de todas las actividades que ocurran en tu cuenta.
           </p>
         </section>
 
         <section>
-          <h2 className="text-2xl font-semibold mb-3">Acceptable Use</h2>
-          <p className="text-muted-foreground mb-3">You agree NOT to:</p>
+          <h2 className="text-2xl font-semibold mb-3">Uso Aceptable</h2>
+          <p className="text-muted-foreground mb-3">Aceptas NO:</p>
           <ul className="list-disc pl-6 text-muted-foreground space-y-1">
-            <li>Use the service for any illegal purpose</li>
-            <li>Attempt to gain unauthorized access to our systems</li>
-            <li>Upload malicious code, viruses, or harmful content</li>
-            <li>Harass, abuse, or harm other users</li>
-            <li>Scrape, copy, or redistribute our content without permission</li>
-            <li>Use the service to cheat on exams or violate academic integrity policies</li>
-            <li>Reverse engineer or attempt to extract source code</li>
-            <li>Overwhelm our servers or interfere with service operation</li>
+            <li>Usar el servicio para cualquier propósito ilegal</li>
+            <li>Intentar obtener acceso no autorizado a nuestros sistemas</li>
+            <li>Subir código malicioso, virus o contenido dañino</li>
+            <li>Acosar, abusar o dañar a otros usuarios</li>
+            <li>Extraer, copiar o redistribuir nuestro contenido sin permiso</li>
+            <li>Usar el servicio para hacer trampa en exámenes o violar políticas de integridad académica</li>
+            <li>Realizar ingeniería inversa o intentar extraer el código fuente</li>
+            <li>Sobrecargar nuestros servidores o interferir con la operación del servicio</li>
           </ul>
         </section>
 
         <section>
-          <h2 className="text-2xl font-semibold mb-3">User Content</h2>
+          <h2 className="text-2xl font-semibold mb-3">Contenido del Usuario</h2>
           <p className="text-muted-foreground mb-3">
-            You retain ownership of content you upload to Exammer. However, you grant us a license to:
+            Conservas la propiedad del contenido que subes a Exammer. Sin embargo, nos otorgas una licencia para:
           </p>
           <ul className="list-disc pl-6 text-muted-foreground space-y-1">
-            <li>Store and process your content to provide the service</li>
-            <li>Use your content to train and improve AI features (anonymized)</li>
-            <li>Display your content to other users in shared classrooms</li>
+            <li>Almacenar y procesar tu contenido para proporcionar el servicio</li>
+            <li>Usar tu contenido para entrenar y mejorar las funciones de IA (de forma anónima)</li>
+            <li>Mostrar tu contenido a otros usuarios en aulas compartidas</li>
           </ul>
           <p className="text-muted-foreground mt-3">
-            You are responsible for ensuring you have the right to upload any content and that it doesn't infringe on others' intellectual property.
+            Eres responsable de asegurarte de que tienes el derecho de subir cualquier contenido y de que no infringe la propiedad intelectual de terceros.
           </p>
         </section>
 
         <section>
-          <h2 className="text-2xl font-semibold mb-3">AI-Generated Content</h2>
+          <h2 className="text-2xl font-semibold mb-3">Contenido Generado por IA</h2>
           <p className="text-muted-foreground">
-            Exammer uses artificial intelligence to generate study materials and feedback. AI-generated content is provided "as is" and may contain errors. You should verify important information independently. We are not responsible for decisions made based on AI-generated content.
+            Exammer utiliza inteligencia artificial para generar materiales de estudio y retroalimentación. El contenido generado por IA se proporciona "tal cual" y puede contener errores. Debes verificar la información importante de forma independiente. No somos responsables de las decisiones tomadas con base en contenido generado por IA.
           </p>
         </section>
 
         <section>
-          <h2 className="text-2xl font-semibold mb-3">Payments and Refunds</h2>
+          <h2 className="text-2xl font-semibold mb-3">Pagos y Reembolsos</h2>
           <p className="text-muted-foreground">
-            Payments are processed securely through Stripe. All fees are non-refundable except as required by law. We reserve the right to change pricing with reasonable notice.
+            Los pagos se procesan de forma segura a través de Stripe. Todas las tarifas no son reembolsables excepto cuando la ley lo requiera. Nos reservamos el derecho de cambiar los precios con aviso razonable.
           </p>
         </section>
 
         <section>
-          <h2 className="text-2xl font-semibold mb-3">Intellectual Property</h2>
+          <h2 className="text-2xl font-semibold mb-3">Propiedad Intelectual</h2>
           <p className="text-muted-foreground">
-            The Exammer service, including its design, features, and branding, is owned by us and protected by copyright and other intellectual property laws. You may not copy, modify, or create derivative works without permission.
+            El servicio de Exammer, incluyendo su diseño, funciones y marca, es de nuestra propiedad y está protegido por derechos de autor y otras leyes de propiedad intelectual. No puedes copiar, modificar ni crear obras derivadas sin permiso.
           </p>
         </section>
 
         <section>
-          <h2 className="text-2xl font-semibold mb-3">Service Availability</h2>
+          <h2 className="text-2xl font-semibold mb-3">Disponibilidad del Servicio</h2>
           <p className="text-muted-foreground">
-            We strive to keep Exammer available 24/7, but we do not guarantee uninterrupted access. We may modify, suspend, or discontinue any part of the service at any time without notice.
+            Nos esforzamos por mantener Exammer disponible las 24 horas del día, los 7 días de la semana, pero no garantizamos acceso ininterrumpido. Podemos modificar, suspender o descontinuar cualquier parte del servicio en cualquier momento sin previo aviso.
           </p>
         </section>
 
         <section>
-          <h2 className="text-2xl font-semibold mb-3">Termination</h2>
+          <h2 className="text-2xl font-semibold mb-3">Terminación</h2>
           <p className="text-muted-foreground">
-            We may terminate or suspend your account immediately if you violate these Terms. You may delete your account at any time. Upon termination, your right to use the service ceases, but certain provisions (like intellectual property rights) survive.
+            Podemos cancelar o suspender tu cuenta de inmediato si violas estos Términos. Puedes eliminar tu cuenta en cualquier momento. Al momento de la terminación, tu derecho a usar el servicio cesa, pero ciertas disposiciones (como los derechos de propiedad intelectual) permanecen vigentes.
           </p>
         </section>
 
         <section>
-          <h2 className="text-2xl font-semibold mb-3">Disclaimer of Warranties</h2>
+          <h2 className="text-2xl font-semibold mb-3">Exención de Garantías</h2>
           <p className="text-muted-foreground">
-            EXAMMER IS PROVIDED "AS IS" WITHOUT WARRANTIES OF ANY KIND. We do not guarantee that the service will meet your requirements, be error-free, or that AI-generated content will be accurate. Use at your own risk.
+            EXAMMER SE PROPORCIONA "TAL CUAL" SIN GARANTÍAS DE NINGÚN TIPO. No garantizamos que el servicio cumpla con tus requisitos, esté libre de errores ni que el contenido generado por IA sea preciso. Úsalo bajo tu propio riesgo.
           </p>
         </section>
 
         <section>
-          <h2 className="text-2xl font-semibold mb-3">Limitation of Liability</h2>
+          <h2 className="text-2xl font-semibold mb-3">Limitación de Responsabilidad</h2>
           <p className="text-muted-foreground">
-            To the fullest extent permitted by law, Exammer shall not be liable for any indirect, incidental, special, or consequential damages arising from your use of the service. Our total liability shall not exceed the amount you paid us in the past 12 months.
+            En la máxima medida permitida por la ley, Exammer no será responsable de ningún daño indirecto, incidental, especial o consecuente derivado de tu uso del servicio. Nuestra responsabilidad total no excederá la cantidad que nos hayas pagado en los últimos 12 meses.
           </p>
         </section>
 
         <section>
-          <h2 className="text-2xl font-semibold mb-3">Governing Law</h2>
+          <h2 className="text-2xl font-semibold mb-3">Ley Aplicable</h2>
           <p className="text-muted-foreground">
-            These Terms are governed by the laws of England and Wales. Any disputes shall be resolved in the courts of England and Wales.
+            Estos Términos se rigen por las leyes de Inglaterra y Gales. Cualquier disputa se resolverá en los tribunales de Inglaterra y Gales.
           </p>
         </section>
 
         <section>
-          <h2 className="text-2xl font-semibold mb-3">Changes to Terms</h2>
+          <h2 className="text-2xl font-semibold mb-3">Cambios a los Términos</h2>
           <p className="text-muted-foreground">
-            We may update these Terms at any time. Significant changes will be notified by email or through the service. Continued use after changes constitutes acceptance of the new terms.
+            Podemos actualizar estos Términos en cualquier momento. Los cambios significativos se notificarán por correo electrónico o a través del servicio. El uso continuado después de los cambios constituye la aceptación de los nuevos términos.
           </p>
         </section>
 
         <section>
-          <h2 className="text-2xl font-semibold mb-3">Contact</h2>
+          <h2 className="text-2xl font-semibold mb-3">Contacto</h2>
           <p className="text-muted-foreground">
-            For questions about these Terms, contact:<br />
+            Para preguntas sobre estos Términos, contacta:<br />
             <a href="mailto:anton.may@new.ox.ac.uk" className="text-primary hover:underline">anton.may@new.ox.ac.uk</a><br />
             New College, Oxford, OX1 3BN, United Kingdom
           </p>

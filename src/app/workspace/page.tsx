@@ -111,12 +111,12 @@ function HomePageContent() {
   return (
     <div className="container mx-auto">
       <div className="flex justify-between items-center mb-8">
-        <h1 className="text-3xl font-bold font-headline">My Workspace</h1>
+        <h1 className="text-3xl font-bold font-headline">Mi Espacio de Trabajo</h1>
         {/* Only show Create button for level 2+ users (teachers and admins) */}
         {(accessLevel === null || accessLevel >= 2) && (
           <Button onClick={() => setUploadStage('syllabus')} disabled={isCreatingSubject || uploadStage !== 'initial'}>
             {isCreatingSubject ? <LoadingSpinner /> : <Upload />}
-            Create New Subject
+            Crear Nuevo Curso
           </Button>
         )}
       </div>
@@ -134,9 +134,9 @@ function HomePageContent() {
           {uploadStage === 'syllabus' && (
             <>
               <AlertDialogHeader>
-                <AlertDialogTitle>Upload Your Syllabus</AlertDialogTitle>
+                <AlertDialogTitle>Sube tus Documentos</AlertDialogTitle>
                 <AlertDialogDescription>
-                  Upload your exam syllabus to begin. We'll analyze it to identify paper types and topics, then you can upload past papers.
+                  Sube un documento para comenzar. Lo analizaremos para identificar temas y generar preguntas automáticamente.
                 </AlertDialogDescription>
               </AlertDialogHeader>
 
@@ -149,7 +149,7 @@ function HomePageContent() {
                     className="w-full"
                   >
                     <Upload className="mr-2 h-4 w-4" />
-                    {syllabusFile ? syllabusFile.name : 'Choose Syllabus File'}
+                    {syllabusFile ? syllabusFile.name : 'Seleccionar Documento'}
                   </Button>
                 </div>
               </div>
@@ -184,12 +184,12 @@ function HomePageContent() {
                 </CardHeader>
                 <CardContent className="flex-grow">
                   <p className="text-sm text-muted-foreground">
-                    {subject.paperTypesCount} paper types identified.
+                    {subject.paperTypesCount} módulos identificados.
                   </p>
                 </CardContent>
                 <CardFooter className="flex justify-between gap-2">
                   <Button asChild variant="default" size="sm" onClick={() => handleNavigate(subject.id)}>
-                    <Link href={`/workspace/subject/${subject.id}`}>Study</Link>
+                    <Link href={`/workspace/subject/${subject.id}`}>Estudiar</Link>
                   </Button>
                   <div className="flex gap-2">
                     {(subject.isCreator || isLevel3User) && (
@@ -202,14 +202,14 @@ function HomePageContent() {
                         </AlertDialogTrigger>
                         <AlertDialogContent>
                           <AlertDialogHeader>
-                            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                            <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
                             <AlertDialogDescription>
-                              This will permanently delete the "{subject.name}" subject and all its data. This action cannot be undone.
+                              Esto eliminará permanentemente el curso "{subject.name}" y todos sus datos. Esta acción no se puede deshacer.
                             </AlertDialogDescription>
                           </AlertDialogHeader>
                           <AlertDialogFooter>
-                            <AlertDialogCancel>Cancel</AlertDialogCancel>
-                            <AlertDialogAction onClick={() => deleteSubject(subject.id)}>Delete</AlertDialogAction>
+                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                            <AlertDialogAction onClick={() => deleteSubject(subject.id)}>Eliminar</AlertDialogAction>
                           </AlertDialogFooter>
                         </AlertDialogContent>
                       </AlertDialog>
@@ -236,7 +236,7 @@ function HomePageContent() {
           <Card className="text-center py-8">
             <CardContent>
               <p className="text-muted-foreground">
-                Your workspace is empty. Create a new subject or add one from below.
+                Tu espacio de trabajo está vacío. Crea un nuevo curso o agrega uno de los que aparecen abajo.
               </p>
             </CardContent>
           </Card>
@@ -247,14 +247,14 @@ function HomePageContent() {
       {(accessLevel === null || accessLevel >= 2) && (
         <>
           <div className="mb-8 mt-12">
-            <h2 className="text-2xl font-bold font-headline mb-4">Find More Subjects</h2>
+            <h2 className="text-2xl font-bold font-headline mb-4">Buscar Más Cursos</h2>
             <p className="text-muted-foreground text-sm mb-4">
-              Search for subjects created by others and add them to your workspace
+              Busca cursos creados por otros y agrégalos a tu espacio de trabajo
             </p>
             <div className="max-w-2xl">
               <Input
                 type="text"
-                placeholder="Search for subjects... (auto-search as you type)"
+                placeholder="Buscar cursos... (búsqueda automática)"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full"
@@ -262,7 +262,7 @@ function HomePageContent() {
               {isLoading('search-subjects') && (
                 <div className="mt-2 flex items-center gap-2 text-sm text-muted-foreground">
                   <LoadingSpinner />
-                  <span>Searching...</span>
+                  <span>Buscando...</span>
                 </div>
               )}
             </div>
@@ -283,7 +283,7 @@ function HomePageContent() {
                       </CardHeader>
                       <CardContent className="flex-grow">
                         <p className="text-sm text-muted-foreground">
-                          {(subject as any).paperTypesCount || subject.paperTypes.length} paper types identified.
+                          {(subject as any).paperTypesCount || subject.paperTypes.length} módulos identificados.
                         </p>
                       </CardContent>
                       <CardFooter className="flex justify-between gap-2">
@@ -295,7 +295,7 @@ function HomePageContent() {
                           className="flex-1"
                         >
                           {isLoading(`add-workspace-${subject.id}`) ? <LoadingSpinner /> : <UserPlus className="mr-2 h-4 w-4" />}
-                          Add to Workspace
+                          Agregar
                         </Button>
                       </CardFooter>
                     </Card>
@@ -305,7 +305,7 @@ function HomePageContent() {
                 <Card className="text-center py-8">
                   <CardContent>
                     <p className="text-muted-foreground">
-                      No subjects found matching "{searchQuery}". Try a different search term.
+                      No se encontraron cursos con "{searchQuery}". Intenta con otro término.
                     </p>
                   </CardContent>
                 </Card>

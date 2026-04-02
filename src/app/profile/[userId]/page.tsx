@@ -77,13 +77,13 @@ export default function ProfilePage({
           const data = await response.json();
           setProfile(data);
         } else if (response.status === 404) {
-          setError("Profile not found");
+          setError("Perfil no encontrado");
         } else {
-          setError("Failed to load profile");
+          setError("Error al cargar el perfil");
         }
       } catch (err) {
         console.error("Error fetching profile:", err);
-        setError("Failed to load profile");
+        setError("Error al cargar el perfil");
       } finally {
         setLoading(false);
       }
@@ -109,10 +109,10 @@ export default function ProfilePage({
           <CardContent className="flex flex-col items-center justify-center py-12">
             <AlertCircle className="h-12 w-12 text-muted-foreground mb-4" />
             <h1 className="text-xl font-semibold text-foreground mb-2">
-              {error || "Profile not available"}
+              {error || "Perfil no disponible"}
             </h1>
             <p className="text-muted-foreground text-center">
-              The profile you&apos;re looking for doesn&apos;t exist or has been removed.
+              El perfil que buscas no existe o ha sido eliminado.
             </p>
           </CardContent>
         </Card>
@@ -135,7 +135,7 @@ export default function ProfilePage({
       {/* Verification Footer */}
       <div className="mt-8 pt-4 border-t text-center text-xs text-muted-foreground">
         <p>
-          Profile generated: {new Date(profile.verification.generatedAt).toLocaleString()}
+          Perfil generado: {new Date(profile.verification.generatedAt).toLocaleString()}
         </p>
         <p className="mt-1">
           <a

@@ -10,149 +10,149 @@ export default function PrivacyPolicy() {
       <Link href="/">
         <Button variant="ghost" size="sm" className="mb-6">
           <ArrowLeft className="mr-2 h-4 w-4" />
-          Back to Home
+          Volver al Inicio
         </Button>
       </Link>
 
-      <h1 className="text-4xl font-bold mb-2">Privacy Policy</h1>
-      <p className="text-muted-foreground mb-8">Last updated: November 19, 2025</p>
+      <h1 className="text-4xl font-bold mb-2">Política de Privacidad</h1>
+      <p className="text-muted-foreground mb-8">Última actualización: 19 de noviembre de 2025</p>
 
       <div className="prose prose-neutral dark:prose-invert max-w-none space-y-6">
         <section>
-          <h2 className="text-2xl font-semibold mb-3">Introduction</h2>
+          <h2 className="text-2xl font-semibold mb-3">Introducción</h2>
           <p className="text-muted-foreground">
-            Exammer ("we", "our", "us") operates the Exammer web application. This Privacy Policy explains how we collect, use, and protect your personal information when you use our service.
+            Exammer ("nosotros", "nuestro", "nos") opera la aplicación web Exammer. Esta Política de Privacidad explica cómo recopilamos, usamos y protegemos tu información personal cuando utilizas nuestro servicio.
           </p>
         </section>
 
         <section>
-          <h2 className="text-2xl font-semibold mb-3">Information We Collect</h2>
-          <h3 className="text-xl font-semibold mb-2 mt-4">Account Information</h3>
+          <h2 className="text-2xl font-semibold mb-3">Información que Recopilamos</h2>
+          <h3 className="text-xl font-semibold mb-2 mt-4">Información de la Cuenta</h3>
           <p className="text-muted-foreground mb-3">
-            When you create an account, we collect:
+            Cuando creas una cuenta, recopilamos:
           </p>
           <ul className="list-disc pl-6 text-muted-foreground space-y-1">
-            <li>Email address</li>
-            <li>Password (encrypted)</li>
-            <li>Display name (if provided)</li>
+            <li>Dirección de correo electrónico</li>
+            <li>Contraseña (encriptada)</li>
+            <li>Nombre para mostrar (si se proporciona)</li>
           </ul>
 
-          <h3 className="text-xl font-semibold mb-2 mt-4">Study Data</h3>
+          <h3 className="text-xl font-semibold mb-2 mt-4">Datos de Estudio</h3>
           <p className="text-muted-foreground mb-3">
-            As you use Exammer, we store:
+            Mientras usas Exammer, almacenamos:
           </p>
           <ul className="list-disc pl-6 text-muted-foreground space-y-1">
-            <li>Your questions, answers, and study materials</li>
-            <li>Progress tracking and performance metrics</li>
-            <li>Subjects, topics, and exam papers you work with</li>
-            <li>Interactions with the AI tutor (Xam)</li>
+            <li>Tus preguntas, respuestas y materiales de estudio</li>
+            <li>Seguimiento de progreso y métricas de rendimiento</li>
+            <li>Cursos, temas y materiales de capacitación con los que trabajas</li>
+            <li>Interacciones con el tutor de IA (Xam)</li>
           </ul>
 
-          <h3 className="text-xl font-semibold mb-2 mt-4">Technical Information</h3>
+          <h3 className="text-xl font-semibold mb-2 mt-4">Información Técnica</h3>
           <p className="text-muted-foreground mb-3">
-            We automatically collect:
+            Recopilamos automáticamente:
           </p>
           <ul className="list-disc pl-6 text-muted-foreground space-y-1">
-            <li>Browser type and version</li>
-            <li>Device information</li>
-            <li>IP address and location data</li>
-            <li>Usage data and analytics</li>
-          </ul>
-        </section>
-
-        <section>
-          <h2 className="text-2xl font-semibold mb-3">How We Use Your Information</h2>
-          <p className="text-muted-foreground mb-3">We use your data to:</p>
-          <ul className="list-disc pl-6 text-muted-foreground space-y-1">
-            <li>Provide and maintain the Exammer service</li>
-            <li>Generate AI-powered study materials and feedback</li>
-            <li>Track your learning progress and understanding levels</li>
-            <li>Enable classroom features and peer comparisons</li>
-            <li>Process payments and donations</li>
-            <li>Send service-related notifications</li>
-            <li>Improve our service and develop new features</li>
+            <li>Tipo y versión del navegador</li>
+            <li>Información del dispositivo</li>
+            <li>Dirección IP y datos de ubicación</li>
+            <li>Datos de uso y analítica</li>
           </ul>
         </section>
 
         <section>
-          <h2 className="text-2xl font-semibold mb-3">Third-Party Services</h2>
+          <h2 className="text-2xl font-semibold mb-3">Cómo Usamos Tu Información</h2>
+          <p className="text-muted-foreground mb-3">Usamos tus datos para:</p>
+          <ul className="list-disc pl-6 text-muted-foreground space-y-1">
+            <li>Proporcionar y mantener el servicio de Exammer</li>
+            <li>Generar materiales de estudio y retroalimentación con inteligencia artificial</li>
+            <li>Dar seguimiento a tu progreso de aprendizaje y niveles de comprensión</li>
+            <li>Habilitar funciones de aula y comparaciones entre compañeros</li>
+            <li>Procesar pagos y donaciones</li>
+            <li>Enviar notificaciones relacionadas con el servicio</li>
+            <li>Mejorar nuestro servicio y desarrollar nuevas funciones</li>
+          </ul>
+        </section>
+
+        <section>
+          <h2 className="text-2xl font-semibold mb-3">Servicios de Terceros</h2>
           <p className="text-muted-foreground mb-3">
-            We use the following third-party services that may process your data:
+            Utilizamos los siguientes servicios de terceros que pueden procesar tus datos:
           </p>
           <ul className="list-disc pl-6 text-muted-foreground space-y-1">
-            <li><strong>AI Providers</strong> - Your study content is processed by AI services to generate questions, feedback, and tutoring</li>
-            <li><strong>Firebase</strong> - For authentication and hosting infrastructure</li>
-            <li><strong>Stripe</strong> - For payment processing (Stripe's privacy policy applies)</li>
+            <li><strong>Proveedores de IA</strong> - Tu contenido de estudio es procesado por servicios de IA para generar preguntas, retroalimentación y tutoría</li>
+            <li><strong>Firebase</strong> - Para autenticación e infraestructura de alojamiento</li>
+            <li><strong>Stripe</strong> - Para procesamiento de pagos (aplica la política de privacidad de Stripe)</li>
           </ul>
           <p className="text-muted-foreground mt-3">
-            These services have their own privacy policies and may collect data independently.
+            Estos servicios tienen sus propias políticas de privacidad y pueden recopilar datos de forma independiente.
           </p>
         </section>
 
         <section>
-          <h2 className="text-2xl font-semibold mb-3">Data Storage and Security</h2>
+          <h2 className="text-2xl font-semibold mb-3">Almacenamiento y Seguridad de Datos</h2>
           <p className="text-muted-foreground">
-            Your data is stored securely using industry-standard encryption. We implement appropriate technical and organizational measures to protect your personal information. However, no method of transmission over the internet is 100% secure.
+            Tus datos se almacenan de forma segura utilizando encriptación estándar de la industria. Implementamos medidas técnicas y organizativas apropiadas para proteger tu información personal. Sin embargo, ningún método de transmisión por internet es 100% seguro.
           </p>
         </section>
 
         <section>
-          <h2 className="text-2xl font-semibold mb-3">Your Rights</h2>
-          <p className="text-muted-foreground mb-3">You have the right to:</p>
+          <h2 className="text-2xl font-semibold mb-3">Tus Derechos</h2>
+          <p className="text-muted-foreground mb-3">Tienes derecho a:</p>
           <ul className="list-disc pl-6 text-muted-foreground space-y-1">
-            <li>Access your personal data</li>
-            <li>Correct inaccurate data</li>
-            <li>Request deletion of your account and data</li>
-            <li>Export your data</li>
-            <li>Object to data processing</li>
-            <li>Withdraw consent at any time</li>
+            <li>Acceder a tus datos personales</li>
+            <li>Corregir datos inexactos</li>
+            <li>Solicitar la eliminación de tu cuenta y datos</li>
+            <li>Exportar tus datos</li>
+            <li>Oponerte al procesamiento de datos</li>
+            <li>Retirar tu consentimiento en cualquier momento</li>
           </ul>
           <p className="text-muted-foreground mt-3">
-            To exercise these rights, contact us at <a href="mailto:anton.may@new.ox.ac.uk" className="text-primary hover:underline">anton.may@new.ox.ac.uk</a>.
+            Para ejercer estos derechos, contáctanos en <a href="mailto:anton.may@new.ox.ac.uk" className="text-primary hover:underline">anton.may@new.ox.ac.uk</a>.
           </p>
         </section>
 
         <section>
           <h2 className="text-2xl font-semibold mb-3">Cookies</h2>
           <p className="text-muted-foreground mb-3">
-            We use cookies to make Exammer work and improve your experience. Cookies are categorized as:
+            Usamos cookies para que Exammer funcione y para mejorar tu experiencia. Las cookies se clasifican en:
           </p>
           <ul className="list-disc pl-6 text-muted-foreground space-y-1 mb-3">
-            <li><strong>Essential:</strong> Required for authentication and basic functionality (cannot be disabled)</li>
-            <li><strong>Functional:</strong> Remember your preferences like theme settings</li>
-            <li><strong>Analytics:</strong> Help us understand how you use the site (optional)</li>
-            <li><strong>Marketing:</strong> Show relevant advertisements (optional, not currently used)</li>
+            <li><strong>Esenciales:</strong> Necesarias para la autenticación y funcionalidad básica (no se pueden desactivar)</li>
+            <li><strong>Funcionales:</strong> Recuerdan tus preferencias como la configuración del tema</li>
+            <li><strong>Analíticas:</strong> Nos ayudan a entender cómo usas el sitio (opcionales)</li>
+            <li><strong>Marketing:</strong> Muestran anuncios relevantes (opcionales, actualmente no se utilizan)</li>
           </ul>
           <p className="text-muted-foreground">
-            You can manage your cookie preferences at any time through our{' '}
+            Puedes gestionar tus preferencias de cookies en cualquier momento a través de nuestra{' '}
             <button
               onClick={() => window.dispatchEvent(new CustomEvent('show-cookie-banner'))}
               className="text-primary hover:underline"
             >
-              Cookie Preferences
+              Preferencias de Cookies
             </button>
-            {' '}settings. Disabling essential cookies will prevent you from using Exammer.
+            {' '}configuración. Desactivar las cookies esenciales te impedirá usar Exammer.
           </p>
         </section>
 
         <section>
-          <h2 className="text-2xl font-semibold mb-3">Children's Privacy</h2>
+          <h2 className="text-2xl font-semibold mb-3">Privacidad de Menores</h2>
           <p className="text-muted-foreground">
-            Exammer is intended for students of all ages. If you are under 16, please obtain parental consent before using our service. Parents may request deletion of their child's data by contacting us.
+            Exammer está dirigido a estudiantes de todas las edades. Si eres menor de 16 años, por favor obtén el consentimiento de tus padres antes de usar nuestro servicio. Los padres pueden solicitar la eliminación de los datos de sus hijos contactándonos.
           </p>
         </section>
 
         <section>
-          <h2 className="text-2xl font-semibold mb-3">Changes to This Policy</h2>
+          <h2 className="text-2xl font-semibold mb-3">Cambios a Esta Política</h2>
           <p className="text-muted-foreground">
-            We may update this Privacy Policy from time to time. We will notify you of significant changes by email or through the service. Continued use after changes constitutes acceptance.
+            Podemos actualizar esta Política de Privacidad de vez en cuando. Te notificaremos de cambios significativos por correo electrónico o a través del servicio. El uso continuado después de los cambios constituye aceptación.
           </p>
         </section>
 
         <section>
-          <h2 className="text-2xl font-semibold mb-3">Contact Us</h2>
+          <h2 className="text-2xl font-semibold mb-3">Contáctanos</h2>
           <p className="text-muted-foreground">
-            For privacy concerns or questions, contact:<br />
+            Para dudas o preguntas sobre privacidad, contacta:<br />
             <a href="mailto:anton.may@new.ox.ac.uk" className="text-primary hover:underline">anton.may@new.ox.ac.uk</a><br />
             New College, Oxford, OX1 3BN, United Kingdom
           </p>

@@ -50,7 +50,7 @@ function SignInContent() {
         }
         // If email not verified, show helpful message
         if (result.error === 'EMAIL_NOT_VERIFIED') {
-          setError('Your email is not verified. Please check your inbox or request a new verification email.');
+          setError('Tu correo no está verificado. Revisa tu bandeja de entrada o solicita un nuevo correo de verificación.');
           setShowResendLink(true);
           return;
         }
@@ -60,7 +60,7 @@ function SignInContent() {
         router.refresh();
       }
     } catch (err) {
-      setError('An unexpected error occurred');
+      setError('Ocurrió un error inesperado');
     } finally {
       setLoading(false);
     }
@@ -71,7 +71,7 @@ function SignInContent() {
     try {
       await signIn(provider, { callbackUrl });
     } catch (err) {
-      setError('An error occurred during sign in');
+      setError('Ocurrió un error al iniciar sesión');
       setLoading(false);
     }
   };
@@ -94,8 +94,8 @@ function SignInContent() {
     <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4 py-12 sm:px-6 lg:px-8">
       <Card className="w-full max-w-md">
         <CardHeader>
-          <CardTitle className="text-2xl font-bold">Sign In</CardTitle>
-          <CardDescription>Enter your credentials to access your account</CardDescription>
+          <CardTitle className="text-2xl font-bold">Iniciar Sesión</CardTitle>
+          <CardDescription>Ingresa tus credenciales para acceder a tu cuenta</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -103,20 +103,12 @@ function SignInContent() {
               <Alert variant="destructive">
                 <AlertDescription>
                   {error}
-                  {showResendLink && (
-                    <>
-                      <br />
-                      <Link href="/auth/resend-verification" className="font-medium underline">
-                        Click here to resend verification email
-                      </Link>
-                    </>
-                  )}
                 </AlertDescription>
               </Alert>
             )}
 
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="email">Correo electrónico</Label>
               <Input
                 id="email"
                 type="email"
@@ -129,7 +121,7 @@ function SignInContent() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
+              <Label htmlFor="password">Contraseña</Label>
               <Input
                 id="password"
                 type="password"
@@ -141,7 +133,7 @@ function SignInContent() {
             </div>
 
             <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? 'Signing in...' : 'Sign In'}
+              {loading ? 'Iniciando sesión...' : 'Iniciar Sesión'}
             </Button>
           </form>
 
@@ -152,7 +144,7 @@ function SignInContent() {
                   <span className="w-full border-t" />
                 </div>
                 <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-white px-2 text-muted-foreground">Or continue with</span>
+                  <span className="bg-white px-2 text-muted-foreground">O continuar con</span>
                 </div>
               </div>
 
@@ -164,7 +156,7 @@ function SignInContent() {
                     onClick={() => handleOAuthSignIn('google')}
                     disabled={loading}
                   >
-                    Sign in with Google
+                    Iniciar con Google
                   </Button>
                 )}
                 {process.env.NEXT_PUBLIC_GITHUB_ENABLED && (
@@ -174,23 +166,17 @@ function SignInContent() {
                     onClick={() => handleOAuthSignIn('github')}
                     disabled={loading}
                   >
-                    Sign in with GitHub
+                    Iniciar con GitHub
                   </Button>
                 )}
               </div>
             </>
           )}
         </CardContent>
-        <CardFooter className="flex flex-col space-y-2">
-          <div className="text-sm text-muted-foreground">
-            Don't have an account?{' '}
-            <Link href="/auth/signup" className="font-medium text-primary hover:underline">
-              Sign up
-            </Link>
-          </div>
-          <Link href="/auth/reset-password" className="text-sm text-muted-foreground hover:underline">
-            Forgot your password?
-          </Link>
+        <CardFooter>
+          <p className="text-sm text-muted-foreground">
+            Contacta a tu administrador si necesitas una cuenta o restablecer tu contraseña.
+          </p>
         </CardFooter>
       </Card>
     </div>
@@ -199,7 +185,7 @@ function SignInContent() {
 
 export default function SignInPage() {
   return (
-    <Suspense fallback={<div className="flex min-h-screen items-center justify-center">Loading...</div>}>
+    <Suspense fallback={<div className="flex min-h-screen items-center justify-center">Cargando...</div>}>
       <SignInContent />
     </Suspense>
   );

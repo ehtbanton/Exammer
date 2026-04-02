@@ -15,8 +15,8 @@ export default function SignOutPage() {
     <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <CardTitle>Signing out...</CardTitle>
-          <CardDescription>Please wait while we sign you out.</CardDescription>
+          <CardTitle>Cerrando sesión...</CardTitle>
+          <CardDescription>Espera mientras cerramos tu sesión.</CardDescription>
         </CardHeader>
         <CardContent className="flex justify-center">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />

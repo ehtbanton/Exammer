@@ -22,7 +22,7 @@ function VerifyEmailContent() {
 
       if (!token) {
         setStatus('error');
-        setMessage('No verification token provided');
+        setMessage('No se proporcionó token de verificación');
         return;
       }
 
@@ -48,16 +48,16 @@ function VerifyEmailContent() {
               router.push('/home');
             } else {
               setStatus('error');
-              setMessage('Verification successful but auto-login failed. Please sign in manually.');
+              setMessage('Verificación exitosa pero el inicio de sesión automático falló. Inicia sesión manualmente.');
             }
           }
         } else {
           setStatus('error');
-          setMessage(data.error || 'Verification failed');
+          setMessage(data.error || 'La verificación falló');
         }
       } catch (error) {
         setStatus('error');
-        setMessage('An error occurred during verification');
+        setMessage('Ocurrió un error durante la verificación');
       }
     };
 
@@ -72,12 +72,12 @@ function VerifyEmailContent() {
             {status === 'loading' && <Loader2 className="h-6 w-6 animate-spin" />}
             {status === 'success' && <CheckCircle2 className="h-6 w-6 text-green-600" />}
             {status === 'error' && <XCircle className="h-6 w-6 text-red-600" />}
-            Email Verification
+            Verificación de Correo
           </CardTitle>
           <CardDescription>
-            {status === 'loading' && 'Verifying your email address...'}
-            {status === 'success' && 'Your email has been verified!'}
-            {status === 'error' && 'Verification failed'}
+            {status === 'loading' && 'Verificando tu correo electrónico...'}
+            {status === 'success' && '¡Tu correo ha sido verificado!'}
+            {status === 'error' && 'La verificación falló'}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -95,13 +95,13 @@ function VerifyEmailContent() {
                   {email && (
                     <>
                       <br />
-                      <strong>{email}</strong> is now verified.
+                      <strong>{email}</strong> ha sido verificado.
                     </>
                   )}
                 </AlertDescription>
               </Alert>
               <p className="text-sm text-muted-foreground text-center">
-                Logging you in and redirecting to workspace...
+                Iniciando sesión y redirigiendo al espacio de trabajo...
               </p>
             </div>
           )}
@@ -112,9 +112,9 @@ function VerifyEmailContent() {
                 <AlertDescription>{message}</AlertDescription>
               </Alert>
               <p className="text-sm text-muted-foreground">
-                The verification link may have expired or is invalid.{' '}
+                El enlace de verificación puede haber expirado o no es válido.{' '}
                 <Link href="/auth/resend-verification" className="font-medium text-primary hover:underline">
-                  Request a new verification email
+                  Solicitar un nuevo correo de verificación
                 </Link>.
               </p>
             </div>
@@ -124,7 +124,7 @@ function VerifyEmailContent() {
           {status === 'success' && (
             <Link href="/home" className="w-full">
               <Button className="w-full">
-                Continue to Workspace
+                Continuar al Espacio de Trabajo
               </Button>
             </Link>
           )}
@@ -132,12 +132,12 @@ function VerifyEmailContent() {
             <>
               <Link href="/auth/resend-verification" className="w-full">
                 <Button className="w-full">
-                  Resend Verification
+                  Reenviar Verificación
                 </Button>
               </Link>
               <Link href="/auth/signin" className="w-full">
                 <Button variant="outline" className="w-full">
-                  Back to Sign In
+                  Volver a Iniciar Sesión
                 </Button>
               </Link>
             </>
@@ -150,7 +150,7 @@ function VerifyEmailContent() {
 
 export default function VerifyEmailPage() {
   return (
-    <Suspense fallback={<div className="flex min-h-screen items-center justify-center">Loading...</div>}>
+    <Suspense fallback={<div className="flex min-h-screen items-center justify-center">Cargando...</div>}>
       <VerifyEmailContent />
     </Suspense>
   );

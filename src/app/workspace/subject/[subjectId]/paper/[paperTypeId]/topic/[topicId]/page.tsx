@@ -90,9 +90,9 @@ function TopicPageContent() {
   if (!topic) {
     return (
       <div className="text-center">
-        <h1 className="text-2xl font-bold">Topic not found</h1>
+        <h1 className="text-2xl font-bold">Tema no encontrado</h1>
         <Button asChild variant="link" className="mt-4">
-          <Link href={`/workspace/subject/${subjectId}/paper/${encodeURIComponent(paperTypeId)}`}>Go back to paper</Link>
+          <Link href={`/workspace/subject/${subjectId}/paper/${encodeURIComponent(paperTypeId)}`}>Volver al módulo</Link>
         </Button>
       </div>
     );
@@ -102,7 +102,7 @@ function TopicPageContent() {
     <div className="container mx-auto">
       <Button variant="ghost" onClick={() => router.push(`/workspace/subject/${subjectId}/paper/${encodeURIComponent(paperTypeId)}`)} className="mb-4">
         <ArrowLeft />
-        Back to Topics
+        Volver a Temas
       </Button>
       <h1 className="text-3xl font-bold font-headline mb-2">{topic.name}</h1>
 
@@ -110,12 +110,12 @@ function TopicPageContent() {
       {topic.description && (
         <Alert className="mb-6">
           <AlertCircle className="h-4 w-4" />
-          <AlertTitle>Topic Overview</AlertTitle>
+          <AlertTitle>Resumen del Tema</AlertTitle>
           <AlertDescription>{topic.description}</AlertDescription>
         </Alert>
       )}
 
-      <p className="text-muted-foreground mb-8">Select a question to start practicing.</p>
+      <p className="text-muted-foreground mb-8">Selecciona una pregunta para comenzar a practicar.</p>
 
       {questions.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -143,7 +143,7 @@ function TopicPageContent() {
                       {question.summary}
                       {!hasMarkscheme && (
                         <span className="inline-flex items-center text-xs font-normal px-2 py-1 bg-amber-100 dark:bg-amber-900 text-amber-800 dark:text-amber-200 rounded">
-                          No MS
+                          No Guide
                         </span>
                       )}
                     </CardTitle>
@@ -155,14 +155,14 @@ function TopicPageContent() {
                 <CardContent>
                   <div className="flex items-end justify-between">
                     <div>
-                      <p className="text-sm text-black">{question.attempts} attempt{question.attempts !== 1 ? 's' : ''}</p>
+                      <p className="text-sm text-black">{question.attempts} intento{question.attempts !== 1 ? 's' : ''}</p>
                       {!hasAttempts && !isInProgress && (
-                        <p className="text-sm text-gray-600">Not attempted</p>
+                        <p className="text-sm text-gray-600">Sin intentar</p>
                       )}
                     </div>
                     {isInProgress && (
                       <span className="text-xs font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wide">
-                        In Progress
+                        En Progreso
                       </span>
                     )}
                   </div>
@@ -175,13 +175,13 @@ function TopicPageContent() {
          <Card className="text-center py-12 border-2 border-dashed">
             <CardContent>
               <AlertCircle className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-              <h3 className="text-lg font-semibold mb-2">No Questions Available</h3>
+              <h3 className="text-lg font-semibold mb-2">No Hay Preguntas Disponibles</h3>
               <p className="text-muted-foreground mb-4">
-                No questions have been extracted for this topic yet. Upload exam papers to get started.
+                Aún no se han extraído preguntas para este tema. Sube documentos para comenzar.
               </p>
               <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-4 max-w-md mx-auto">
                 <p className="text-sm text-blue-800 dark:text-blue-200">
-                  <strong>Tip:</strong> Upload exam papers via the "Add All Past Papers" button on the subject page. You can optionally upload markschemes later to enable objective-based grading.
+                  <strong>Tip:</strong> Sube documentos con el botón "Agregar Documentos" en la página del curso. Opcionalmente puedes subir guías de respuestas después para calificación por objetivos.
                 </p>
               </div>
             </CardContent>

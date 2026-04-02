@@ -29,7 +29,7 @@ export default function ResendVerificationPage() {
       const data = await response.json();
 
       if (!response.ok) {
-        setError(data.error || 'An error occurred');
+        setError(data.error || 'Ocurrió un error');
         setLoading(false);
         return;
       }
@@ -37,7 +37,7 @@ export default function ResendVerificationPage() {
       setSuccess(true);
       setLoading(false);
     } catch (err) {
-      setError('An unexpected error occurred');
+      setError('Ocurrió un error inesperado');
       setLoading(false);
     }
   };
@@ -48,24 +48,24 @@ export default function ResendVerificationPage() {
       <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4 py-12 sm:px-6 lg:px-8">
         <Card className="w-full max-w-md">
           <CardHeader>
-            <CardTitle className="text-2xl font-bold">Check Your Email</CardTitle>
-            <CardDescription>Verification email sent</CardDescription>
+            <CardTitle className="text-2xl font-bold">Revisa tu Correo</CardTitle>
+            <CardDescription>Correo de verificación enviado</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <Alert>
               <AlertDescription>
-                If an account with the email <strong>{email}</strong> exists and is unverified,
-                a verification email has been sent. Please check your inbox.
+                Si existe una cuenta con el correo <strong>{email}</strong> sin verificar,
+                se ha enviado un correo de verificación. Revisa tu bandeja de entrada.
               </AlertDescription>
             </Alert>
             <p className="text-sm text-muted-foreground">
-              Didn't receive it? Check your spam folder or wait 60 seconds before requesting another email.
+              ¿No lo recibiste? Revisa tu carpeta de spam o espera 60 segundos antes de solicitar otro correo.
             </p>
           </CardContent>
           <CardFooter className="flex gap-2">
             <Link href="/auth/signin" className="w-full">
               <Button variant="outline" className="w-full">
-                Back to Sign In
+                Volver a Iniciar Sesión
               </Button>
             </Link>
             <Button
@@ -75,7 +75,7 @@ export default function ResendVerificationPage() {
                 setEmail('');
               }}
             >
-              Send Another
+              Enviar Otro
             </Button>
           </CardFooter>
         </Card>
@@ -87,8 +87,8 @@ export default function ResendVerificationPage() {
     <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4 py-12 sm:px-6 lg:px-8">
       <Card className="w-full max-w-md">
         <CardHeader>
-          <CardTitle className="text-2xl font-bold">Resend Verification Email</CardTitle>
-          <CardDescription>Enter your email to receive a new verification link</CardDescription>
+          <CardTitle className="text-2xl font-bold">Reenviar Correo de Verificación</CardTitle>
+          <CardDescription>Ingresa tu correo para recibir un nuevo enlace de verificación</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -99,7 +99,7 @@ export default function ResendVerificationPage() {
             )}
 
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="email">Correo electrónico</Label>
               <Input
                 id="email"
                 type="email"
@@ -112,15 +112,15 @@ export default function ResendVerificationPage() {
             </div>
 
             <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? 'Sending...' : 'Send Verification Email'}
+              {loading ? 'Enviando...' : 'Enviar Correo de Verificación'}
             </Button>
           </form>
         </CardContent>
         <CardFooter>
           <div className="text-sm text-muted-foreground">
-            Remember your password?{' '}
+            ¿Recuerdas tu contraseña?{' '}
             <Link href="/auth/signin" className="font-medium text-primary hover:underline">
-              Sign in
+              Iniciar sesión
             </Link>
           </div>
         </CardFooter>

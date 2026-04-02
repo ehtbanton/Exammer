@@ -68,24 +68,24 @@ export default function CookieConsent() {
         <Card className="max-w-4xl mx-auto p-6 shadow-lg border-2">
           <div className="flex items-start justify-between gap-4">
             <div className="flex-1">
-              <h3 className="font-semibold mb-2">We use cookies</h3>
+              <h3 className="font-semibold mb-2">Usamos cookies</h3>
               <p className="text-sm text-muted-foreground mb-4">
-                We use essential cookies to keep you signed in and make our service work.
-                We'd also like to use optional cookies to remember your preferences and understand how you use our site.
-                For more information, see our{' '}
+                Usamos cookies esenciales para mantener tu sesión y que el servicio funcione.
+                También nos gustaría usar cookies opcionales para recordar tus preferencias y entender cómo usas nuestro sitio.
+                Para más información, consulta nuestra{' '}
                 <Link href="/privacy" className="text-primary hover:underline">
-                  Privacy Policy
+                  Política de Privacidad
                 </Link>.
               </p>
               <div className="flex flex-wrap gap-3">
                 <Button onClick={handleAcceptAll} size="sm">
-                  Accept All
+                  Aceptar Todo
                 </Button>
                 <Button onClick={handleEssentialOnly} variant="outline" size="sm">
-                  Essential Only
+                  Solo Esenciales
                 </Button>
                 <Button onClick={handleManagePreferences} variant="ghost" size="sm">
-                  Manage Preferences
+                  Administrar Preferencias
                 </Button>
               </div>
             </div>

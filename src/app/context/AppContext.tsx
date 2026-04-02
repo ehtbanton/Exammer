@@ -250,7 +250,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         id: processAId,
         type: 'process_a',
         status: 'pending',
-        displayName: 'P_A: Determining paper types and topics...',
+        displayName: 'Analyzing document and identifying topics...',
         subjectId,
         execute: async () => {
           console.log('Starting syllabus processing...');
@@ -330,8 +330,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
           }
 
           toast({
-            title: "Syllabus Processed",
-            description: `"${result.subjectName}" with ${createdPaperTypes.length} paper types identified.`
+            title: "Document Processed",
+            description: `"${result.subjectName}" with ${createdPaperTypes.length} modules identified.`
           });
         }
       });
@@ -339,7 +339,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       return subjectId;
     } catch (error) {
       console.error(error);
-      toast({ variant: "destructive", title: "Error", description: "Failed to start syllabus processing." });
+      toast({ variant: "destructive", title: "Error", description: "Failed to process document." });
       return null;
     } finally {
       setLoading(loadingKey, false);
@@ -406,7 +406,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         id: processBId,
         type: 'process_b',
         status: 'pending',
-        displayName: 'P_B: Extracting and categorizing PPQs...',
+        displayName: 'P_B: Extracting and categorizing questions...',
         subjectId,
         dependsOn: needsToWaitForProcessA ? processAId : undefined, // Only wait if Process A is running
         execute: async () => {
@@ -518,8 +518,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       });
 
       const message = needsToWaitForProcessA
-        ? `${examPapers.length} paper(s) uploaded. Question extraction will begin after syllabus processing completes.`
-        : `${examPapers.length} paper(s) uploaded. Starting question extraction...`;
+        ? `${examPapers.length} document(s) uploaded. Question extraction will begin after initial processing completes.`
+        : `${examPapers.length} document(s) uploaded. Starting question extraction...`;
 
       toast({
         title: "Papers Uploaded",
@@ -528,7 +528,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     } catch (error) {
       console.error(error);
-      toast({ variant: "destructive", title: "Error", description: "Failed to process exam papers." });
+      toast({ variant: "destructive", title: "Error", description: "Failed to process training materials." });
     } finally {
       setLoading(loadingKey, false);
     }
@@ -589,7 +589,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         id: processMId,
         type: 'process_m',
         status: 'pending',
-        displayName: 'P_M: Matching markschemes to questions...',
+        displayName: 'P_M: Matching answer guides to questions...',
         subjectId,
         execute: async () => {
           // Fetch latest paper types with topics
@@ -685,20 +685,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
           });
 
           toast({
-            title: "Markschemes Matched",
-            description: `Updated ${matchResult.questionsUpdated} questions with solution objectives from ${markschemes.length} markscheme(s).`
+            title: "Answer Guides Matched",
+            description: `Updated ${matchResult.questionsUpdated} questions with solution objectives from ${markschemes.length} answer guide(s).`
           });
         }
       });
 
       toast({
-        title: "Markschemes Uploaded",
-        description: `${markschemes.length} markscheme(s) uploaded. Starting matching to existing questions...`
+        title: "Answer Guides Uploaded",
+        description: `${markschemes.length} answer guide(s) uploaded. Starting matching to existing questions...`
       });
 
     } catch (error) {
       console.error(error);
-      toast({ variant: "destructive", title: "Error", description: "Failed to process markschemes." });
+      toast({ variant: "destructive", title: "Error", description: "Failed to process answer guides." });
     } finally {
       setLoading(loadingKey, false);
     }
@@ -777,7 +777,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setSubjects(prevSubjects => prevSubjects.map(subject =>
         subject.id === subjectId ? { ...subject, pastPapers: [...subject.pastPapers, newPaper] } : subject
       ));
-      toast({ title: "Past Paper Added", description: `"${paperFile.name}" has been uploaded.` });
+      toast({ title: "Document Added", description: `"${paperFile.name}" has been uploaded.` });
     } catch (error) {
       console.error(error);
       toast({ variant: "destructive", title: "Upload Error", description: "Failed to save past paper." });

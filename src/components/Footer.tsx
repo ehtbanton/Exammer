@@ -14,12 +14,12 @@ export default function Footer() {
           <div>
             <h3 className="font-semibold mb-3">Exammer</h3>
             <p className="text-sm text-muted-foreground mb-2">
-              AI-powered exam preparation tool
+              Plataforma de aprendizaje con IA
             </p>
             <p className="text-xs text-muted-foreground">
               New College<br />
               Oxford, OX1 3BN<br />
-              United Kingdom
+              Reino Unido
             </p>
           </div>
 
@@ -29,12 +29,12 @@ export default function Footer() {
             <ul className="space-y-2 text-sm">
               <li>
                 <Link href="/privacy" className="text-muted-foreground hover:text-primary transition-colors">
-                  Privacy Policy
+                  Política de Privacidad
                 </Link>
               </li>
               <li>
                 <Link href="/terms" className="text-muted-foreground hover:text-primary transition-colors">
-                  Terms of Service
+                  Términos de Servicio
                 </Link>
               </li>
               <li>
@@ -42,7 +42,7 @@ export default function Footer() {
                   onClick={() => window.dispatchEvent(new CustomEvent('show-cookie-banner'))}
                   className="text-muted-foreground hover:text-primary transition-colors"
                 >
-                  Cookie Preferences
+                  Preferencias de Cookies
                 </button>
               </li>
             </ul>
@@ -50,7 +50,7 @@ export default function Footer() {
 
           {/* Contact */}
           <div>
-            <h3 className="font-semibold mb-3">Contact</h3>
+            <h3 className="font-semibold mb-3">Contacto</h3>
             <p className="text-sm text-muted-foreground">
               <a
                 href="mailto:anton.may@new.ox.ac.uk"
@@ -65,7 +65,7 @@ export default function Footer() {
         <Separator className="my-6" />
 
         <div className="text-center text-sm text-muted-foreground">
-          © {currentYear} Exammer. All rights reserved.
+          © {currentYear} Exammer. Todos los derechos reservados.
         </div>
       </div>
     </footer>

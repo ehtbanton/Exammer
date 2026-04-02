@@ -12,13 +12,13 @@ import { cn } from '@/lib/utils';
 export const metadata: Metadata = {
   metadataBase: new URL('https://exammer.co.uk'),
   title: 'Exammer',
-  description: 'AI-Powered Exam Preparation Tool',
+  description: 'Plataforma de Aprendizaje con IA',
   icons: {
     icon: '/exammer.png',
   },
   openGraph: {
-    title: 'Exammer - Get hooked on Revision',
-    description: 'AI framework that turns past papers into a structured revision plan, using an interactive tutor and gamified progress tracking.',
+    title: 'Exammer - Aprende con inteligencia',
+    description: 'Plataforma de IA que convierte tus documentos en un plan de aprendizaje estructurado, con un tutor interactivo y seguimiento gamificado.',
     url: 'https://exammer.co.uk',
     siteName: 'Exammer',
     images: [
@@ -26,16 +26,16 @@ export const metadata: Metadata = {
         url: '/exammer.png',
         width: 800,
         height: 800,
-        alt: 'Exammer Logo',
+        alt: 'Logo de Exammer',
       },
     ],
-    locale: 'en_GB',
+    locale: 'es_MX',
     type: 'website',
   },
   twitter: {
     card: 'summary',
-    title: 'Exammer - Get hooked on Revision',
-    description: 'AI framework that turns past papers into a structured revision plan.',
+    title: 'Exammer - Aprende con inteligencia',
+    description: 'Plataforma de IA que convierte tus documentos en un plan de aprendizaje estructurado.',
     images: ['/exammer.png'],
   },
 };
@@ -46,7 +46,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="h-full">
+    <html lang="es" className="h-full">
       <head>
         <link rel="icon" href="/exammer.png" type="image/png" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />

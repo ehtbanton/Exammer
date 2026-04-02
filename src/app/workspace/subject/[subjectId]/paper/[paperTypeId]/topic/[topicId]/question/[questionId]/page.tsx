@@ -425,7 +425,7 @@ function InterviewPageContent() {
       } catch (e: any) {
         if (e.message?.includes('no solution objectives')) {
           setNoMarkscheme(true);
-          toast({ variant: 'destructive', title: 'No Markscheme', description: 'This question has no markscheme objectives.' });
+          toast({ variant: 'destructive', title: 'No Answer Guide', description: 'This question has no answer guide objectives.' });
         } else {
           toast({ variant: 'destructive', title: 'AI Error', description: 'Could not start the interview.' });
         }
@@ -673,7 +673,7 @@ function InterviewPageContent() {
       } catch (e: any) {
         if (e.message?.includes('no solution objectives')) {
           setNoMarkscheme(true);
-          toast({ variant: 'destructive', title: 'No Markscheme', description: 'This question has no markscheme objectives.' });
+          toast({ variant: 'destructive', title: 'No Answer Guide', description: 'This question has no answer guide objectives.' });
         } else {
           toast({ variant: 'destructive', title: 'AI Error', description: 'Could not start the interview.' });
         }
@@ -751,8 +751,8 @@ function InterviewPageContent() {
               {noMarkscheme ? (
                 <div className="flex items-center justify-center flex-1 p-6">
                   <div className="text-center space-y-2">
-                    <p className="text-lg font-bold text-destructive">NO MARKSCHEME FOUND</p>
-                    <p className="text-sm text-muted-foreground">This question cannot be attempted without marking objectives.</p>
+                    <p className="text-lg font-bold text-destructive">SIN GUÍA DE RESPUESTAS</p>
+                    <p className="text-sm text-muted-foreground">Esta pregunta no se puede intentar sin objetivos de calificación.</p>
                   </div>
                 </div>
               ) : (
@@ -802,7 +802,7 @@ function InterviewPageContent() {
                               <h3 className="text-sm font-semibold text-blue-800 dark:text-blue-200">📋 All Solution Objectives:</h3>
                               {!hasOriginalMarkscheme && (
                                 <span className="inline-flex items-center text-xs px-2 py-1 bg-amber-100 dark:bg-amber-900 text-amber-800 dark:text-amber-200 rounded">
-                                  No MS
+                                  No Guide
                                 </span>
                               )}
                             </div>

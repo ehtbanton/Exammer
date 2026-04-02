@@ -25,7 +25,7 @@ export function SummaryCards({ summary }: SummaryCardsProps) {
     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Mastered</CardTitle>
+          <CardTitle className="text-sm font-medium">Dominadas</CardTitle>
           <Award className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
@@ -33,14 +33,14 @@ export function SummaryCards({ summary }: SummaryCardsProps) {
             {summary.questionsMastered}
           </div>
           <p className="text-xs text-muted-foreground">
-            questions (80%+)
+            preguntas (80%+)
           </p>
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Attempted</CardTitle>
+          <CardTitle className="text-sm font-medium">Intentadas</CardTitle>
           <Target className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
@@ -48,14 +48,14 @@ export function SummaryCards({ summary }: SummaryCardsProps) {
             {summary.questionsAttempted}
           </div>
           <p className="text-xs text-muted-foreground">
-            total questions
+            preguntas totales
           </p>
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Avg Score</CardTitle>
+          <CardTitle className="text-sm font-medium">Promedio</CardTitle>
           <TrendingUp className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
@@ -69,14 +69,14 @@ export function SummaryCards({ summary }: SummaryCardsProps) {
             )}
           </div>
           <p className="text-xs text-muted-foreground">
-            {masteryRate}% mastery rate
+            {masteryRate}% tasa de dominio
           </p>
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Subjects</CardTitle>
+          <CardTitle className="text-sm font-medium">Cursos</CardTitle>
           <BookOpen className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
@@ -84,14 +84,14 @@ export function SummaryCards({ summary }: SummaryCardsProps) {
             {summary.subjectsCount}
           </div>
           <p className="text-xs text-muted-foreground">
-            enrolled
+            inscritos
           </p>
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Streak</CardTitle>
+          <CardTitle className="text-sm font-medium">Racha</CardTitle>
           <Flame className="h-4 w-4 text-orange-500" />
         </CardHeader>
         <CardContent>
@@ -99,14 +99,14 @@ export function SummaryCards({ summary }: SummaryCardsProps) {
             {summary.currentStreak}
           </div>
           <p className="text-xs text-muted-foreground">
-            days (best: {summary.longestStreak})
+            días (mejor: {summary.longestStreak})
           </p>
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Study Days</CardTitle>
+          <CardTitle className="text-sm font-medium">Días de Estudio</CardTitle>
           <Calendar className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
@@ -114,7 +114,7 @@ export function SummaryCards({ summary }: SummaryCardsProps) {
             {summary.totalStudyDays}
           </div>
           <p className="text-xs text-muted-foreground">
-            total active days
+            días activos en total
           </p>
         </CardContent>
       </Card>
