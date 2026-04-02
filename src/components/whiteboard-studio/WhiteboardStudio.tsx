@@ -112,11 +112,12 @@ export function WhiteboardStudio({
     if (!canvas) return null;
 
     try {
-      const paths = await canvas.exportPaths();
-      if (!paths || paths.length === 0) return null;
-
-      const dataUrl = await canvas.exportImage('png');
+      const dataUrl = await canvas.exportImage('jpeg');
       if (!dataUrl) return null;
+
+      // Check if the image is just a blank white canvas by checking data size
+      // A blank canvas export is typically very small
+      if (dataUrl.length < 1000) return null;
 
       return dataUrl;
     } catch (error) {
