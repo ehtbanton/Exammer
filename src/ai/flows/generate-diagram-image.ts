@@ -38,7 +38,7 @@ export async function generateDiagramImage(
     try {
       // Use generateContent API with Gemini 3 Pro Image (nano banana pro)
       const response = await ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
+        model: 'gemini-3-pro-image-preview',
         contents: [{
           role: 'user',
           parts: [{

@@ -5,101 +5,21 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAppContext } from '@/app/context/AppContext';
 import { AuthGuard } from '@/components/AuthGuard';
-import { aiPoweredInterview, generateQuestion } from '@/ai/flows/ai-powered-interview';
+import { aiPoweredInterview } from '@/ai/flows/ai-powered-interview';
 import { generateSimilarQuestion } from '@/ai/flows/generate-similar-question';
 import { executeDevCommand } from '@/ai/flows/dev-commands';
 import { isDevCommand } from '@/lib/dev-commands-helpers';
 import type { ChatHistory } from '@/lib/types';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import LoadingSpinner from '@/components/LoadingSpinner';
-import { Send, User, Bot, ArrowLeft, MessageSquare, PenTool, Terminal, Check, Mic } from 'lucide-react';
-import { Card, CardContent } from '@/components/ui/card';
-import { Progress } from '@/components/ui/progress';
+import { ArrowLeft } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import PageSpinner from '@/components/PageSpinner';
-import { Whiteboard } from '@/components/whiteboard';
-import { VoiceInterviewLive } from '@/components/voice-interview-live';
-import { WhiteboardStudio } from '@/components/whiteboard-studio';
+import { WhiteboardStudio, FinishQuestionDialog } from '@/components/whiteboard-studio';
 import 'tldraw/tldraw.css';
 import { AnimatePresence } from 'framer-motion';
-import { Maximize2 } from 'lucide-react';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useSession } from 'next-auth/react';
-import { LatexRenderer } from '@/components/latex-renderer';
-import { generateDiagramImage } from '@/ai/flows/generate-diagram-image';
-
-// AI Diagram component - generates image from description using Gemini
-function AIDiagram({ description }: { description: string }) {
-  const [imageUrl, setImageUrl] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    const generateImage = async () => {
-      try {
-        setIsLoading(true);
-        setError(null);
-
-        const result = await generateDiagramImage({
-          description: description,
-          aspectRatio: '4:3',
-        });
-
-        setImageUrl(result.imageDataUri);
-      } catch (err: any) {
-        console.error('Diagram generation error:', err);
-        setError(err?.message || 'Failed to generate diagram');
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    generateImage();
-  }, [description]);
-
-  if (isLoading) {
-    return (
-      <div className="flex justify-center items-center p-8 bg-muted/30 rounded-lg border">
-        <div className="flex items-center gap-3">
-          <LoadingSpinner className="w-5 h-5" />
-          <p className="text-sm text-muted-foreground">Generating diagram...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    // Fallback to showing description if image generation fails
-    return (
-      <div className="p-4 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg">
-        <div className="flex items-center gap-2 mb-2">
-          <span className="text-lg">📐</span>
-          <p className="text-sm font-semibold text-blue-800 dark:text-blue-200">Diagram Description</p>
-        </div>
-        <p className="text-sm text-blue-700 dark:text-blue-300 whitespace-pre-wrap">{description}</p>
-      </div>
-    );
-  }
-
-  if (!imageUrl) {
-    return null;
-  }
-
-  return (
-    <div className="flex justify-center items-center p-4 bg-muted/30 rounded-lg border">
-      <img
-        src={imageUrl}
-        alt="Generated diagram"
-        className="max-w-full h-auto rounded"
-      />
-    </div>
-  );
-}
 
 export default function InterviewPage() {
   return (
@@ -126,15 +46,12 @@ function InterviewPageContent() {
   const [topic, setTopic] = useState<import('@/app/context/AppContext').TopicWithMetrics | null>(null);
   const [examQuestion, setExamQuestion] = useState<import('@/app/context/AppContext').FullQuestion | null>(null);
   const [chatHistory, setChatHistory] = useState<ChatHistory>([]);
-  const [userInput, setUserInput] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [generatedVariant, setGeneratedVariant] = useState<{questionText: string; solutionObjectives: string[]; diagramDescription?: string} | null>(null);
-  const [inputMode, setInputMode] = useState<'text' | 'whiteboard' | 'voice'>('text');
   const [accessLevel, setAccessLevel] = useState<number | null>(null);
   const [completedObjectives, setCompletedObjectives] = useState<number[]>([]);
   const [showFinishDialog, setShowFinishDialog] = useState(false);
   const [noMarkscheme, setNoMarkscheme] = useState(false);
-  const hasOriginalMarkscheme = examQuestion?.solution_objectives && examQuestion.solution_objectives.length > 0;
   const [showCacheLimitWarning, setShowCacheLimitWarning] = useState(false);
   const [oldestCachedQuestion, setOldestCachedQuestion] = useState<{id: string; timestamp: number} | null>(null);
   const [pendingQuestionGeneration, setPendingQuestionGeneration] = useState<(() => Promise<void>) | null>(null);
@@ -275,12 +192,6 @@ function InterviewPageContent() {
     loadData();
   }, [questionId, subjectId, paperTypeId, topicId, loadFullQuestion, loadSubjectsList, loadPaperTypes, loadTopics, toast, cacheVersion]);
 
-  // Compute if all objectives are completed
-  const isCompleted = generatedVariant
-    ? completedObjectives.length === generatedVariant.solutionObjectives.length
-    : false;
-
-  const scrollAreaViewport = useRef<HTMLDivElement>(null);
   const hasInitialized = useRef<string | false>(false);
   const isInitializing = useRef(false);
 
@@ -314,12 +225,6 @@ function InterviewPageContent() {
       console.log('Auto-saved progress to cache:', completedObjectives.length, 'objectives completed');
     }
   }, [completedObjectives, chatHistory, generatedVariant, questionId]);
-
-  useEffect(() => {
-    if (scrollAreaViewport.current) {
-      scrollAreaViewport.current.scrollTo({ top: scrollAreaViewport.current.scrollHeight, behavior: 'smooth' });
-    }
-  }, [chatHistory]);
 
   useEffect(() => {
     console.log('=== useEffect triggered ===', { questionId: examQuestion?.id });
@@ -408,6 +313,9 @@ function InterviewPageContent() {
               await saveMessage(convId, msg.role, msg.content, msg.imageUrl);
             }
           }
+
+          // Auto-launch WhiteboardStudio after cache restoration
+          setIsWhiteboardStudio(true);
         } else {
           // Check if cache is full before generating new question
           if (!canAddToCache()) {
@@ -421,6 +329,9 @@ function InterviewPageContent() {
           }
 
           await generateNewQuestion();
+
+          // Auto-launch WhiteboardStudio after question generation
+          setIsWhiteboardStudio(true);
         }
       } catch (e: any) {
         if (e.message?.includes('no solution objectives')) {
@@ -597,19 +508,6 @@ function InterviewPageContent() {
     );
   }
 
-  // Format question text with better spacing for parts
-  const formatQuestionText = (text: string) => {
-    if (!text) return text;
-
-    // Add spacing before lettered parts like "a)" or "(a)" at the start of a line
-    let formatted = text.replace(/(\n|^)\s*\(?([a-z])\)\s*/gim, '\n\n$2) ');
-
-    // Add spacing before roman numeral parts like "i)" or "(i)" at the start of a line
-    formatted = formatted.replace(/(\n|^)\s*\(?(i{1,3}|iv|v|vi{0,3}|ix|x)\)\s*/gim, '\n$2) ');
-
-    return formatted.trim();
-  };
-
   const handleBackClick = () => {
     // Progress is already auto-saved via useEffect
     router.push(`/workspace/subject/${subjectId}/paper/${encodeURIComponent(paperTypeId)}/topic/${encodeURIComponent(topicId)}`);
@@ -693,39 +591,36 @@ function InterviewPageContent() {
     router.push(`/workspace/subject/${subjectId}/paper/${encodeURIComponent(paperTypeId)}/topic/${encodeURIComponent(topicId)}`);
   };
 
-  return (
-    <div className="container mx-auto h-[calc(100vh-6rem)] flex flex-col p-4">
-      {/* Header with Back Button and Topic */}
-      <div className="flex items-center justify-between mb-4 pb-3 border-b shrink-0">
-        <Button variant="ghost" onClick={handleBackClick}>
-          <ArrowLeft className="mr-2 h-4 w-4" />
-          Back to Questions
-        </Button>
-        <div className="text-sm text-muted-foreground">
-          <span className="font-medium">Topic:</span> {topic.name}
+  // Show loading state while question is being generated
+  if (isLoading && !generatedVariant) {
+    return (
+      <div className="fixed inset-0 flex items-center justify-center bg-background">
+        <div className="flex flex-col items-center gap-4">
+          <LoadingSpinner className="w-8 h-8" />
+          <p className="text-sm text-muted-foreground">Generating question...</p>
         </div>
       </div>
+    );
+  }
 
-      {/* Finish Question Dialog */}
-      <AlertDialog open={showFinishDialog} onOpenChange={setShowFinishDialog}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Save Your Progress?</AlertDialogTitle>
-            <AlertDialogDescription>
-              {generatedVariant ? (
-                `You've completed ${completedObjectives.length}/${generatedVariant.solutionObjectives.length} objectives. Would you like to save your progress?`
-              ) : (
-                'Would you like to save your progress on this question?'
-              )}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={handleDiscardProgress}>Discard</AlertDialogCancel>
-            <AlertDialogAction onClick={handleSaveProgress}>Save Progress</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+  // Show no markscheme error
+  if (noMarkscheme) {
+    return (
+      <div className="fixed inset-0 flex items-center justify-center bg-background">
+        <div className="text-center space-y-4">
+          <p className="text-lg font-bold text-destructive">NO MARKSCHEME FOUND</p>
+          <p className="text-sm text-muted-foreground">This question cannot be attempted without marking objectives.</p>
+          <Button variant="outline" onClick={handleBackClick}>
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back to Topic
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
+  return (
+    <>
       {/* Cache Limit Warning Dialog */}
       <AlertDialog open={showCacheLimitWarning} onOpenChange={setShowCacheLimitWarning}>
         <AlertDialogContent>
@@ -956,7 +851,7 @@ function InterviewPageContent() {
         </div>
       </div>
 
-      {/* Whiteboard Studio Overlay */}
+      {/* Whiteboard Studio - Primary Interface */}
       <AnimatePresence>
         {isWhiteboardStudio && generatedVariant && (
           <WhiteboardStudio
@@ -966,11 +861,32 @@ function InterviewPageContent() {
             chatHistory={chatHistory}
             completedObjectives={completedObjectives}
             onSendMessage={handleSendMessage}
-            onExit={() => setIsWhiteboardStudio(false)}
+            onExit={handleBackClick}
             isLoading={isLoading}
+            subjectId={subjectId}
+            paperTypeId={paperTypeId}
+            topicId={topicId}
+            onFinishQuestion={handleFinishQuestion}
+            currentScore={completedObjectives.length}
+            previousScore={examQuestion?.score || 0}
+            examQuestionSummary={examQuestion?.summary || ''}
+            onVoiceMessage={handleVoiceMessage}
+            onVoiceEvaluation={handleVoiceEvaluation}
+            diagramDescription={generatedVariant.diagramDescription}
+            accessLevel={accessLevel}
           />
         )}
       </AnimatePresence>
-    </div>
+
+      {/* Finish Question Dialog */}
+      <FinishQuestionDialog
+        isOpen={showFinishDialog}
+        completedCount={completedObjectives.length}
+        totalCount={generatedVariant?.solutionObjectives.length || 0}
+        onSave={handleSaveProgress}
+        onDiscard={handleDiscardProgress}
+        onClose={() => setShowFinishDialog(false)}
+      />
+    </>
   );
 }

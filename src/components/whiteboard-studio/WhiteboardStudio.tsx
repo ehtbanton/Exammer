@@ -6,6 +6,7 @@ import { Send } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import type { Editor } from 'tldraw';
 import { LeftSidebar } from './LeftSidebar';
+import { QuestionHeader } from './QuestionHeader';
 import { VerticalToolbar, DrawingTool } from './VerticalToolbar';
 import { SnippingTool } from './SnippingTool';
 import { SnippingMenu } from './SnippingMenu';
@@ -46,6 +47,18 @@ interface WhiteboardStudioProps {
   onSendMessage: (content: string, imageData?: string) => Promise<void>;
   onExit: () => void;
   isLoading?: boolean;
+  // New props for full question page features
+  subjectId?: string;
+  paperTypeId?: string;
+  topicId?: string;
+  onFinishQuestion?: () => void;
+  currentScore?: number;
+  previousScore?: number;
+  examQuestionSummary?: string;
+  onVoiceMessage?: (role: 'user' | 'assistant', content: string) => void;
+  onVoiceEvaluation?: (userAnswer: string) => Promise<void>;
+  diagramDescription?: string;
+  accessLevel?: number | null;
 }
 
 export function WhiteboardStudio({
@@ -57,6 +70,17 @@ export function WhiteboardStudio({
   onSendMessage,
   onExit,
   isLoading = false,
+  subjectId,
+  paperTypeId,
+  topicId,
+  onFinishQuestion,
+  currentScore = 0,
+  previousScore = 0,
+  examQuestionSummary = '',
+  onVoiceMessage,
+  onVoiceEvaluation,
+  diagramDescription,
+  accessLevel,
 }: WhiteboardStudioProps) {
   const editorRef = useRef<Editor | null>(null);
   const [canUndo, setCanUndo] = useState(false);
@@ -496,25 +520,44 @@ export function WhiteboardStudio({
             isCollapsed={sidebarCollapsed}
             onToggleCollapse={() => setSidebarCollapsed(prev => !prev)}
             onExit={onExit}
+            onFinishQuestion={onFinishQuestion}
+            currentScore={currentScore}
+            previousScore={previousScore}
+            examQuestionSummary={examQuestionSummary}
+            onVoiceMessage={onVoiceMessage}
+            onVoiceEvaluation={onVoiceEvaluation}
+            diagramDescription={diagramDescription}
+            accessLevel={accessLevel}
+            onSubmitCanvas={handleSubmit}
+            isSubmittingCanvas={isSubmitting}
           />
 
           {/* Canvas Area */}
-          <main className="flex-1 relative bg-[var(--s-canvas)]">
+          <main className="flex-1 flex flex-col bg-[var(--s-canvas)]">
+            {/* Question Header - Always Visible */}
+            <QuestionHeader
+              questionText={questionText}
+              objectives={objectives}
+              completedObjectives={completedObjectives}
+              diagramDescription={diagramDescription}
+            />
+
             {/* tldraw Canvas */}
-            <motion.div
-              className="absolute inset-0"
-              variants={canvasVariants}
-              initial="hidden"
-              animate="visible"
-              exit="exit"
-            >
-              <Tldraw
-                onMount={handleMount}
-                persistenceKey={`whiteboard-${questionId}`}
-                autoFocus
-                hideUi
-              />
-            </motion.div>
+            <div className="flex-1 relative">
+              <motion.div
+                className="absolute inset-0"
+                variants={canvasVariants}
+                initial="hidden"
+                animate="visible"
+                exit="exit"
+              >
+                <Tldraw
+                  onMount={handleMount}
+                  persistenceKey={`whiteboard-${questionId}`}
+                  autoFocus
+                  hideUi
+                />
+              </motion.div>
 
             {/* Grid Overlay */}
             {showGrid && (
@@ -595,6 +638,7 @@ export function WhiteboardStudio({
               onClose={handleSnipMenuClose}
               onAskXam={handleAskXamWithSnip}
             />
+            </div>
           </main>
 
           {/* Right Vertical Toolbar */}

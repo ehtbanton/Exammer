@@ -82,7 +82,7 @@ Generate a summary that captures what the student demonstrated and the key conce
     });
 
     const response = await prompt(flowInput, {
-      model: 'googleai/gemini-3-flash-preview',
+      model: 'googleai/gemini-2.5-flash-lite',
     });
 
     return response.output;
