@@ -28,7 +28,7 @@ import { LatexRenderer } from '@/components/latex-renderer';
 import { VoiceInterviewLive } from '@/components/voice-interview-live';
 import { cn } from '@/lib/utils';
 import 'tldraw/tldraw.css';
-import { AnimatePresence } from 'framer-motion';
+
 import { useSession } from 'next-auth/react';
 
 export default function InterviewPage() {
@@ -659,31 +659,30 @@ function InterviewPageContent() {
       )}
 
       {/* Whiteboard Studio - Primary Interface */}
-      <AnimatePresence>
-        {isWhiteboardStudio && generatedVariant && (
-          <WhiteboardStudio
-            questionId={questionId}
-            questionText={generatedVariant.questionText}
-            objectives={generatedVariant.solutionObjectives}
-            chatHistory={chatHistory}
-            completedObjectives={completedObjectives}
-            onSendMessage={handleSendMessage}
-            onExit={handleBackClick}
-            isLoading={isLoading}
-            subjectId={subjectId}
-            paperTypeId={paperTypeId}
-            topicId={topicId}
-            onFinishQuestion={handleFinishQuestion}
-            currentScore={completedObjectives.length}
-            previousScore={examQuestion?.score || 0}
-            examQuestionSummary={examQuestion?.summary || ''}
-            onVoiceMessage={handleVoiceMessage}
-            onVoiceEvaluation={handleVoiceEvaluation}
-            diagramDescription={generatedVariant.diagramDescription}
-            accessLevel={accessLevel}
-          />
-        )}
-      </AnimatePresence>
+      {isWhiteboardStudio && generatedVariant && (
+        <WhiteboardStudio
+          key={`studio-${questionId}`}
+          questionId={questionId}
+          questionText={generatedVariant.questionText}
+          objectives={generatedVariant.solutionObjectives}
+          chatHistory={chatHistory}
+          completedObjectives={completedObjectives}
+          onSendMessage={handleSendMessage}
+          onExit={handleBackClick}
+          isLoading={isLoading}
+          subjectId={subjectId}
+          paperTypeId={paperTypeId}
+          topicId={topicId}
+          onFinishQuestion={handleFinishQuestion}
+          currentScore={completedObjectives.length}
+          previousScore={examQuestion?.score || 0}
+          examQuestionSummary={examQuestion?.summary || ''}
+          onVoiceMessage={handleVoiceMessage}
+          onVoiceEvaluation={handleVoiceEvaluation}
+          diagramDescription={generatedVariant.diagramDescription}
+          accessLevel={accessLevel}
+        />
+      )}
 
       {/* Finish Question Dialog */}
       <FinishQuestionDialog
