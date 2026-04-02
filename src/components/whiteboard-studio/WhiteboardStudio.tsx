@@ -3,8 +3,7 @@
 import React, { useCallback, useRef, useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Send } from 'lucide-react';
-import dynamic from 'next/dynamic';
-import type { Editor } from 'tldraw';
+import { ReactSketchCanvas, type ReactSketchCanvasRef } from 'react-sketch-canvas';
 import { LeftSidebar } from './LeftSidebar';
 import { QuestionHeader } from './QuestionHeader';
 import { VerticalToolbar, DrawingTool } from './VerticalToolbar';
@@ -18,19 +17,6 @@ import { WidgetMenu, WidgetType } from './WidgetMenu';
 import { overlayVariants, canvasVariants } from './animations';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
-
-// Dynamically import tldraw to avoid SSR issues
-const Tldraw = dynamic(
-  () => import('tldraw').then((mod) => mod.Tldraw),
-  {
-    ssr: false,
-    loading: () => (
-      <div className="flex items-center justify-center h-full">
-        <div className="text-[#8e8e93]">Loading canvas...</div>
-      </div>
-    ),
-  }
-);
 
 interface ChatMessage {
   role: 'user' | 'assistant';
@@ -82,9 +68,10 @@ export function WhiteboardStudio({
   diagramDescription,
   accessLevel,
 }: WhiteboardStudioProps) {
-  const editorRef = useRef<Editor | null>(null);
+  const canvasRef = useRef<ReactSketchCanvasRef | null>(null);
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
+  const [strokeColor, setStrokeColor] = useState('#000000');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSnipping, setIsSnipping] = useState(false);
   const [snipResult, setSnipResult] = useState<{
@@ -106,118 +93,37 @@ export function WhiteboardStudio({
   const PAGE_WIDTH = 794;
   const PAGE_HEIGHT = 1123;
 
-  // Handle editor mount
-  const handleMount = useCallback((editor: Editor) => {
-    editorRef.current = editor;
-
-    // Set initial tool to draw
-    editor.setCurrentTool('draw');
-
-    // Set light color scheme with grid
-    editor.user.updateUserPreferences({ colorScheme: studioTheme });
-
-    // Update undo/redo state
-    const updateState = () => {
-      setCanUndo(editor.getCanUndo());
-      setCanRedo(editor.getCanRedo());
-    };
-
-    editor.store.listen(updateState);
-    updateState();
-  }, [studioTheme]);
-
-  // Helper function to compress image blob if too large
-  const compressImageBlob = useCallback(async (blob: Blob, targetSizeKB: number): Promise<Blob> => {
-    return new Promise((resolve, reject) => {
-      const img = new Image();
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-
-        let { width, height } = img;
-        const maxDim = 1024;
-        if (width > maxDim || height > maxDim) {
-          const ratio = Math.min(maxDim / width, maxDim / height);
-          width = Math.round(width * ratio);
-          height = Math.round(height * ratio);
-        }
-
-        canvas.width = width;
-        canvas.height = height;
-
-        const ctx = canvas.getContext('2d');
-        if (!ctx) {
-          reject(new Error('Could not get canvas context'));
-          return;
-        }
-
-        ctx.fillStyle = '#FFFFFF';
-        ctx.fillRect(0, 0, width, height);
-        ctx.drawImage(img, 0, 0, width, height);
-
-        const tryCompress = (quality: number) => {
-          canvas.toBlob(
-            (compressedBlob) => {
-              if (!compressedBlob) {
-                reject(new Error('Compression failed'));
-                return;
-              }
-              const sizeKB = compressedBlob.size / 1024;
-              if (sizeKB <= targetSizeKB || quality <= 0.4) {
-                resolve(compressedBlob);
-              } else {
-                tryCompress(quality - 0.1);
-              }
-            },
-            'image/jpeg',
-            quality
-          );
-        };
-
-        tryCompress(0.8);
-        URL.revokeObjectURL(img.src);
-      };
-
-      img.onerror = () => reject(new Error('Failed to load image for compression'));
-      img.src = URL.createObjectURL(blob);
-    });
-  }, []);
+  // Color map for tldraw color names to hex
+  const colorMap: Record<string, string> = {
+    black: '#000000',
+    blue: '#3b82f6',
+    red: '#ef4444',
+    green: '#22c55e',
+    orange: '#f97316',
+    violet: '#8b5cf6',
+    yellow: '#eab308',
+    white: '#ffffff',
+    grey: '#6b7280',
+  };
 
   // Export canvas to image
   const exportCanvas = useCallback(async (): Promise<string | null> => {
-    const editor = editorRef.current;
-    if (!editor) return null;
+    const canvas = canvasRef.current;
+    if (!canvas) return null;
 
     try {
-      const shapeIds = editor.getCurrentPageShapeIds();
-      if (shapeIds.size === 0) return null;
+      const paths = await canvas.exportPaths();
+      if (!paths || paths.length === 0) return null;
 
-      const result = await editor.toImage([...shapeIds], {
-        format: 'jpeg',
-        quality: 0.85,
-        scale: 1,
-        background: true,
-        padding: 10,
-      });
+      const dataUrl = await canvas.exportImage('png');
+      if (!dataUrl) return null;
 
-      if (!result?.blob) return null;
-
-      let finalBlob = result.blob;
-      const initialSizeKB = finalBlob.size / 1024;
-
-      if (initialSizeKB > 500) {
-        finalBlob = await compressImageBlob(finalBlob, 500);
-      }
-
-      return new Promise((resolve) => {
-        const reader = new FileReader();
-        reader.onloadend = () => resolve(reader.result as string);
-        reader.readAsDataURL(finalBlob);
-      });
+      return dataUrl;
     } catch (error) {
       console.error('Error exporting canvas:', error);
       return null;
     }
-  }, [compressImageBlob]);
+  }, []);
 
   // Handle submit
   const handleSubmit = useCallback(async () => {
@@ -238,8 +144,7 @@ export function WhiteboardStudio({
         title: "Answer submitted",
         description: "XAM is analyzing your work...",
       });
-      editorRef.current?.selectAll();
-      editorRef.current?.deleteShapes(editorRef.current.getSelectedShapeIds());
+      canvasRef.current?.clearCanvas();
     } catch (error) {
       toast({
         title: "Submission failed",
@@ -253,41 +158,28 @@ export function WhiteboardStudio({
 
   // Handle clear
   const handleClear = useCallback(() => {
-    const editor = editorRef.current;
-    if (editor) {
-      editor.selectAll();
-      editor.deleteShapes(editor.getSelectedShapeIds());
-    }
+    canvasRef.current?.clearCanvas();
   }, []);
 
   // Handle undo/redo
-  const handleUndo = useCallback(() => { editorRef.current?.undo(); }, []);
-  const handleRedo = useCallback(() => { editorRef.current?.redo(); }, []);
+  const handleUndo = useCallback(() => { canvasRef.current?.undo(); }, []);
+  const handleRedo = useCallback(() => { canvasRef.current?.redo(); }, []);
 
   // Handle tool change from vertical toolbar
   const handleToolChange = useCallback((tool: DrawingTool) => {
-    const editor = editorRef.current;
-    if (!editor) return;
-
     setActiveTool(tool);
-    editor.setCurrentTool(tool);
+    if (tool === 'eraser') {
+      canvasRef.current?.eraseMode(true);
+    } else {
+      canvasRef.current?.eraseMode(false);
+    }
   }, []);
 
   // Handle color change from vertical toolbar
   const handleColorChange = useCallback((color: string) => {
-    const editor = editorRef.current;
-    if (!editor) return;
-
     setActiveColor(color);
-    // tldraw uses DefaultColorStyle for setting drawing color
-    try {
-      const { DefaultColorStyle } = require('tldraw');
-      editor.setStyleForNextShapes(DefaultColorStyle, color);
-    } catch {
-      // Fallback if import fails
-      console.warn('Could not set color style');
-    }
-  }, []);
+    setStrokeColor(colorMap[color] || color);
+  }, [colorMap]);
 
   // Handle chat message from sidebar
   const handleChatMessage = useCallback((content: string) => {
@@ -305,64 +197,19 @@ export function WhiteboardStudio({
 
   const handleSnipComplete = useCallback(async (bounds: { x: number; y: number; width: number; height: number }) => {
     setIsSnipping(false);
-    const editor = editorRef.current;
-    if (!editor) return;
 
     try {
-      // Convert screen coordinates to tldraw page coordinates
-      const topLeft = editor.screenToPage({ x: bounds.x, y: bounds.y });
-      const bottomRight = editor.screenToPage({ x: bounds.x + bounds.width, y: bounds.y + bounds.height });
-      const pageBounds = {
-        x: topLeft.x,
-        y: topLeft.y,
-        width: bottomRight.x - topLeft.x,
-        height: bottomRight.y - topLeft.y,
-      };
-
-      const allShapes = editor.getCurrentPageShapes();
-      const selectedShapeIds = allShapes
-        .filter(shape => {
-          const shapeBounds = editor.getShapePageBounds(shape.id);
-          if (!shapeBounds) return false;
-          return (
-            shapeBounds.x < pageBounds.x + pageBounds.width &&
-            shapeBounds.x + shapeBounds.width > pageBounds.x &&
-            shapeBounds.y < pageBounds.y + pageBounds.height &&
-            shapeBounds.y + shapeBounds.height > pageBounds.y
-          );
-        })
-        .map(shape => shape.id);
-
-      if (selectedShapeIds.length === 0) {
-        toast({
-          title: "No content selected",
-          description: "Draw something first, then snip it",
-          variant: "destructive",
-        });
+      // Export full canvas and crop to selection
+      const dataUrl = await canvasRef.current?.exportImage('png');
+      if (!dataUrl) {
+        toast({ title: "No content to capture", variant: "destructive" });
         return;
       }
 
-      const result = await editor.toImage(selectedShapeIds, {
-        format: 'png',
-        quality: 1,
-        scale: 2,
-        background: true,
-        padding: 10,
+      setSnipResult({
+        imageData: dataUrl,
+        position: { x: bounds.x + bounds.width + 20, y: bounds.y },
       });
-
-      if (!result?.blob) {
-        toast({ title: "Failed to capture", variant: "destructive" });
-        return;
-      }
-
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setSnipResult({
-          imageData: reader.result as string,
-          position: { x: bounds.x + bounds.width + 20, y: bounds.y },
-        });
-      };
-      reader.readAsDataURL(result.blob);
     } catch (error) {
       console.error('Snip error:', error);
       toast({ title: "Snip failed", variant: "destructive" });
@@ -458,23 +305,8 @@ export function WhiteboardStudio({
 
   // Theme toggle handler
   const handleToggleTheme = useCallback(() => {
-    setStudioTheme(prev => {
-      const next = prev === 'light' ? 'dark' : 'light';
-      // Sync tldraw color scheme
-      const editor = editorRef.current;
-      if (editor) {
-        editor.user.updateUserPreferences({ colorScheme: next });
-      }
-      return next;
-    });
+    setStudioTheme(prev => prev === 'light' ? 'dark' : 'light');
   }, []);
-
-  // Sync tldraw color scheme on theme change
-  useEffect(() => {
-    if (editorRef.current) {
-      editorRef.current.user.updateUserPreferences({ colorScheme: studioTheme });
-    }
-  }, [studioTheme]);
 
   // Prevent body scroll
   useEffect(() => {
@@ -542,11 +374,16 @@ export function WhiteboardStudio({
                 animate="visible"
                 exit="exit"
               >
-                <Tldraw
-                  onMount={handleMount}
-                  persistenceKey={`whiteboard-${questionId}`}
-                  autoFocus
-                  hideUi
+                <ReactSketchCanvas
+                  ref={canvasRef}
+                  strokeWidth={3}
+                  strokeColor={strokeColor}
+                  canvasColor={studioTheme === 'dark' ? '#2c2c2e' : '#ffffff'}
+                  eraserWidth={20}
+                  style={{ border: 'none' }}
+                  onChange={() => {
+                    setCanUndo(true);
+                  }}
                 />
               </motion.div>
 

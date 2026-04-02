@@ -27,7 +27,7 @@ import { AIDiagram } from '@/components/whiteboard-studio/AIDiagram';
 import { LatexRenderer } from '@/components/latex-renderer';
 import { VoiceInterviewLive } from '@/components/voice-interview-live';
 import { cn } from '@/lib/utils';
-import 'tldraw/tldraw.css';
+
 
 import { useSession } from 'next-auth/react';
 
