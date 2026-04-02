@@ -92,21 +92,14 @@ export function WhiteboardStudio({
     position: { x: number; y: number };
   } | null>(null);
   const [activeWidgets, setActiveWidgets] = useState<WidgetType[]>([]);
-  const [showGrid, setShowGrid] = useState(false);
+  const [showGrid, setShowGrid] = useState(true);
   const [showPages, setShowPages] = useState(false);
   const [youtubeInitialUrl, setYoutubeInitialUrl] = useState<string | undefined>();
   const [resourceUrl, setResourceUrl] = useState<string | null>(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [activeTool, setActiveTool] = useState<DrawingTool>('draw');
   const [activeColor, setActiveColor] = useState('black');
-  const [studioTheme, setStudioTheme] = useState<'light' | 'dark'>(() => {
-    if (typeof window !== 'undefined') {
-      // Match Exammer's theme: localStorage 'theme' key, defaults to dark
-      const savedTheme = localStorage.getItem('theme');
-      return savedTheme === 'light' ? 'light' : 'dark';
-    }
-    return 'dark';
-  });
+  const [studioTheme, setStudioTheme] = useState<'light' | 'dark'>('light');
   const { toast } = useToast();
 
   // Page dimensions (A4 at 96 DPI)
@@ -120,10 +113,8 @@ export function WhiteboardStudio({
     // Set initial tool to draw
     editor.setCurrentTool('draw');
 
-    // Sync dark mode with studio theme on mount
-    if (studioTheme === 'dark') {
-      editor.user.updateUserPreferences({ colorScheme: 'dark' });
-    }
+    // Set light color scheme with grid
+    editor.user.updateUserPreferences({ colorScheme: studioTheme });
 
     // Update undo/redo state
     const updateState = () => {
