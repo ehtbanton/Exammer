@@ -43,15 +43,12 @@ function SignInContent() {
       });
 
       if (result?.error) {
-        // If email not found, redirect to signup with email pre-filled
         if (result.error === 'EMAIL_NOT_FOUND') {
-          router.push(`/auth/signup?email=${encodeURIComponent(email)}`);
+          setError('No se encontró una cuenta con este correo. Contacta a tu administrador.');
           return;
         }
-        // If email not verified, show helpful message
         if (result.error === 'EMAIL_NOT_VERIFIED') {
-          setError('Tu correo no está verificado. Revisa tu bandeja de entrada o solicita un nuevo correo de verificación.');
-          setShowResendLink(true);
+          setError('Tu cuenta aún no está activada. Contacta a tu administrador.');
           return;
         }
         setError(result.error);

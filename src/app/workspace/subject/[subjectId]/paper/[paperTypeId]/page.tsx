@@ -86,9 +86,9 @@ function PaperTypePageContent() {
   if (!subject || !paperType) {
     return (
       <div className="text-center">
-        <h1 className="text-2xl font-bold">Paper Type not found</h1>
+        <h1 className="text-2xl font-bold">Módulo no encontrado</h1>
         <Button asChild variant="link" className="mt-4">
-          <Link href={`/workspace/subject/${subjectId}`}>Go back to subject</Link>
+          <Link href={`/workspace/subject/${subjectId}`}>Volver al curso</Link>
         </Button>
       </div>
     );
@@ -103,21 +103,21 @@ function PaperTypePageContent() {
     <div className="container mx-auto">
       <Button variant="ghost" onClick={() => router.push(`/workspace/subject/${subjectId}`)} className="mb-4">
         <ArrowLeft />
-        Back to Paper Types
+        Volver a Módulos
       </Button>
       <h1 className="text-3xl font-bold font-headline mb-2">{paperType.name}</h1>
-      <p className="text-muted-foreground mb-8">Topics for {subject.name}</p>
+      <p className="text-muted-foreground mb-8">Temas de {subject.name}</p>
 
       <div>
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-2xl font-bold font-headline flex items-center gap-2"><BookCopy /> Topics</h2>
+          <h2 className="text-2xl font-bold font-headline flex items-center gap-2"><BookCopy /> Temas</h2>
           <div className="flex items-center gap-2">
             <Switch
               id="hide-empty-topics"
               checked={hideEmptyTopics}
               onCheckedChange={setHideEmptyTopics}
             />
-            <Label htmlFor="hide-empty-topics" className="text-sm">Hide topics without questions</Label>
+            <Label htmlFor="hide-empty-topics" className="text-sm">Ocultar temas sin preguntas</Label>
           </div>
         </div>
         {filteredTopics.length > 0 ? (
@@ -157,7 +157,7 @@ function PaperTypePageContent() {
                     </CardHeader>
                     <CardContent className="space-y-2">
                       <p className="text-sm text-black">
-                        {hasQuestions ? `${topic.attempted_questions}/${topic.total_questions} attempted` : 'No questions yet'}
+                        {hasQuestions ? `${topic.attempted_questions}/${topic.total_questions} intentadas` : 'Sin preguntas aún'}
                       </p>
                       {hasQuestions && (
                         <Progress value={progressPercentage} className="h-2" />
@@ -171,8 +171,8 @@ function PaperTypePageContent() {
         ) : (
           <Card className="text-center py-12">
             <CardContent>
-              <h3 className="text-lg font-semibold">No topics found for this paper</h3>
-              <p className="text-muted-foreground mt-1">The AI might not have identified any topics for this paper type in the syllabus.</p>
+              <h3 className="text-lg font-semibold">No se encontraron temas para este módulo</h3>
+              <p className="text-muted-foreground mt-1">La IA no identificó temas para este módulo en el documento.</p>
             </CardContent>
           </Card>
         )}

@@ -11,6 +11,7 @@ import { executeDevCommand } from '@/ai/flows/dev-commands';
 import { isDevCommand } from '@/lib/dev-commands-helpers';
 import type { ChatHistory } from '@/lib/types';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import { ArrowLeft } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
