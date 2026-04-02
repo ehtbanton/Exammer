@@ -67,6 +67,7 @@ function InterviewPageContent() {
   const [pendingQuestionGeneration, setPendingQuestionGeneration] = useState<(() => Promise<void>) | null>(null);
   const [conversationId, setConversationId] = useState<number | null>(null);
   const [isWhiteboardStudio, setIsWhiteboardStudio] = useState(false);
+  const [userInput, setUserInput] = useState('');
 
   // Cache management functions
   const CACHE_KEY = 'question-progress-cache';
