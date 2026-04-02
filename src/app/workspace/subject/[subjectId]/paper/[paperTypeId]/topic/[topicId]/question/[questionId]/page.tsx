@@ -12,12 +12,21 @@ import { isDevCommand } from '@/lib/dev-commands-helpers';
 import type { ChatHistory } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Progress } from '@/components/ui/progress';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import LoadingSpinner from '@/components/LoadingSpinner';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Bot, Check, Maximize2, MessageSquare, Mic, PenTool, Send, Terminal, User } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
 import PageSpinner from '@/components/PageSpinner';
 import { WhiteboardStudio, FinishQuestionDialog } from '@/components/whiteboard-studio';
+import { AIDiagram } from '@/components/whiteboard-studio/AIDiagram';
+import { LatexRenderer } from '@/components/latex-renderer';
+import { VoiceInterviewLive } from '@/components/voice-interview-live';
+import { cn } from '@/lib/utils';
 import 'tldraw/tldraw.css';
 import { AnimatePresence } from 'framer-motion';
 import { useSession } from 'next-auth/react';
@@ -638,219 +647,15 @@ function InterviewPageContent() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Main Content - Question Left, Chat Right */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 flex-1 min-h-0 overflow-hidden">
-        {/* Left Side - Question Display */}
-        <div className="flex flex-col h-full overflow-hidden">
-          <Card className="bg-primary/5 border-primary/20 flex-1 flex flex-col h-full overflow-hidden">
-            <CardContent className="flex-1 flex flex-col p-0 h-full overflow-hidden">
-              {noMarkscheme ? (
-                <div className="flex items-center justify-center flex-1 p-6">
-                  <div className="text-center space-y-2">
-                    <p className="text-lg font-bold text-destructive">SIN GUÍA DE RESPUESTAS</p>
-                    <p className="text-sm text-muted-foreground">Esta pregunta no se puede intentar sin objetivos de calificación.</p>
-                  </div>
-                </div>
-              ) : (
-                <>
-                  <div className="p-4 pb-3 border-b">
-                    {generatedVariant && (
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-semibold text-muted-foreground shrink-0">{completedObjectives.length}/{generatedVariant.solutionObjectives.length} Objectives</span>
-                        <Progress value={(completedObjectives.length / generatedVariant.solutionObjectives.length) * 100} className="h-2 flex-1" />
-                        <Button
-                          onClick={handleFinishQuestion}
-                          size="sm"
-                          disabled={chatHistory.length <= 1}
-                          className={cn(
-                            "shrink-0 font-bold text-white",
-                            (() => {
-                              const currentScore = examQuestion?.score || 0; // 0-100 from database
-                              const newScore = (completedObjectives.length / generatedVariant.solutionObjectives.length) * 100; // Convert to 0-100
-                              if (newScore > currentScore) return "bg-green-600 hover:bg-green-700";
-                              if (newScore < currentScore) return "bg-red-600 hover:bg-red-700";
-                              return "bg-amber-600 hover:bg-amber-700";
-                            })()
-                          )}
-                        >
-                          Finish Question
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-                  {generatedVariant ? (
-                    <>
-                      <ScrollArea className="flex-1 p-6 overflow-auto">
-                        <div className="prose prose-base max-w-none dark:prose-invert">
-                          <LatexRenderer className="text-base leading-relaxed whitespace-pre-wrap break-words font-normal">
-                            {formatQuestionText(generatedVariant.questionText)}
-                          </LatexRenderer>
-                          {/* AI-generated diagram display */}
-                          {generatedVariant.diagramDescription && (
-                            <div className="mt-6">
-                              <AIDiagram description={generatedVariant.diagramDescription} />
-                            </div>
-                          )}
-                        </div>
-                        {accessLevel !== null && accessLevel >= 2 && (
-                          <div className="mt-6 p-4 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg">
-                            <div className="flex items-center gap-2 mb-2">
-                              <h3 className="text-sm font-semibold text-blue-800 dark:text-blue-200">📋 All Solution Objectives:</h3>
-                              {!hasOriginalMarkscheme && (
-                                <span className="inline-flex items-center text-xs px-2 py-1 bg-amber-100 dark:bg-amber-900 text-amber-800 dark:text-amber-200 rounded">
-                                  No Guide
-                                </span>
-                              )}
-                            </div>
-                            <ul className="space-y-1">
-                              {generatedVariant.solutionObjectives.map((objective, idx) => {
-                                const isCompleted = completedObjectives.includes(idx);
-                                return (
-                                  <li key={idx} className="text-sm text-blue-700 dark:text-blue-300 flex items-start gap-2">
-                                    <span className="font-mono text-xs mt-0.5">[{idx}]</span>
-                                    <span className={isCompleted ? 'flex-1' : ''}>{objective}</span>
-                                    {isCompleted && (
-                                      <Check className="h-4 w-4 text-green-600 dark:text-green-400 shrink-0 mt-0.5" />
-                                    )}
-                                  </li>
-                                );
-                              })}
-                            </ul>
-                          </div>
-                        )}
-                      </ScrollArea>
-                    </>
-                  ) : (
-                    <div className="flex items-center justify-center gap-3 flex-1 overflow-hidden">
-                      <LoadingSpinner className="w-5 h-5" />
-                      <p className="text-sm text-muted-foreground">Generating similar question...</p>
-                    </div>
-                  )}
-                </>
-              )}
-            </CardContent>
-          </Card>
+      {/* No Markscheme State */}
+      {noMarkscheme && (
+        <div className="flex items-center justify-center flex-1 p-6">
+          <div className="text-center space-y-2">
+            <p className="text-lg font-bold text-destructive">SIN GUÍA DE RESPUESTAS</p>
+            <p className="text-sm text-muted-foreground">Esta pregunta no se puede intentar sin objetivos de calificación.</p>
+          </div>
         </div>
-
-        {/* Right Side - Chat Interface */}
-        <div className="flex flex-col h-full overflow-hidden">
-          <Card className="flex-1 flex flex-col h-full overflow-hidden">
-            <CardContent className="flex-1 flex flex-col p-0 h-full overflow-hidden">
-              <ScrollArea className="flex-1 p-4 overflow-auto" viewportRef={scrollAreaViewport}>
-                <div className="space-y-6">
-                  {chatHistory.map((message, index) => (
-                    <div key={index} className={cn("flex items-start gap-3", message.role === 'user' ? "justify-end" : "")}>
-                      {message.role === 'assistant' && (
-                        <Avatar className="w-8 h-8 shrink-0">
-                          <AvatarFallback><Bot size={20} /></AvatarFallback>
-                        </Avatar>
-                      )}
-                      <div className={cn("rounded-lg px-4 py-3 max-w-lg whitespace-pre-wrap break-words",
-                        message.role === 'assistant' ? "bg-secondary text-secondary-foreground" : "bg-primary text-primary-foreground"
-                      )}>
-                        {message.imageUrl && (
-                          <img
-                            src={message.imageUrl}
-                            alt="Whiteboard drawing"
-                            className="max-w-full h-auto rounded mb-2"
-                          />
-                        )}
-                        <p className="text-sm">{message.content}</p>
-                      </div>
-                      {message.role === 'user' && (
-                        <Avatar className="w-8 h-8 shrink-0">
-                          <AvatarFallback><User size={20} /></AvatarFallback>
-                        </Avatar>
-                      )}
-                    </div>
-                  ))}
-                  {isLoading && chatHistory.length > 0 && (
-                     <div className="flex items-start gap-3">
-                        <Avatar className="w-8 h-8 shrink-0">
-                          <AvatarFallback><Bot size={20} /></AvatarFallback>
-                        </Avatar>
-                        <div className="rounded-lg px-4 py-3 bg-secondary text-secondary-foreground">
-                           <LoadingSpinner className="w-5 h-5" />
-                        </div>
-                     </div>
-                  )}
-                   {isLoading && chatHistory.length === 0 && (
-                      <div className="flex items-center justify-center h-full">
-                        <LoadingSpinner className="w-8 h-8" />
-                      </div>
-                  )}
-                </div>
-              </ScrollArea>
-              <div className="p-4 border-t shrink-0">
-                <Tabs value={inputMode} onValueChange={(v) => setInputMode(v as 'text' | 'whiteboard' | 'voice')}>
-                  <TabsList className="grid w-full grid-cols-3 mb-3">
-                    <TabsTrigger value="text" disabled={isLoading || isCompleted}>
-                      <MessageSquare className="h-4 w-4 mr-2" />
-                      Text
-                    </TabsTrigger>
-                    <TabsTrigger value="whiteboard" disabled={isLoading || isCompleted}>
-                      <PenTool className="h-4 w-4 mr-2" />
-                      Whiteboard
-                    </TabsTrigger>
-                    <TabsTrigger value="voice" disabled={isLoading || isCompleted}>
-                      <Mic className="h-4 w-4 mr-2" />
-                      Talk
-                    </TabsTrigger>
-                  </TabsList>
-                  <TabsContent value="text" className="mt-0">
-                    <div className="space-y-2">
-                      {accessLevel !== null && accessLevel >= 2 && (
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted/50 px-2 py-1 rounded">
-                          <Terminal className="h-3 w-3" />
-                          <span>Cheat commands enabled: <code className="bg-background px-1 rounded">fullans</code>, <code className="bg-background px-1 rounded">objans</code></span>
-                        </div>
-                      )}
-                      <div className="flex items-center gap-2">
-                        <Input
-                          placeholder={accessLevel !== null && accessLevel >= 2 ? "Type your answer or cheat command..." : "Type your answer..."}
-                          value={userInput}
-                          onChange={(e) => setUserInput(e.target.value)}
-                          onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
-                          onPaste={(e) => e.preventDefault()}
-                          disabled={isLoading || isCompleted}
-                          className={accessLevel !== null && accessLevel >= 2 && isDevCommand(userInput) ? "text-blue-600 font-bold dark:text-blue-400" : ""}
-                        />
-                        <Button onClick={() => handleSendMessage()} disabled={isLoading || isCompleted || !userInput.trim()}>
-                          {isLoading ? <LoadingSpinner /> : <Send />}
-                        </Button>
-                      </div>
-                    </div>
-                  </TabsContent>
-                  <TabsContent value="whiteboard" className="mt-0">
-                    <div className="space-y-3">
-                      <Button
-                        onClick={() => setIsWhiteboardStudio(true)}
-                        disabled={isLoading || isCompleted}
-                        className="w-full bg-gray-900 hover:bg-gray-800 text-white"
-                      >
-                        <Maximize2 className="h-4 w-4 mr-2" />
-                        Open Whiteboard Studio
-                      </Button>
-                      <p className="text-xs text-muted-foreground text-center">
-                        Full-screen canvas with drawing tools
-                      </p>
-                    </div>
-                  </TabsContent>
-                  <TabsContent value="voice" className="mt-0">
-                    <VoiceInterviewLive
-                      question={generatedVariant?.questionText || ''}
-                      solutionObjectives={generatedVariant?.solutionObjectives || []}
-                      subsection={examQuestion?.summary || ''}
-                      onAddMessage={handleVoiceMessage}
-                      onEvaluateAnswer={handleVoiceEvaluation}
-                    />
-                  </TabsContent>
-                </Tabs>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
+      )}
 
       {/* Whiteboard Studio - Primary Interface */}
       <AnimatePresence>
