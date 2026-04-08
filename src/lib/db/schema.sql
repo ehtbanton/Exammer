@@ -91,6 +91,7 @@ CREATE TABLE IF NOT EXISTS subjects (
   name TEXT NOT NULL,
   syllabus_content TEXT,
   class_id INTEGER DEFAULT NULL,
+  field_classification TEXT,
   created_at INTEGER DEFAULT (unixepoch()),
   updated_at INTEGER DEFAULT (unixepoch()),
   FOREIGN KEY (class_id) REFERENCES classes(id) ON DELETE SET NULL
@@ -252,6 +253,42 @@ CREATE INDEX IF NOT EXISTS idx_feedback_category ON feedback(category);
 CREATE INDEX IF NOT EXISTS idx_feedback_created_at ON feedback(created_at);
 CREATE INDEX IF NOT EXISTS idx_feedback_notes_feedback_id ON feedback_notes(feedback_id);
 CREATE INDEX IF NOT EXISTS idx_feedback_status_history_feedback_id ON feedback_status_history(feedback_id);
+
+-- Enrichment suggestions table (V12: curriculum enrichment system)
+CREATE TABLE IF NOT EXISTS enrichment_suggestions (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  subject_id INTEGER NOT NULL,
+  type TEXT NOT NULL CHECK(type IN ('gap', 'breakthrough')),
+  source_subject_id INTEGER,
+  source_topic_name TEXT,
+  source_topic_description TEXT,
+  breakthrough_title TEXT,
+  breakthrough_summary TEXT,
+  breakthrough_source TEXT,
+  breakthrough_relevance TEXT,
+  field TEXT NOT NULL,
+  confidence_score INTEGER DEFAULT 50,
+  created_at INTEGER DEFAULT (unixepoch()),
+  expires_at INTEGER,
+  FOREIGN KEY (subject_id) REFERENCES subjects(id) ON DELETE CASCADE,
+  FOREIGN KEY (source_subject_id) REFERENCES subjects(id) ON DELETE SET NULL
+);
+
+-- Enrichment dismissals table (V12: per-user dismissals)
+CREATE TABLE IF NOT EXISTS enrichment_dismissals (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL,
+  suggestion_id INTEGER NOT NULL,
+  dismissed_at INTEGER DEFAULT (unixepoch()),
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  FOREIGN KEY (suggestion_id) REFERENCES enrichment_suggestions(id) ON DELETE CASCADE,
+  UNIQUE(user_id, suggestion_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_enrichment_suggestions_subject_id ON enrichment_suggestions(subject_id);
+CREATE INDEX IF NOT EXISTS idx_enrichment_suggestions_type ON enrichment_suggestions(type);
+CREATE INDEX IF NOT EXISTS idx_enrichment_suggestions_field ON enrichment_suggestions(field);
+CREATE INDEX IF NOT EXISTS idx_enrichment_dismissals_user_id ON enrichment_dismissals(user_id);
 
 -- Database version tracking table
 CREATE TABLE IF NOT EXISTS db_version (
